@@ -5,25 +5,23 @@ Date: 2026-10-27
 
 ## 1. Core operating rule
 
-A Kanban card represents a **specific material at a specific productive workplace/point of use**.
+A Kanban card represents a **specific material within one physical replenishment loop / point-of-use supply circuit**.
 
-A material may have:
-- one or more physical containers at that workplace;
-- **one Kanban card** for that material/workplace combination.
+That replenishment loop may supply:
+- one product;
+- several products in the same area;
+- one productive area;
+- or, where the physical supply arrangement is shared, more than one productive area.
 
-If the same material is consumed in another productive workplace, that workplace has its own containers and its own Kanban card.
+A material may have one or more physical containers associated with the same replenishment loop, but only one Kanban card for that loop.
 
-Therefore the operational identity is:
-
-```text
-Material + Productive Workplace + Kanban Card
-```
-
-not simply:
+Therefore the operational identity is better represented as:
 
 ```text
-Material
+Material + Replenishment Loop + Kanban Card
 ```
+
+The products and productive areas are **consumers linked to that replenishment loop**, not part of the card identity itself.
 
 ## 2. Cardinality
 
@@ -251,13 +249,26 @@ Calculated by MOP from:
 
 MOP may predict that a trigger will occur, but it must not silently mark the physical card as triggered without operator confirmation in the initial maturity level.
 
-## 11. Shared materials
+## 11. Shared materials and aggregated demand
 
-A material shared across products does not require one card per product if consumption occurs from the same workplace/material replenishment loop.
+A material shared across products does not require one card per product when those products are supplied by the same physical replenishment loop.
 
-The card identity follows the **physical point of use**, not the product.
+Likewise, if one physical replenishment loop supplies more than one productive area, the same card can represent the aggregated requirement of those areas.
 
-Products consume through ABM/BOM relationships; Kanban replenishment is linked to the material/workplace supply loop.
+The card identity follows the **physical replenishment circuit**, not an individual product.
+
+Products and areas consume through explicit relationships to the material/replenishment loop. The reorder point and replenishment policy must therefore consider the combined expected consumption of all linked consumers.
+
+Conceptually:
+
+```text
+Product A ----\
+Product B -----+--> Material X --> Replenishment Loop KX --> Kanban Card KX
+Area 1 -------/
+Area 2 ------/
+```
+
+The same material may still have another independent replenishment loop elsewhere in the plant, with its own card, containers, reorder point and replenishment quantity.
 
 ## 12. Design principle
 
