@@ -12,4 +12,4 @@
 | DEC-008 | Initial deployment topology on FAIC network | OPEN | TBD | - | Requires infrastructure inventory |
 | DEC-009 | Authentication source / identity integration | OPEN | TBD | - | Requires IT context |
 
-| DEC-010 | Authoritative source/ledger for physical operational stock | OPEN | TBD | - | Critical for Materials, PP/PR and APS material constraints |
+| DEC-010 | Initial operational inventory truth is the physical point-of-use Kanban container/card state; MOP will digitize Kanban state before attempting exact perpetual stock | ACCEPTED | ADR-0007 | 2026-10-27 | Exact stock ledger is a later maturity step, not a prerequisite for first deployment |
