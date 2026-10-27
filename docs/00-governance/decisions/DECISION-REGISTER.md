@@ -15,3 +15,5 @@
 | DEC-010 | Initial operational inventory truth is the physical point-of-use Kanban container/card state; MOP will digitize Kanban state before attempting exact perpetual stock | ACCEPTED | ADR-0007 | 2026-10-27 | Exact stock ledger is a later maturity step, not a prerequisite for first deployment |
 
 | DEC-011 | Legacy PP/PR workbook values are historical reference only and require recalculation from current demand/lead-time inputs | ACCEPTED | ADR-0008 | 2026-10-27 | Preserve method knowledge, not stale numeric outputs |
+
+| DEC-012 | Existing Kanban PP/PR values and historical supplier-performance/lead-time data are non-verifiable and cannot be used as calibrated inputs | ACCEPTED | ADR-0009 | 2026-10-27 | New baseline must be measured prospectively |
