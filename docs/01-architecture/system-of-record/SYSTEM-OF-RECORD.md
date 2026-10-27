@@ -7,7 +7,7 @@ Status: Requires G0 confirmation with FAIC.
 | Production plan | Operations Platform | Master | provisional |
 | Taquilla / production-order detail | PCP / Operations Platform | Master after controlled import | provisional |
 | Product manufacturing definition | Engineering / controlled ABM sources | Reconciled master | provisional |
-| Operational stock | OPEN — Prolowin capability exists but is not used operationally at FAIC | Source to be defined; platform may need its own operational stock ledger | OPEN |
+| Operational material availability / replenishment trigger | Physical point-of-use Kanban container/card state | MOP digitizes state and calculates projected risk; exact perpetual quantity deferred | confirmed initial source |
 | Accounting / financial documents | Tango | External master; outside current project scope | confirmed boundary |
 | Suppliers | Prolowin | Mirror/reconcile | confirmed |
 | Purchase orders / purchasing follow-up | Prolowin | Operational purchasing reference and supplier-delay follow-up | confirmed |
