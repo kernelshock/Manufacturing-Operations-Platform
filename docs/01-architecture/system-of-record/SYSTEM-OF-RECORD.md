@@ -7,11 +7,11 @@ Status: Requires G0 confirmation with FAIC.
 | Production plan | Operations Platform | Master | provisional |
 | Taquilla / production-order detail | PCP / Operations Platform | Master after controlled import | provisional |
 | Product manufacturing definition | Engineering / controlled ABM sources | Reconciled master | provisional |
-| Operational stock | Prolowin | External authoritative source; platform mirrors/reconciles for operations | confirmed |
-| Accounting stock | Prolowin | External master | confirmed |
+| Operational stock | OPEN — Prolowin capability exists but is not used operationally at FAIC | Source to be defined; platform may need its own operational stock ledger | OPEN |
+| Accounting / financial documents | Tango | External master; outside current project scope | confirmed boundary |
 | Suppliers | Prolowin | Mirror/reconcile | confirmed |
-| Purchase orders | Prolowin | Mirror/reconcile initially; write-back to be decided | confirmed source / integration open |
-| Receipts | Prolowin | Mirror/reconcile initially; write-back to be decided | confirmed source / integration open |
+| Purchase orders / purchasing follow-up | Prolowin | Operational purchasing reference and supplier-delay follow-up | confirmed |
+| Remittances / invoices / payments | Tango | External accounting/commercial record; excluded from current scope | confirmed boundary |
 | Production execution | MES | Master | proposed |
 | Maintenance execution | Maintenance module | Master | proposed |
 | Workforce operational availability | Workforce | Operational master | proposed |
