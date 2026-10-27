@@ -17,3 +17,5 @@
 | DEC-011 | Legacy PP/PR workbook values are historical reference only and require recalculation from current demand/lead-time inputs | ACCEPTED | ADR-0008 | 2026-10-27 | Preserve method knowledge, not stale numeric outputs |
 
 | DEC-012 | Existing Kanban PP/PR values and historical supplier-performance/lead-time data are non-verifiable and cannot be used as calibrated inputs | ACCEPTED | ADR-0009 | 2026-10-27 | New baseline must be measured prospectively |
+
+| DEC-013 | Weekly production plans and issued taquillas are the trusted near-term demand source for Materials/APS recalibration | ACCEPTED | ADR-0010 | 2026-10-27 | Use as primary demand signal for projected material exposure |
