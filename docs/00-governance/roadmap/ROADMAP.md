@@ -65,3 +65,23 @@ Every operational module should progress through:
 and deployment through:
 
 `DEVELOPMENT → SIMULATION → SHADOW MODE → PARALLEL → VALIDATION → PRODUCTION`.
+
+
+## G0 progress snapshot — 2026-10-27
+Confirmed:
+- repository governance baseline;
+- modular-monolith / API-first / event-oriented architecture direction;
+- FAIC v1.x frozen as functional reference;
+- Prolowin role: purchasing reference, purchase orders, supplier/material reference and supplier-delay follow-up;
+- Prolowin practical integration: controlled CSV/XLSX exports, daily or weekly;
+- Tango role: formal remittances, invoices, payments and accounting chain, outside current scope;
+- local G0 structural tests: 2 passed.
+
+Open:
+- authoritative operational stock source/ledger;
+- application technology stack;
+- FAIC deployment topology;
+- authentication/identity source;
+- backup/restore requirements;
+- multi-plant/multi-tenant isolation strategy;
+- Prolowin API availability (non-blocking research item).
