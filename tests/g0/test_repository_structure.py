@@ -20,6 +20,7 @@ REQUIRED = [
     "docs/01-architecture/system-of-record/SYSTEM-OF-RECORD.md",
     "docs/02-requirements/current-state-faic/FAIC-BASELINE.md",
     "docs/02-requirements/current-state-faic/MATERIAL-REPLENISHMENT-FLOW.md",
+    "docs/02-requirements/materials/E-KANBAN-FUNCTIONAL-MODEL.md",
     "docs/03-deliverables/G0-architecture-foundation/README.md",
     "integrations/prolowin/INTEGRATION-BASELINE.md",
 ]
