@@ -22,7 +22,7 @@ Operational deployment progresses:
 Development → Simulation → Shadow Mode → Parallel → Validation → Production.
 
 ## G0 unresolved decisions
-1. Prolowin technical access mechanism and synchronization cadence (System of Record is now confirmed).
+1. Authoritative operational stock source/ledger (Prolowin is not currently used for stock control).
 2. Backend/frontend technology stack.
 3. FAIC server/network deployment topology.
 4. Authentication/identity source.
@@ -31,3 +31,9 @@ Development → Simulation → Shadow Mode → Parallel → Validation → Produ
 
 ## G0 release condition
 G0 remains IN PROGRESS until these decisions are resolved or formally deferred and the architecture package is reviewed.
+
+
+## Confirmed external-system boundary
+- **Prolowin:** purchasing reference, purchase orders, supplier/material reference and supplier-delay follow-up; batch exports can be daily or weekly.
+- **Tango:** remittances, invoices, payments and accounting chain; explicitly outside the current project phase.
+- **Operational stock:** source still unresolved and therefore a G0 decision item.
