@@ -77,3 +77,12 @@ Confirmed during G0:
 - there is only one card for that material/workplace combination;
 - if the same material is consumed at another workplace, that workplace has its own card and containers;
 - after a compliant replenishment, the same card returns to the container and is reused for the next replenishment cycle.
+
+
+## Refined replenishment-loop rule
+Further G0 clarification:
+- the Kanban card is not tied to a single product;
+- one physical replenishment loop may supply multiple products;
+- where the same physical supply circuit serves multiple productive areas, their demand is aggregated into the same Kanban policy;
+- the reorder point must reflect total expected consumption from all consumers linked to that replenishment loop;
+- the same material may have separate replenishment loops elsewhere, each with independent card, containers, PP and replenishment quantity.
