@@ -13,11 +13,13 @@ REQUIRED = [
     "docs/01-architecture/ADR/ADR-0002-api-first-event-oriented.md",
     "docs/01-architecture/ADR/ADR-0005-prolowin-system-of-record.md",
     "docs/01-architecture/ADR/ADR-0006-prolowin-file-integration.md",
+    "docs/01-architecture/ADR/ADR-0007-physical-kanban-operational-inventory.md",
     "docs/01-architecture/domain-model/CANONICAL-DOMAIN-MODEL.md",
     "docs/01-architecture/event-catalog/EVENT-CATALOG.md",
     "docs/01-architecture/modules/MODULE-MAP.md",
     "docs/01-architecture/system-of-record/SYSTEM-OF-RECORD.md",
     "docs/02-requirements/current-state-faic/FAIC-BASELINE.md",
+    "docs/02-requirements/current-state-faic/MATERIAL-REPLENISHMENT-FLOW.md",
     "docs/03-deliverables/G0-architecture-foundation/README.md",
     "integrations/prolowin/INTEGRATION-BASELINE.md",
 ]
