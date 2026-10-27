@@ -1,0 +1,2 @@
+date,gate,module,task,category,actual_hours,result,evidence,rework,rework_reason,status
+2026-10-27,G0,Governance,Repository bootstrap,ARCHITECTURE,,Initial repository structure and governance baseline,PR/commit pending,NO,,IN_PROGRESS
