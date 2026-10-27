@@ -1,0 +1,37 @@
+name: G0 Architecture Structure
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "src/modules/**"
+      - "tests/g0/**"
+      - "config/**"
+      - "integrations/**"
+      - "infrastructure/**"
+      - ".github/workflows/g0-structure.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "src/modules/**"
+      - "tests/g0/**"
+
+jobs:
+  g0-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: python -m pip install pytest
+
+      - name: Validate G0 repository structure
+        run: python -m pytest tests/g0 -q
