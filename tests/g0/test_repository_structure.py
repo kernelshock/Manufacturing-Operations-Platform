@@ -11,6 +11,7 @@ REQUIRED = [
     "docs/00-governance/decisions/DECISION-REGISTER.md",
     "docs/01-architecture/ADR/ADR-0001-modular-monolith.md",
     "docs/01-architecture/ADR/ADR-0002-api-first-event-oriented.md",
+    "docs/01-architecture/ADR/ADR-0005-prolowin-system-of-record.md",
     "docs/01-architecture/domain-model/CANONICAL-DOMAIN-MODEL.md",
     "docs/01-architecture/event-catalog/EVENT-CATALOG.md",
     "docs/01-architecture/modules/MODULE-MAP.md",
