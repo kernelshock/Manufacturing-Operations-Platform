@@ -68,3 +68,12 @@ Current-state sequence to preserve:
 - Human confirmation remains authoritative for the physical Kanban trigger during early maturity levels.
 - Later maturity may introduce barcode/QR/RFID, container scans, exact receipts/issues or perpetual inventory without changing the canonical model.
 - Incoming inspection requirements must be represented even if a full Quality module is deferred.
+
+
+## Clarified cardinality
+Confirmed during G0:
+- one Kanban card represents one material at one productive workplace;
+- the same local material loop may have multiple physical containers;
+- there is only one card for that material/workplace combination;
+- if the same material is consumed at another workplace, that workplace has its own card and containers;
+- after a compliant replenishment, the same card returns to the container and is reused for the next replenishment cycle.
