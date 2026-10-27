@@ -36,6 +36,10 @@ Status: Draft for G0 validation
 - InventoryItem
 - InventoryBalance
 - MaterialMovement
+- ReplenishmentLoop
+- PointOfUseContainer
+- KanbanCard
+- ReplenishmentCycle
 - ReorderPolicy
 - KanbanSignal
 - Supplier
@@ -43,6 +47,7 @@ Status: Draft for G0 validation
 - PurchaseRequest
 - PurchaseOrder
 - Receipt
+- ReceivingInspection
 
 ## Maintenance
 - MaintenanceOrder
@@ -84,3 +89,17 @@ Status: Draft for G0 validation
 5. Module ownership is explicit for every aggregate.
 6. Cross-module references use stable IDs and contracts.
 7. Historical execution records are immutable except through auditable correction events.
+
+
+## Kanban relationships
+
+```text
+Material 1 --- n ReplenishmentLoop
+ReplenishmentLoop 1 --- 1 KanbanCard
+ReplenishmentLoop 1 --- n PointOfUseContainer
+ReplenishmentLoop n --- n Product
+ReplenishmentLoop n --- n Area/WorkCenter
+KanbanCard 1 --- n ReplenishmentCycle
+```
+
+A `ReplenishmentLoop` represents the physical supply circuit whose consumers share one reorder policy. Its PP and replenishment quantity are local to that loop, even when the same material exists in other loops.
