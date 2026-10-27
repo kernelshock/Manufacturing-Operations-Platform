@@ -22,7 +22,7 @@ Operational deployment progresses:
 Development → Simulation → Shadow Mode → Parallel → Validation → Production.
 
 ## G0 unresolved decisions
-1. System of record and access mechanism for articles, stock, suppliers, purchases and receipts.
+1. Prolowin technical access mechanism and synchronization cadence (System of Record is now confirmed).
 2. Backend/frontend technology stack.
 3. FAIC server/network deployment topology.
 4. Authentication/identity source.
