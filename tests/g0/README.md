@@ -26,7 +26,7 @@ python3 -m pytest tests/g0 -q
 Expected result for the current baseline:
 
 ```text
-2 passed
+4 passed
 ```
 
 ## What G0 tests validate
@@ -39,3 +39,13 @@ Functional, API, database, contract and end-to-end tests will be added gate by g
 
 ## Important
 Not every code block shown in project discussions is a command to execute. Only commands documented under a test/run section or stored as executable scripts/tests in the repository should be treated as executable instructions.
+
+
+## Contract tests
+`test_prolowin_contract.py` validates that the Prolowin complete-structure transport schema is valid JSON, versioned and requires the expected source/root/row fields.
+
+Current expected local result:
+
+```text
+4 passed
+```
