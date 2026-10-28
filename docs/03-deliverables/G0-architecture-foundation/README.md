@@ -1,6 +1,6 @@
 # G0 — Architecture Foundation
 
-Status: **IN PROGRESS**
+Status: **VALIDATED**
 
 ## Purpose
 Establish the architecture, governance, canonical data semantics, module boundaries, release discipline and technical decision framework before rebuilding functional modules.
@@ -30,3 +30,12 @@ G0 can move to VALIDATED when:
 8. Direction-facing G0 deliverable is generated.
 
 G0 becomes RELEASED only after explicit approval.
+
+
+## Validation evidence
+- Branch-head CI: GitHub Actions run #70
+- Result: SUCCESS
+- Automated G0 suite: 5 passed
+- Validated: 2026-10-28
+
+G0 is **not RELEASED**. Release and merge require explicit approval.
