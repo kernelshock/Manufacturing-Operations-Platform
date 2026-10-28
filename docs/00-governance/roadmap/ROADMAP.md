@@ -77,7 +77,7 @@ Confirmed:
 - Tango role: formal remittances, invoices, payments and accounting chain, outside current scope;
 - physical point-of-use Kanban container/card state confirmed as the initial operational material truth;
 - material replenishment is continuous visual review, not a periodic stock review;
-- local G0 structural tests: 2 passed;
+- G0 structural + Prolowin contract tests: 4 passed in GitHub Actions (run #58);
 - legacy PP/PR and supplier-performance data classified as non-verifiable;
 - prospective measurement baseline required before recalibration;
 - five-product authoritative Prolowin PDF corpus analyzed;
