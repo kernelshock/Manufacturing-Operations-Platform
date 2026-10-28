@@ -18,6 +18,7 @@ REQUIRED = [
     "docs/01-architecture/ADR/ADR-0009-prospective-recalibration-baseline.md",
     "docs/01-architecture/ADR/ADR-0010-weekly-plan-taquilla-demand-source.md",
     "docs/01-architecture/ADR/ADR-0011-separate-bom-from-bop-routing.md",
+    "docs/01-architecture/ADR/ADR-0012-prolowin-complete-report-fin-normalization.md",
     "docs/01-architecture/domain-model/CANONICAL-DOMAIN-MODEL.md",
     "docs/01-architecture/event-catalog/EVENT-CATALOG.md",
     "docs/01-architecture/modules/MODULE-MAP.md",
@@ -29,7 +30,11 @@ REQUIRED = [
     "docs/02-requirements/materials/PLAN-TAQUILLA-DEMAND-DERIVATION.md",
     "docs/03-deliverables/G0-architecture-foundation/README.md",
     "docs/02-requirements/master-data/samples/PROLOWIN-X-2209-COMPLETE-STRUCTURE.md",
+    "docs/02-requirements/master-data/samples/PROLOWIN-X-6111-COMPLETE-STRUCTURE.md",
+    "docs/02-requirements/master-data/samples/PROLOWIN-X-7070-COMPLETE-STRUCTURE.md",
     "docs/04-reference/faic-legacy/LEGACY-REORDER-POINT-METHOD-ANALYSIS.md",
+    "docs/04-reference/faic-prolowin-samples/SOURCE-MANIFEST.md",
+    "docs/04-reference/faic-prolowin-samples/PROLOWIN-REFERENCE-CORPUS-ANALYSIS.md",
     "integrations/prolowin/INTEGRATION-BASELINE.md",
 ]
 
