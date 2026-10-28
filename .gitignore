@@ -1,0 +1,29 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build / temp
+dist/
+build/
+tmp/
+*.log
+
+# Proprietary FAIC raw source evidence — keep out of public repository
+docs/04-reference/faic-prolowin-samples/source-pdfs/*.pdf
+docs/04-reference/faic-prolowin-samples/raw-private/**
