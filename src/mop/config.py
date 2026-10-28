@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     environment: Environment = "development"
     api_prefix: str = "/api/v1"
     debug: bool = False
+    database_url: str = (
+        "postgresql+psycopg://mop:mop_dev_only@127.0.0.1:5432/mop?connect_timeout=2"
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="MOP_",
