@@ -10,7 +10,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 
 | Gate | Scope | Demonstrable outcome | Status |
 |---|---|---|---|
-| G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | IN PROGRESS |
+| G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | VALIDATED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | PLANNED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | PLANNED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
@@ -77,7 +77,7 @@ Confirmed:
 - Tango role: formal remittances, invoices, payments and accounting chain, outside current scope;
 - physical point-of-use Kanban container/card state confirmed as the initial operational material truth;
 - material replenishment is continuous visual review, not a periodic stock review;
-- G0 structural + Prolowin contract tests: 4 passed in GitHub Actions (run #58);
+- G0 automated validation suite: 5 passed; validation evidence GitHub Actions run #70;
 - legacy PP/PR and supplier-performance data classified as non-verifiable;
 - prospective measurement baseline required before recalibration;
 - five-product authoritative Prolowin PDF corpus analyzed;
