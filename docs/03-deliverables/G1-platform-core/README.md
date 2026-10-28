@@ -33,7 +33,7 @@ G1 must conform to:
 ## Implementation slices
 - **G1.1 — Executable skeleton — COMPLETED:** backend package, FastAPI application factory, typed configuration, versioned API metadata, liveness/readiness endpoints, packaging manifest and CI baseline.
 - **G1.2 — Persistence — COMPLETED:** PostgreSQL 18 connection, SQLAlchemy base/session lifecycle, Alembic baseline, database-aware readiness and clean-database CI migration.
-- **G1.3 — Organization model:** Organization, Plant, Area, WorkCenter and Resource.
+- **G1.3 — Organization model — COMPLETED:** Organization, Plant, Area, WorkCenter and Resource persisted through contextual business-code constraints and versioned REST APIs.
 - **G1.4 — Identity/RBAC:** User, Role, Permission, assignment and authorization service boundary.
 - **G1.5 — Audit:** append-only audit event baseline for privileged/core actions.
 - **G1.6 — Frontend shell:** React/TypeScript/Vite application shell consuming the documented API.
@@ -73,3 +73,13 @@ G1 becomes **RELEASED** only after explicit approval.
 - G0 regression: 5 passed;
 - G1 suite: 11 passed;
 - next slice: **G1.3 — Organization model**.
+
+### G1.3 — Organization model
+- implementation head: `6f5fa9b5f9f15c0b300ecc9cdae27b942ea5840d`;
+- GitHub Actions: `G1 Platform Core` run #41;
+- result: **SUCCESS**;
+- Alembic head: `0002_g1_3`;
+- hierarchy: Organization → Plant → Area → WorkCenter → Resource;
+- G0 regression: 5 passed;
+- G1 suite: 16 passed;
+- next slice: **G1.4 — Identity/RBAC**.
