@@ -4,7 +4,17 @@ import pytest
 from mop.config import Settings
 
 
-def test_default_settings_are_safe_for_development() -> None:
+def test_default_settings_are_safe_for_development(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for variable in (
+        "MOP_ENVIRONMENT",
+        "MOP_API_PREFIX",
+        "MOP_DEBUG",
+        "MOP_DATABASE_URL",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+
     settings = Settings(_env_file=None)
 
     assert settings.environment == "development"
