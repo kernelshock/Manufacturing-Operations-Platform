@@ -35,7 +35,7 @@ G1 must conform to:
 - **G1.2 — Persistence — COMPLETED:** PostgreSQL 18 connection, SQLAlchemy base/session lifecycle, Alembic baseline, database-aware readiness and clean-database CI migration.
 - **G1.3 — Organization model — COMPLETED:** Organization, Plant, Area, WorkCenter and Resource persisted through contextual business-code constraints and versioned REST APIs.
 - **G1.4 — Identity/RBAC — COMPLETED:** local users, Argon2 password hashing, opaque server-side sessions, roles, seeded permissions, scoped assignments and server-side authorization.
-- **G1.5 — Audit:** append-only audit event baseline for privileged/core actions.
+- **G1.5 — Audit — COMPLETED:** PostgreSQL-enforced append-only audit events for authentication, IAM administration and privileged/core mutations, with read-only RBAC-protected query API.
 - **G1.6 — Frontend shell:** React/TypeScript/Vite application shell consuming the documented API.
 - **G1.7 — Runtime:** Docker Compose DEV/TEST topology and configuration examples without committed secrets.
 - **G1.8 — Gate hardening:** tests, evidence, security review and release-facing summary.
@@ -95,3 +95,15 @@ G1 becomes **RELEASED** only after explicit approval.
 - G0 regression: 5 passed;
 - G1 suite: 21 passed;
 - next slice: **G1.5 — Audit**.
+
+### G1.5 — Audit
+- implementation head: `9687ce62d3b55739ecfe4f66df251927e1790ac2`;
+- GitHub Actions: `G1 Platform Core` run #78;
+- result: **SUCCESS**;
+- Alembic head: `0004_g1_5`;
+- append-only enforcement: PostgreSQL trigger rejects UPDATE and DELETE;
+- audit query permission: `audit.read`;
+- covered baselines: authentication, IAM administration, organizational core mutations;
+- G0 regression: 5 passed;
+- G1 suite: 24 passed;
+- next slice: **G1.6 — Frontend shell**.

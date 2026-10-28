@@ -7,6 +7,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ### Added
 - G1 Platform Core executable backend, PostgreSQL/Alembic persistence, organizational hierarchy and local scoped RBAC.
 - Local session authentication with Argon2 password hashing and server-side opaque sessions.
+- Append-only PostgreSQL audit trail for authentication, IAM administration and privileged core mutations.
 - Prolowin manufacturing-definition import contract and JSON Schema.
 - Five-product Prolowin reference-corpus analysis and reconciliation rules.
 - Recursive BOM/ABM and separate BOP/Routing canonical model.

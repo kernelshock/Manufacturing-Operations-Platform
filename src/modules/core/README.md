@@ -25,3 +25,18 @@ Identity and authorization are now enforced server-side:
 - bootstrap command for the first administrator: `python -m mop.cli.bootstrap_admin`.
 
 No public self-registration endpoint exists. OIDC federation remains behind the authentication boundary defined by ADR-0016.
+
+## Implemented in G1.5
+The cross-cutting audit baseline is now executable:
+- immutable `audit_event` records;
+- PostgreSQL trigger rejects UPDATE and DELETE;
+- actor identity and username snapshot;
+- action, object, scope and outcome;
+- request correlation identifier and source IP;
+- structured JSON details with explicit exclusion of credentials/session tokens;
+- authentication success/failure and logout;
+- IAM user/role/permission/assignment mutations;
+- organizational core create mutations;
+- read-only `/api/v1/audit/events` endpoint protected by `audit.read`.
+
+Audit records are corrections-by-addition: an incorrect historical fact is not rewritten; a later compensating/correction event is the required pattern.
