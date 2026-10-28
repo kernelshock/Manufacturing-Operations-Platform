@@ -87,3 +87,14 @@ Contact the vendor/support or inspect installed-version technical documentation 
 8. Direct database access supported?
 9. Stable scheduled CSV/XLSX export available?
 10. Vendor-supported integration practices?
+
+
+## Manufacturing-definition contract
+
+The normalized transport contract is defined in:
+- `integrations/prolowin/contracts/IMPORT-CONTRACT.md`
+- `integrations/prolowin/contracts/complete-structure-batch.schema.json`
+
+The transport is deliberately independent of PDF/CSV/XLSX/API. Every adapter must produce the same normalized contract before canonical application.
+
+Canonical application targets **Master Data**. Materials and APS consume approved definitions; they do not own imported BOM/routing masters.
