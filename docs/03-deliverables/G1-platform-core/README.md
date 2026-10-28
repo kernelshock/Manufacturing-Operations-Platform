@@ -32,7 +32,7 @@ G1 must conform to:
 
 ## Implementation slices
 - **G1.1 — Executable skeleton — COMPLETED:** backend package, FastAPI application factory, typed configuration, versioned API metadata, liveness/readiness endpoints, packaging manifest and CI baseline.
-- **G1.2 — Persistence:** PostgreSQL connection, SQLAlchemy base, Alembic and initial schema.
+- **G1.2 — Persistence — COMPLETED:** PostgreSQL 18 connection, SQLAlchemy base/session lifecycle, Alembic baseline, database-aware readiness and clean-database CI migration.
 - **G1.3 — Organization model:** Organization, Plant, Area, WorkCenter and Resource.
 - **G1.4 — Identity/RBAC:** User, Role, Permission, assignment and authorization service boundary.
 - **G1.5 — Audit:** append-only audit event baseline for privileged/core actions.
@@ -63,3 +63,13 @@ G1 becomes **RELEASED** only after explicit approval.
 - result: **SUCCESS**;
 - checks: package installation, compile, G0 regression and G1 tests;
 - next slice: **G1.2 — Persistence**.
+
+### G1.2 — Persistence
+- implementation head: `57ed637e81e6cb40acfa8d423bde7b943ffbdde3`;
+- GitHub Actions: `G1 Platform Core` run #25;
+- result: **SUCCESS**;
+- PostgreSQL service: 18.x (CI observed 18.6);
+- Alembic head: `0001_g1_2`;
+- G0 regression: 5 passed;
+- G1 suite: 11 passed;
+- next slice: **G1.3 — Organization model**.
