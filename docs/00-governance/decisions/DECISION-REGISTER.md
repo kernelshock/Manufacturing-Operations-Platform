@@ -23,3 +23,7 @@
 | DEC-014 | BOM/ABM and BOP/Routing are separate canonical structures linked by Article/ProductRevision | ACCEPTED | ADR-0011 | 2026-10-28 | Prevent material-demand and process-routing semantics from being conflated |
 
 | DEC-015 | For validated Prolowin complete-structure reports, FIN rows form the flattened quantity projection; non-FIN rows are routing evidence and the root FIN is excluded from demand | ACCEPTED | ADR-0012 | 2026-10-28 | Guarded by import validation; recursive BOM still comes from native parent-child structure |
+
+| DEC-016 | Master Data is the sole canonical owner of Article/Revision/BOM/Routing manufacturing definitions | ACCEPTED | ADR-0013 | 2026-10-28 | Materials and APS consume approved definitions; no duplicate domain truth |
+
+| DEC-017 | Proprietary FAIC source PDFs and equivalent raw manufacturing evidence are not committed to the public GitHub repository | ACCEPTED | Governance data boundary | 2026-10-28 | Store hashes/derived non-sensitive architecture evidence only unless repository visibility changes and access is approved |
