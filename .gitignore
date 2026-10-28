@@ -23,3 +23,7 @@ dist/
 build/
 tmp/
 *.log
+
+# Proprietary FAIC raw source evidence — keep out of public repository
+docs/04-reference/faic-prolowin-samples/source-pdfs/*.pdf
+docs/04-reference/faic-prolowin-samples/raw-private/**
