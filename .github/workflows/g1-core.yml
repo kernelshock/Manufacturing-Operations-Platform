@@ -1,0 +1,37 @@
+name: G1 Platform Core
+
+on:
+  push:
+    branches:
+      - feat/G1-platform-core
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-baseline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install project and development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Compile backend package
+        run: python -m compileall -q src/mop
+
+      - name: Run G0 regression tests
+        run: python -m pytest tests/g0 -q
+
+      - name: Run G1 tests
+        run: python -m pytest tests/g1 -q
