@@ -19,7 +19,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - Automated G0 repository structure check.
 
 ### Changed
-- G0 Architecture Foundation validated on 2026-10-28; release/merge remains pending explicit approval.
+- G0 Architecture Foundation released on 2026-10-28 after explicit approval; PR #1 merged to `main` as `6f79f82155789c02c8138b2caec1f617b46619db`.
 
 ### Project baseline
 - The FAIC v0.x/v1.x dashboard is treated as a functional reference prototype.

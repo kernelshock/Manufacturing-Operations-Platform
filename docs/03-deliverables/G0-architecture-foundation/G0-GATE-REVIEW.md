@@ -3,7 +3,7 @@
 Review date: 2026-10-28  
 Branch: `feat/G0-architecture-foundation`  
 PR: #1  
-Decision: VALIDATED (not RELEASED)
+Decision: RELEASED
 
 ## Scope reviewed
 G0 establishes architecture and governance only. No production module implementation is claimed.
@@ -58,7 +58,7 @@ Resolved:
 - Master Data = canonical manufacturing definition.
 
 ### 6. G0 automated tests pass
-PASS — GitHub Actions run #70 completed SUCCESS with 5 tests.
+PASS — GitHub Actions run #72 completed SUCCESS with 5 tests.
 
 Current suite covers:
 - repository structure;
@@ -113,11 +113,12 @@ Mitigation: proprietary FAIC source evidence is excluded; only hashes, schemas a
 
 All G0 validation criteria are satisfied.
 
-- G0 status: **VALIDATED**
-- validation evidence: GitHub Actions run #70 — SUCCESS
-- PR #1 remains open;
-- no merge into `main`;
-- no `RELEASED` status until explicit approval.
+- G0 status: **RELEASED**
+- explicit release approval: 2026-10-28
+- validation/release-gate evidence: GitHub Actions run #72 — SUCCESS
+- validated head: `807fc323c5e00b361ffca475d28b10fbb028e3ae`
+- PR #1: merged into `main`
+- release merge commit: `6f79f82155789c02c8138b2caec1f617b46619db`.
 
 ## Next gate
 G1 — Platform Core:
