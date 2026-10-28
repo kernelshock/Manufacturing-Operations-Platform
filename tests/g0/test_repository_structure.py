@@ -36,6 +36,12 @@ REQUIRED = [
     "docs/04-reference/faic-prolowin-samples/SOURCE-MANIFEST.md",
     "docs/04-reference/faic-prolowin-samples/PROLOWIN-REFERENCE-CORPUS-ANALYSIS.md",
     "integrations/prolowin/INTEGRATION-BASELINE.md",
+    "integrations/prolowin/contracts/complete-structure-batch.schema.json",
+    "integrations/prolowin/contracts/IMPORT-CONTRACT.md",
+    "docs/00-governance/data-handling/REPOSITORY-DATA-BOUNDARY.md",
+    "docs/02-requirements/master-data/PROLOWIN-ASSIMILATION-ACCEPTANCE-CRITERIA.md",
+    "docs/01-architecture/data-model/MASTER-DATA-BOM-BOP-PHYSICAL-SCHEMA.md",
+    "docs/01-architecture/ADR/ADR-0013-master-data-owns-manufacturing-definition.md",
 ]
 
 MODULES = [
