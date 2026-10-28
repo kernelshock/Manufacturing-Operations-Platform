@@ -34,7 +34,7 @@ G1 must conform to:
 - **G1.1 — Executable skeleton — COMPLETED:** backend package, FastAPI application factory, typed configuration, versioned API metadata, liveness/readiness endpoints, packaging manifest and CI baseline.
 - **G1.2 — Persistence — COMPLETED:** PostgreSQL 18 connection, SQLAlchemy base/session lifecycle, Alembic baseline, database-aware readiness and clean-database CI migration.
 - **G1.3 — Organization model — COMPLETED:** Organization, Plant, Area, WorkCenter and Resource persisted through contextual business-code constraints and versioned REST APIs.
-- **G1.4 — Identity/RBAC:** User, Role, Permission, assignment and authorization service boundary.
+- **G1.4 — Identity/RBAC — COMPLETED:** local users, Argon2 password hashing, opaque server-side sessions, roles, seeded permissions, scoped assignments and server-side authorization.
 - **G1.5 — Audit:** append-only audit event baseline for privileged/core actions.
 - **G1.6 — Frontend shell:** React/TypeScript/Vite application shell consuming the documented API.
 - **G1.7 — Runtime:** Docker Compose DEV/TEST topology and configuration examples without committed secrets.
@@ -83,3 +83,15 @@ G1 becomes **RELEASED** only after explicit approval.
 - G0 regression: 5 passed;
 - G1 suite: 16 passed;
 - next slice: **G1.4 — Identity/RBAC**.
+
+### G1.4 — Identity/RBAC
+- implementation head: `d2cddfb50b52fd714db7e5eee44e59889d3575ad`;
+- GitHub Actions: `G1 Platform Core` run #71;
+- result: **SUCCESS**;
+- Alembic head: `0003_g1_4`;
+- password storage: Argon2 via `pwdlib[argon2]`;
+- authentication: opaque server-side session + HttpOnly / SameSite=Strict cookie;
+- RBAC scopes: global, organization, plant, area;
+- G0 regression: 5 passed;
+- G1 suite: 21 passed;
+- next slice: **G1.5 — Audit**.
