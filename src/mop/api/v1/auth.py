@@ -3,6 +3,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from mop.audit.context import request_audit_context
+from mop.audit.service import AuditService
 from mop.iam.authorization import AuthorizationService
 from mop.iam.dependencies import get_current_user
 from mop.iam.models import User
@@ -22,11 +24,29 @@ def login(
     session: Session = Depends(get_session),
 ):
     settings = request.app.state.settings
+    audit_context = request_audit_context(request)
     user = IdentityService(session).authenticate(payload.username, payload.password)
     if user is None:
+        AuditService(session).record(
+            action="auth.login.failure",
+            object_type="user_session",
+            outcome="failure",
+            actor_username=payload.username,
+            details={"reason": "invalid_credentials"},
+            **audit_context,
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
     raw_token = SessionService(session, settings.session_ttl_minutes).create(user)
+    AuditService(session).record(
+        action="auth.login.success",
+        object_type="user_session",
+        object_id=str(user.id),
+        outcome="success",
+        actor_user_id=user.id,
+        actor_username=user.username,
+        **audit_context,
+    )
     response.set_cookie(
         key=settings.session_cookie_name,
         value=raw_token,
@@ -47,8 +67,20 @@ def logout(
 ):
     settings = request.app.state.settings
     token = request.cookies.get(settings.session_cookie_name)
+    user = None
     if token:
+        user = SessionService(session, settings.session_ttl_minutes).resolve(token)
         SessionService(session, settings.session_ttl_minutes).revoke(token)
+    if user is not None:
+        AuditService(session).record(
+            action="auth.logout",
+            object_type="user_session",
+            object_id=str(user.id),
+            outcome="success",
+            actor_user_id=user.id,
+            actor_username=user.username,
+            **request_audit_context(request),
+        )
     response.delete_cookie(key=settings.session_cookie_name, path="/")
     response.status_code = status.HTTP_204_NO_CONTENT
     return None

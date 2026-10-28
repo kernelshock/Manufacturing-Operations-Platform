@@ -2,10 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from mop.iam.dependencies import require_global_permission
+from mop.audit.context import request_audit_context
+from mop.audit.service import AuditService
+from mop.iam.dependencies import get_current_user, require_global_permission
+from mop.iam.models import User
 from mop.iam.schemas import (
     PermissionRead,
     RoleAssignmentCreate,
@@ -40,8 +43,25 @@ def _translate(operation):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_global_permission("admin.users"))],
 )
-def create_user(payload: UserCreate, app: IdentityService = Depends(identity)):
-    return _translate(lambda: app.create_user(payload))
+def create_user(
+    payload: UserCreate,
+    request: Request,
+    app: IdentityService = Depends(identity),
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_user(payload))
+    AuditService(session).record(
+        action="iam.user.create",
+        object_type="user",
+        object_id=str(created.id),
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details={"username": created.username},
+        **request_audit_context(request),
+    )
+    return created
 
 
 @router.get(
@@ -59,8 +79,25 @@ def list_users(app: IdentityService = Depends(identity)):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_global_permission("admin.roles"))],
 )
-def create_role(payload: RoleCreate, app: IdentityService = Depends(identity)):
-    return _translate(lambda: app.create_role(payload))
+def create_role(
+    payload: RoleCreate,
+    request: Request,
+    app: IdentityService = Depends(identity),
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_role(payload))
+    AuditService(session).record(
+        action="iam.role.create",
+        object_type="role",
+        object_id=str(created.id),
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details={"code": created.code},
+        **request_audit_context(request),
+    )
+    return created
 
 
 @router.get(
@@ -86,8 +123,25 @@ def list_permissions(app: IdentityService = Depends(identity)):
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_global_permission("admin.roles"))],
 )
-def grant_permission(role_id: UUID, permission_code: str, app: IdentityService = Depends(identity)):
+def grant_permission(
+    role_id: UUID,
+    permission_code: str,
+    request: Request,
+    app: IdentityService = Depends(identity),
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     _translate(lambda: app.grant_permission(role_id, permission_code))
+    AuditService(session).record(
+        action="iam.role.permission.grant",
+        object_type="role",
+        object_id=str(role_id),
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details={"permission": permission_code},
+        **request_audit_context(request),
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -97,5 +151,25 @@ def grant_permission(role_id: UUID, permission_code: str, app: IdentityService =
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_global_permission("admin.users"))],
 )
-def assign_role(user_id: UUID, payload: RoleAssignmentCreate, app: IdentityService = Depends(identity)):
-    return _translate(lambda: app.assign_role(user_id, payload))
+def assign_role(
+    user_id: UUID,
+    payload: RoleAssignmentCreate,
+    request: Request,
+    app: IdentityService = Depends(identity),
+    actor: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    assignment = _translate(lambda: app.assign_role(user_id, payload))
+    AuditService(session).record(
+        action="iam.user.role.assign",
+        object_type="user_role_assignment",
+        object_id=str(assignment.id),
+        scope_type=assignment.scope_type,
+        scope_id=assignment.scope_id,
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details={"user_id": str(user_id), "role_id": str(assignment.role_id)},
+        **request_audit_context(request),
+    )
+    return assignment
