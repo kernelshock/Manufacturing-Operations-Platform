@@ -87,11 +87,11 @@ Confirmed:
 - Prolowin import contract v1.0.0 + machine-readable JSON Schema defined;
 - bulk-assimilation acceptance criteria defined.
 
-Open:
-- exact-stock maturity strategy beyond the initial physical/e-Kanban state model;
-- application technology stack;
-- FAIC deployment topology;
-- authentication/identity source;
-- backup/restore requirements;
-- multi-plant/multi-tenant isolation strategy;
-- Prolowin API availability (non-blocking research item).
+Resolved/deferred for G0:
+- exact-stock maturity: deferred to G6/G7; physical/e-Kanban remains initial operational truth;
+- application stack: accepted in ADR-0014;
+- deployment topology: accepted in ADR-0015;
+- authentication/RBAC: accepted in ADR-0016;
+- backup/restore: accepted in ADR-0017;
+- multi-plant/tenant strategy: accepted in ADR-0018;
+- Prolowin API availability: deferred to G11 as non-blocking research.
