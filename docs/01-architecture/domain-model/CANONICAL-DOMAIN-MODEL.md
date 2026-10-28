@@ -151,3 +151,31 @@ These source rows are normalized into canonical Article, ComponentRelation, Oper
 Product-family membership does not authorize BOM inference.
 
 The canonical BOM/ABM must be effective against the **exact ProductRevision/Configuration**. Cross-variant multipliers may be analyzed for validation or optimization, but they are not a substitute for an explicit source structure.
+
+
+## Prolowin ingestion/reconciliation entities
+
+```text
+RawImportBatch
+  -> SourceStructureRow
+       -> SourceOperationState        (non-FIN source rows)
+       -> FlattenedArticleRequirementSnapshot (validated FIN projection)
+
+Article
+  -> ArticleClassification
+  -> UomMapping / canonical UoM
+
+BOMRevision
+  -> ComponentRelation
+
+RoutingRevision
+  -> Operation
+  -> ArticleOperation
+  -> ResourceAssignment
+
+DataQualityIssue
+```
+
+The same canonical `Article` is global and may be reused by many finished-product BOMs. Product ownership is expressed by relations, not duplicated article records.
+
+The flattened FIN projection is a reconciliation snapshot; it does not replace the recursive BOM hierarchy.
