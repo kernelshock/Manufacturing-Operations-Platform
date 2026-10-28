@@ -126,3 +126,21 @@ Article / ProductRevision
 BOM/ABM depth is not fixed.
 
 Imported operations/resources must be classified before APS scheduling so that costing-only pseudo-operations and pseudo-resources are excluded from physical capacity.
+
+
+## Prolowin complete-structure normalization
+
+Prolowin complete-structure reports can repeat the same article code across multiple operation stages and the final state. Therefore the ingestion layer must preserve a source-row representation before normalization:
+
+```text
+SourceStructureRow
+- parent_article_code
+- article_code
+- operation_code
+- source_description
+- quantity
+- source_uom
+- source_timestamp
+```
+
+These source rows are normalized into canonical Article, ComponentRelation, Operation and ArticleOperation entities. Repeated operation rows must not be naively summed as independent material demand.
