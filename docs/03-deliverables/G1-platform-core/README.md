@@ -1,0 +1,57 @@
+# G1 — Platform Core
+
+Status: **IN PROGRESS**  
+Started: 2026-10-28  
+Branch: `feat/G1-platform-core`  
+Base release: G0 commit `4ca6a279ba661a813598c745befd9639435c2e8f`
+
+## Purpose
+Implement the minimum executable platform foundation required by all later MOP gates without introducing FAIC-specific module forks or prematurely implementing G2+ business functionality.
+
+## Governing decisions
+G1 must conform to:
+- ADR-0014 — Python + FastAPI + SQLAlchemy 2.x + Alembic + PostgreSQL; React + TypeScript + Vite;
+- ADR-0015 — containerized Linux deployment, Docker Compose, intranet-first HTTPS topology;
+- ADR-0016 — application-local identity, secure session authentication, RBAC and future OIDC boundary;
+- ADR-0017 — backup/restore requirements carried into deployment design;
+- ADR-0018 — single-tenant runtime with multi-plant domain model.
+
+## G1 scope
+1. Repository/application skeleton for backend, frontend and deployment assets.
+2. Typed configuration model with secrets outside source control.
+3. PostgreSQL persistence baseline and Alembic migration framework.
+4. Core organization hierarchy:
+   `Organization -> Plant -> Area -> WorkCenter -> Resource`.
+5. Local identity:
+   users, roles, permissions and scoped authorization foundations.
+6. Audit trail for authentication and privileged/core mutations.
+7. API baseline:
+   versioned REST boundary, OpenAPI, consistent error contract and health endpoints.
+8. Containerized DEV/TEST runtime.
+9. Automated G1 tests and CI evidence.
+
+## Implementation slices
+- **G1.1 — Executable skeleton:** backend package, FastAPI application factory, configuration and health endpoints.
+- **G1.2 — Persistence:** PostgreSQL connection, SQLAlchemy base, Alembic and initial schema.
+- **G1.3 — Organization model:** Organization, Plant, Area, WorkCenter and Resource.
+- **G1.4 — Identity/RBAC:** User, Role, Permission, assignment and authorization service boundary.
+- **G1.5 — Audit:** append-only audit event baseline for privileged/core actions.
+- **G1.6 — Frontend shell:** React/TypeScript/Vite application shell consuming the documented API.
+- **G1.7 — Runtime:** Docker Compose DEV/TEST topology and configuration examples without committed secrets.
+- **G1.8 — Gate hardening:** tests, evidence, security review and release-facing summary.
+
+## Exit criteria
+G1 can move to **VALIDATED** only when:
+- backend and frontend start from documented commands;
+- PostgreSQL schema can be created from migrations on a clean database;
+- core organization hierarchy is persisted and accessible through tested APIs;
+- local users/roles/permissions work with server-side authorization;
+- privileged/core changes produce audit records;
+- health/readiness endpoints reflect application/database status;
+- DEV/TEST container runtime is reproducible;
+- secrets are excluded from Git;
+- automated G1 tests pass in CI;
+- G1 evidence and direction-facing summary exist;
+- no critical unresolved G1 risk remains without explicit deferral.
+
+G1 becomes **RELEASED** only after explicit approval.
