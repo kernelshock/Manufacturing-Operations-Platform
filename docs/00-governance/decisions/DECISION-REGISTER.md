@@ -19,3 +19,5 @@
 | DEC-012 | Existing Kanban PP/PR values and historical supplier-performance/lead-time data are non-verifiable and cannot be used as calibrated inputs | ACCEPTED | ADR-0009 | 2026-10-27 | New baseline must be measured prospectively |
 
 | DEC-013 | Weekly production plans and issued taquillas are the trusted near-term demand source for Materials/APS recalibration | ACCEPTED | ADR-0010 | 2026-10-27 | Use as primary demand signal for projected material exposure |
+
+| DEC-014 | BOM/ABM and BOP/Routing are separate canonical structures linked by Article/ProductRevision | ACCEPTED | ADR-0011 | 2026-10-28 | Prevent material-demand and process-routing semantics from being conflated |
