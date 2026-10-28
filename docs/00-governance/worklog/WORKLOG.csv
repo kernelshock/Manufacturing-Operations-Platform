@@ -8,3 +8,4 @@ date,gate,module,task,category,actual_hours,result,evidence,rework,rework_reason
 2026-10-28,G1,Core,G1 Platform Core bootstrap,IMPLEMENTATION,,G1 branch opened from released G0 baseline,feat/G1-platform-core @ 4ca6a279ba661a813598c745befd9639435c2e8f,NO,,IN_PROGRESS
 2026-10-28,G1,Core,G1.1 executable skeleton,IMPLEMENTATION,,FastAPI package configuration health API packaging and CI baseline implemented,Actions G1 Platform Core #1 / d3a0daf076423f3c0c334d198d3936d735f2169f,NO,,COMPLETED
 2026-10-28,G1,Core,G1.2 persistence baseline,IMPLEMENTATION,,PostgreSQL SQLAlchemy Alembic database readiness and clean migration gate implemented,Actions G1 Platform Core #25 / 57ed637e81e6cb40acfa8d423bde7b943ffbdde3,NO,,COMPLETED
+2026-10-28,G1,Core,G1.3 organization model,IMPLEMENTATION,,Organization Plant Area WorkCenter Resource persistence and REST APIs implemented,Actions G1 Platform Core #41 / 6f5fa9b5f9f15c0b300ecc9cdae27b942ea5840d,NO,,COMPLETED
