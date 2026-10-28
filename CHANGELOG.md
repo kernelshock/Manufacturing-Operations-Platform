@@ -5,6 +5,12 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- Prolowin manufacturing-definition import contract and JSON Schema.
+- Five-product Prolowin reference-corpus analysis and reconciliation rules.
+- Recursive BOM/ABM and separate BOP/Routing canonical model.
+- FAIC e-Kanban/replenishment-loop baseline and prospective PP/PR recalibration model.
+- Reference deployment topology, authentication/RBAC, backup/restore and multi-plant architecture decisions.
+- Public-repository data boundary for proprietary FAIC evidence.
 - G0 Architecture Foundation repository structure.
 - Governance model with stage gates and release criteria.
 - Versioned roadmap and worklog templates.
