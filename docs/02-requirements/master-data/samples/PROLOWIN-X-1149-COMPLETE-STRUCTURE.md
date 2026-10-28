@@ -1,3 +1,5 @@
+> **Authoritative source update — 2026-10-28:** a complete PDF for this product has replaced the earlier screenshot-only evidence. Where any prior transcription differs, the PDF corpus and SOURCE-MANIFEST.md prevail.
+
 # Prolowin Complete Structure Reference — X-1149
 
 Status: G0 reference sample  
