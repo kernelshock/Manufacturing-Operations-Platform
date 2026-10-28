@@ -3,7 +3,7 @@
 Review date: 2026-10-28  
 Branch: `feat/G0-architecture-foundation`  
 PR: #1  
-Decision target: VALIDATED (not RELEASED)
+Decision: VALIDATED (not RELEASED)
 
 ## Scope reviewed
 G0 establishes architecture and governance only. No production module implementation is claimed.
@@ -58,7 +58,7 @@ Resolved:
 - Master Data = canonical manufacturing definition.
 
 ### 6. G0 automated tests pass
-Required before VALIDATED.
+PASS — GitHub Actions run #70 completed SUCCESS with 5 tests.
 
 Current suite covers:
 - repository structure;
@@ -109,10 +109,12 @@ Mitigation: capture purchasing/receiving timestamps prospectively.
 ### R5 — Public repository
 Mitigation: proprietary FAIC source evidence is excluded; only hashes, schemas and non-sensitive derived architecture evidence are committed.
 
-## Gate decision rule
+## Gate decision
 
-If branch-head CI succeeds:
-- G0 status -> **VALIDATED**;
+All G0 validation criteria are satisfied.
+
+- G0 status: **VALIDATED**
+- validation evidence: GitHub Actions run #70 — SUCCESS
 - PR #1 remains open;
 - no merge into `main`;
 - no `RELEASED` status until explicit approval.
