@@ -21,3 +21,5 @@
 | DEC-013 | Weekly production plans and issued taquillas are the trusted near-term demand source for Materials/APS recalibration | ACCEPTED | ADR-0010 | 2026-10-27 | Use as primary demand signal for projected material exposure |
 
 | DEC-014 | BOM/ABM and BOP/Routing are separate canonical structures linked by Article/ProductRevision | ACCEPTED | ADR-0011 | 2026-10-28 | Prevent material-demand and process-routing semantics from being conflated |
+
+| DEC-015 | For validated Prolowin complete-structure reports, FIN rows form the flattened quantity projection; non-FIN rows are routing evidence and the root FIN is excluded from demand | ACCEPTED | ADR-0012 | 2026-10-28 | Guarded by import validation; recursive BOM still comes from native parent-child structure |
