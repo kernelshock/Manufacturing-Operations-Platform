@@ -21,13 +21,14 @@ Reflect reality → measure → understand → improve → automate.
 Operational deployment progresses:
 Development → Simulation → Shadow Mode → Parallel → Validation → Production.
 
-## G0 unresolved decisions
-1. Authoritative operational stock source/ledger (Prolowin is not currently used for stock control).
-2. Backend/frontend technology stack.
-3. FAIC server/network deployment topology.
-4. Authentication/identity source.
-5. Database backup/restore and retention requirements.
-6. Required multi-plant / multi-tenant isolation level for the first product release.
+## G0 architecture decisions resolved
+- Operational material truth: physical/e-Kanban state initially; exact perpetual inventory deferred to Materials/Kanban maturity.
+- Technology stack: Python/FastAPI + PostgreSQL + React/TypeScript.
+- Deployment: on-premise/intranet Linux host or VM using containerized services and browser clients.
+- Authentication: application-local identity + RBAC initially, with OIDC federation boundary.
+- Backup/recovery: automated PostgreSQL backups with tested restore and production RPO/RTO targets.
+- Isolation: single-tenant deployment with multi-plant canonical model.
+- Prolowin API verification: deferred/non-blocking; controlled files remain the accepted initial adapter.
 
 ## G0 release condition
 G0 remains IN PROGRESS until these decisions are resolved or formally deferred and the architecture package is reviewed.
@@ -36,4 +37,4 @@ G0 remains IN PROGRESS until these decisions are resolved or formally deferred a
 ## Confirmed external-system boundary
 - **Prolowin:** purchasing reference, purchase orders, supplier/material reference and supplier-delay follow-up; batch exports can be daily or weekly.
 - **Tango:** remittances, invoices, payments and accounting chain; explicitly outside the current project phase.
-- **Operational stock:** source still unresolved and therefore a G0 decision item.
+- **Operational material availability:** physical point-of-use Kanban/e-Kanban state is the initial truth; exact perpetual stock is a later maturity step.
