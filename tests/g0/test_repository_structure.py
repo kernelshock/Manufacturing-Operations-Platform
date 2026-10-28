@@ -29,6 +29,7 @@ REQUIRED = [
     "docs/02-requirements/materials/BASELINE-RECALIBRATION-REQUIREMENT.md",
     "docs/02-requirements/materials/PLAN-TAQUILLA-DEMAND-DERIVATION.md",
     "docs/03-deliverables/G0-architecture-foundation/README.md",
+    "docs/03-deliverables/G0-architecture-foundation/G0-GATE-REVIEW.md",
     "docs/02-requirements/master-data/samples/PROLOWIN-X-2209-COMPLETE-STRUCTURE.md",
     "docs/02-requirements/master-data/samples/PROLOWIN-X-6111-COMPLETE-STRUCTURE.md",
     "docs/02-requirements/master-data/samples/PROLOWIN-X-7070-COMPLETE-STRUCTURE.md",
