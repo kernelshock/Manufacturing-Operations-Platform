@@ -4,9 +4,17 @@ from mop.application import create_app
 from mop.config import Settings
 
 
+class ReadyDatabase:
+    def check_connection(self) -> None:
+        return None
+
+    def dispose(self) -> None:
+        return None
+
+
 def client() -> TestClient:
     settings = Settings(environment="test", _env_file=None)
-    return TestClient(create_app(settings))
+    return TestClient(create_app(settings, database=ReadyDatabase()))
 
 
 def test_liveness_endpoint() -> None:
@@ -20,12 +28,15 @@ def test_liveness_endpoint() -> None:
     }
 
 
-def test_readiness_endpoint_is_explicitly_application_only_in_g1_1() -> None:
+def test_readiness_endpoint_includes_database_status() -> None:
     response = client().get("/health/ready")
 
     assert response.status_code == 200
     assert response.json()["status"] == "ready"
-    assert response.json()["checks"] == {"application": "ok"}
+    assert response.json()["checks"] == {
+        "application": "ok",
+        "database": "ok",
+    }
 
 
 def test_versioned_api_metadata() -> None:
