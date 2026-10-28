@@ -1,6 +1,6 @@
 # Manufacturing Operations Platform — Roadmap
 
-Last updated: 2026-10-27  
+Last updated: 2026-10-28  
 Baseline: G0 Architecture Foundation
 
 ## Objective
@@ -67,7 +67,7 @@ and deployment through:
 `DEVELOPMENT → SIMULATION → SHADOW MODE → PARALLEL → VALIDATION → PRODUCTION`.
 
 
-## G0 progress snapshot — 2026-10-27
+## G0 progress snapshot — 2026-10-28
 Confirmed:
 - repository governance baseline;
 - modular-monolith / API-first / event-oriented architecture direction;
@@ -79,7 +79,13 @@ Confirmed:
 - material replenishment is continuous visual review, not a periodic stock review;
 - local G0 structural tests: 2 passed;
 - legacy PP/PR and supplier-performance data classified as non-verifiable;
-- prospective measurement baseline required before recalibration.
+- prospective measurement baseline required before recalibration;
+- five-product authoritative Prolowin PDF corpus analyzed;
+- recursive BOM and separate BOP/Routing model validated across Enterprise, Moonraker, Apollo and Discovery examples;
+- Master Data established as canonical manufacturing-definition owner;
+- relational physical schema baseline defined for Article/BOM/Routing/staging/data quality/reconciliation;
+- Prolowin import contract v1.0.0 + machine-readable JSON Schema defined;
+- bulk-assimilation acceptance criteria defined.
 
 Open:
 - exact-stock maturity strategy beyond the initial physical/e-Kanban state model;
