@@ -4,6 +4,7 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from mop.config import get_settings
+from mop.core import models as core_models  # noqa: F401
 from mop.persistence.base import Base
 
 config = context.config
