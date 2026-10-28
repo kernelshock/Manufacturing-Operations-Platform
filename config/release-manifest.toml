@@ -14,3 +14,8 @@ psycopg_series = "3.3"
 
 [notes]
 postgresql_19 = "Not approved for this baseline; 19 is still release-candidate as of 2026-10-28."
+
+[security]
+pwdlib_series = "0.3"
+password_hash = "argon2"
+session_model = "opaque-server-side-cookie"
