@@ -11,7 +11,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | Gate | Scope | Demonstrable outcome | Status |
 |---|---|---|---|
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
-| G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | PLANNED |
+| G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | IN PROGRESS |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | PLANNED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
@@ -103,3 +103,9 @@ Resolved/deferred for G0:
 - release merge commit: `6f79f82155789c02c8138b2caec1f617b46619db`;
 - GitHub Actions `G0 Architecture Structure` run #72: SUCCESS;
 - G0 status: **RELEASED**.
+
+## G1 start record — 2026-10-28
+- branch: `feat/G1-platform-core`;
+- base: released `main` commit `4ca6a279ba661a813598c745befd9639435c2e8f`;
+- implementation must conform to ADR-0014 through ADR-0018;
+- G1 status: **IN PROGRESS**.
