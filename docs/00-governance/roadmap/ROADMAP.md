@@ -10,7 +10,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 
 | Gate | Scope | Demonstrable outcome | Status |
 |---|---|---|---|
-| G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | VALIDATED |
+| G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | PLANNED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | PLANNED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
@@ -77,7 +77,7 @@ Confirmed:
 - Tango role: formal remittances, invoices, payments and accounting chain, outside current scope;
 - physical point-of-use Kanban container/card state confirmed as the initial operational material truth;
 - material replenishment is continuous visual review, not a periodic stock review;
-- G0 automated validation suite: 5 passed; validation evidence GitHub Actions run #70;
+- G0 automated validation suite: 5 passed; release-gate evidence GitHub Actions run #72;
 - legacy PP/PR and supplier-performance data classified as non-verifiable;
 - prospective measurement baseline required before recalibration;
 - five-product authoritative Prolowin PDF corpus analyzed;
@@ -95,3 +95,11 @@ Resolved/deferred for G0:
 - backup/restore: accepted in ADR-0017;
 - multi-plant/tenant strategy: accepted in ADR-0018;
 - Prolowin API availability: deferred to G11 as non-blocking research.
+
+## G0 release record — 2026-10-28
+- explicit release approval recorded;
+- PR #1 merged into `main`;
+- validated head: `807fc323c5e00b361ffca475d28b10fbb028e3ae`;
+- release merge commit: `6f79f82155789c02c8138b2caec1f617b46619db`;
+- GitHub Actions `G0 Architecture Structure` run #72: SUCCESS;
+- G0 status: **RELEASED**.
