@@ -8,4 +8,4 @@ Planned areas:
 - `deployment/`
 - `scripts/`
 
-Target baseline: Linux intranet deployment, PostgreSQL, web frontend, application/API backend and background workers. Final topology is an open G0 decision pending FAIC infrastructure inventory.
+Target baseline: Linux intranet deployment, PostgreSQL, web frontend, FastAPI application/API backend and background worker processes. The reference topology is defined in `deployment/FAIC-REFERENCE-TOPOLOGY.md`; exact FAIC host sizing is validated before pilot.
