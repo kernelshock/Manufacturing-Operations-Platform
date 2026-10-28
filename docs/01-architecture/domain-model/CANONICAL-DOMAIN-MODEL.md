@@ -103,3 +103,26 @@ KanbanCard 1 --- n ReplenishmentCycle
 ```
 
 A `ReplenishmentLoop` represents the physical supply circuit whose consumers share one reorder policy. Its PP and replenishment quantity are local to that loop, even when the same material exists in other loops.
+
+
+## Recursive product structure and routing
+
+The canonical model must support:
+
+```text
+Article / ProductRevision
+  |
+  +-- ComponentRelation(parent, child, quantity, unit_of_measure)
+  |       |
+  |       +-- child may itself be another manufactured Article
+  |
+  +-- Routing
+          |
+          +-- Operation
+                  |
+                  +-- ResourceAssignment
+```
+
+BOM/ABM depth is not fixed.
+
+Imported operations/resources must be classified before APS scheduling so that costing-only pseudo-operations and pseudo-resources are excluded from physical capacity.
