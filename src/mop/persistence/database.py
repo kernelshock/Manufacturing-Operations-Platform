@@ -1,6 +1,7 @@
 """Database engine and session lifecycle."""
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -19,8 +20,9 @@ class DatabaseManager:
             expire_on_commit=False,
         )
 
+    @contextmanager
     def session(self) -> Iterator[Session]:
-        """Yield a transactional session and always close it."""
+        """Provide a transactional session and always close it."""
 
         with self.session_factory() as db_session:
             yield db_session
