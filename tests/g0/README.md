@@ -26,7 +26,7 @@ python3 -m pytest tests/g0 -q
 Expected result for the current baseline:
 
 ```text
-4 passed
+5 passed
 ```
 
 ## What G0 tests validate
@@ -47,5 +47,8 @@ Not every code block shown in project discussions is a command to execute. Only 
 Current expected local result:
 
 ```text
-4 passed
+5 passed
 ```
+
+
+`test_foundation_decisions.py` verifies that foundation decisions required to leave G0 are explicitly ACCEPTED or DEFERRED rather than silently left open.
