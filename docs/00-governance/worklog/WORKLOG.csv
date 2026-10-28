@@ -1,2 +1,6 @@
 date,gate,module,task,category,actual_hours,result,evidence,rework,rework_reason,status
 2026-10-27,G0,Governance,Repository bootstrap,ARCHITECTURE,,Initial repository structure and governance baseline,PR/commit pending,NO,,IN_PROGRESS
+2026-10-28,G0,Master Data,Prolowin five-product structure analysis,DATA,,Authoritative corpus analyzed and normalization rules defined,docs/04-reference/faic-prolowin-samples/PROLOWIN-REFERENCE-CORPUS-ANALYSIS.md,NO,,COMPLETED
+2026-10-28,G0,Master Data,BOM BOP physical schema and importer contract,ARCHITECTURE,,Canonical schema and import contract defined,docs/01-architecture/data-model/MASTER-DATA-BOM-BOP-PHYSICAL-SCHEMA.md,NO,,COMPLETED
+2026-10-28,G0,Infrastructure,Runtime deployment identity backup and tenancy decisions,ARCHITECTURE,,Reference topology and resilience baseline defined,ADR-0014..ADR-0018,NO,,COMPLETED
+2026-10-28,G0,Governance,G0 automated validation expansion,TEST,,Structure and import-contract validation expanded,tests/g0,NO,,COMPLETED
