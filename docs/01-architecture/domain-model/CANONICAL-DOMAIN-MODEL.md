@@ -144,3 +144,10 @@ SourceStructureRow
 ```
 
 These source rows are normalized into canonical Article, ComponentRelation, Operation and ArticleOperation entities. Repeated operation rows must not be naively summed as independent material demand.
+
+
+## Configuration-specific BOM rule
+
+Product-family membership does not authorize BOM inference.
+
+The canonical BOM/ABM must be effective against the **exact ProductRevision/Configuration**. Cross-variant multipliers may be analyzed for validation or optimization, but they are not a substitute for an explicit source structure.
