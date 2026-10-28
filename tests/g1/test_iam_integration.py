@@ -7,8 +7,9 @@ from sqlalchemy import select
 
 from mop.application import create_app
 from mop.config import Settings
-from mop.iam.models import Role
+from mop.iam.models import AuthSession, Role
 from mop.iam.schemas import RoleAssignmentCreate, UserCreate
+from mop.iam.security import hash_session_token
 from mop.iam.service import IdentityService
 from mop.persistence.database import DatabaseManager
 
@@ -54,6 +55,27 @@ def test_login_me_logout_and_admin_management() -> None:
 
     with TestClient(create_app(settings, database=database)) as client:
         _bootstrap_admin(client, database, suffix)
+
+        raw_token = client.cookies.get(settings.session_cookie_name)
+        assert raw_token is not None
+        set_cookie = client.post(
+            "/api/v1/auth/login",
+            json={
+                "username": f"rbac-admin-{suffix}".lower(),
+                "password": ADMIN_PASSWORD,
+            },
+        ).headers["set-cookie"]
+        assert "HttpOnly" in set_cookie
+        assert "SameSite=strict" in set_cookie
+
+        with database.session() as session:
+            stored = session.scalar(
+                select(AuthSession).where(
+                    AuthSession.token_hash == hash_session_token(client.cookies.get(settings.session_cookie_name))
+                )
+            )
+            assert stored is not None
+            assert stored.token_hash != client.cookies.get(settings.session_cookie_name)
 
         me = client.get("/api/v1/auth/me")
         assert me.status_code == 200
@@ -181,3 +203,6 @@ def test_scoped_role_cannot_escape_assigned_organization() -> None:
             json={"code": f"NO-{suffix}", "name": "Not Allowed"},
         )
         assert create_org.status_code == 403
+
+        iam_users = client.get("/api/v1/iam/users")
+        assert iam_users.status_code == 403
