@@ -11,6 +11,24 @@ on:
 jobs:
   backend-baseline:
     runs-on: ubuntu-latest
+    env:
+      MOP_ENVIRONMENT: test
+      MOP_DATABASE_URL: postgresql+psycopg://mop_test:mop_test@127.0.0.1:5432/mop_test
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: mop_test
+          POSTGRES_USER: mop_test
+          POSTGRES_PASSWORD: mop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mop_test -d mop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -29,6 +47,12 @@ jobs:
 
       - name: Compile backend package
         run: python -m compileall -q src/mop
+
+      - name: Apply database migrations from clean PostgreSQL
+        run: python -m alembic upgrade head
+
+      - name: Verify migration head
+        run: python -m alembic current
 
       - name: Run G0 regression tests
         run: python -m pytest tests/g0 -q
