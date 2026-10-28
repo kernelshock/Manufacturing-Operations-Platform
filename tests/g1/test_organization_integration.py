@@ -3,9 +3,13 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from mop.application import create_app
 from mop.config import Settings
+from mop.iam.models import Role
+from mop.iam.schemas import RoleAssignmentCreate, UserCreate
+from mop.iam.service import IdentityService
 from mop.persistence.database import DatabaseManager
 
 
@@ -14,6 +18,33 @@ pytestmark = pytest.mark.skipif(
     reason="requires an explicit PostgreSQL integration database",
 )
 
+TEST_PASSWORD = "Mop-Test-Admin-Password-2026!"
+
+
+def _login_admin(client: TestClient, database: DatabaseManager, suffix: str) -> None:
+    username = f"admin-{suffix}".lower()
+    with database.session() as session:
+        service = IdentityService(session)
+        user = service.create_user(
+            UserCreate(
+                username=username,
+                display_name="Integration Administrator",
+                password=TEST_PASSWORD,
+            )
+        )
+        admin_role = session.scalar(select(Role).where(Role.code == "ADMIN"))
+        assert admin_role is not None
+        service.assign_role(
+            user.id,
+            RoleAssignmentCreate(role_id=admin_role.id, scope_type="global"),
+        )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": TEST_PASSWORD},
+    )
+    assert response.status_code == 200
+
 
 def test_full_organization_hierarchy_through_api() -> None:
     settings = Settings(environment="test", _env_file=None)
@@ -21,6 +52,8 @@ def test_full_organization_hierarchy_through_api() -> None:
     suffix = uuid4().hex[:8].upper()
 
     with TestClient(create_app(settings, database=database)) as client:
+        _login_admin(client, database, suffix)
+
         organization = client.post(
             "/api/v1/core/organizations",
             json={"code": f"ORG-{suffix}", "name": "FAIC Test Organization"},
@@ -97,11 +130,13 @@ def test_full_organization_hierarchy_through_api() -> None:
         assert [item["code"] for item in resources.json()] == ["R1"]
 
 
-def test_missing_parent_is_rejected() -> None:
+def test_missing_parent_is_rejected_for_authorized_admin() -> None:
     settings = Settings(environment="test", _env_file=None)
     database = DatabaseManager(settings.database_url)
+    suffix = uuid4().hex[:8].upper()
 
     with TestClient(create_app(settings, database=database)) as client:
+        _login_admin(client, database, suffix)
         response = client.post(
             "/api/v1/core/plants",
             json={
@@ -113,3 +148,13 @@ def test_missing_parent_is_rejected() -> None:
 
         assert response.status_code == 404
         assert response.json()["detail"] == "organization not found"
+
+
+def test_core_requires_authentication() -> None:
+    settings = Settings(environment="test", _env_file=None)
+    database = DatabaseManager(settings.database_url)
+
+    with TestClient(create_app(settings, database=database)) as client:
+        response = client.get("/api/v1/core/organizations")
+
+        assert response.status_code == 401
