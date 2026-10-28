@@ -1,3 +1,5 @@
+> **Authority note — 2026-10-28:** the five complete PDFs (X-1148, X-1149, X-2209, X-6111, X-7070) are now the authoritative G0 reference corpus. Earlier screenshot-derived observations are superseded where they differ.
+
 # Prolowin Product Structure Reference Samples
 
 These samples are used during G0 to derive the canonical assimilation rules before importing the complete Prolowin product base.
@@ -18,3 +20,7 @@ These samples are used during G0 to derive the canonical assimilation rules befo
 
 - X-2209 confirms that one manufactured article can traverse multiple productive areas before FIN.
 - BOM/ABM (what is required) and BOP/Routing (how it is produced) must be normalized separately.
+
+- `X-6111` — Apollo; links material 14027 Kanban demand to the complete product structure.
+- `X-7070` — Discovery; validates cross-family reuse and shared subassemblies.
+- Across all five authoritative PDFs, each unique article code has exactly one FIN row; non-FIN rows represent operation states. See ADR-0012.
