@@ -31,7 +31,7 @@ G1 must conform to:
 9. Automated G1 tests and CI evidence.
 
 ## Implementation slices
-- **G1.1 — Executable skeleton:** backend package, FastAPI application factory, configuration and health endpoints.
+- **G1.1 — Executable skeleton — COMPLETED:** backend package, FastAPI application factory, typed configuration, versioned API metadata, liveness/readiness endpoints, packaging manifest and CI baseline.
 - **G1.2 — Persistence:** PostgreSQL connection, SQLAlchemy base, Alembic and initial schema.
 - **G1.3 — Organization model:** Organization, Plant, Area, WorkCenter and Resource.
 - **G1.4 — Identity/RBAC:** User, Role, Permission, assignment and authorization service boundary.
@@ -55,3 +55,11 @@ G1 can move to **VALIDATED** only when:
 - no critical unresolved G1 risk remains without explicit deferral.
 
 G1 becomes **RELEASED** only after explicit approval.
+
+## Slice evidence
+### G1.1 — Executable skeleton
+- implementation head: `d3a0daf076423f3c0c334d198d3936d735f2169f`;
+- GitHub Actions: `G1 Platform Core` run #1;
+- result: **SUCCESS**;
+- checks: package installation, compile, G0 regression and G1 tests;
+- next slice: **G1.2 — Persistence**.
