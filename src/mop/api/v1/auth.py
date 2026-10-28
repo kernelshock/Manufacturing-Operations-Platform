@@ -50,7 +50,8 @@ def logout(
     if token:
         SessionService(session, settings.session_ttl_minutes).revoke(token)
     response.delete_cookie(key=settings.session_cookie_name, path="/")
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return None
 
 
 @router.get("/me", response_model=CurrentUserRead)
