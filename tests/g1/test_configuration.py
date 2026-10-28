@@ -12,6 +12,8 @@ def test_default_settings_are_safe_for_development(
         "MOP_API_PREFIX",
         "MOP_DEBUG",
         "MOP_DATABASE_URL",
+        "MOP_SESSION_TTL_MINUTES",
+        "MOP_SESSION_COOKIE_SECURE",
     ):
         monkeypatch.delenv(variable, raising=False)
 
