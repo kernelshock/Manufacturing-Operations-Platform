@@ -188,3 +188,41 @@ Visible subtotal = 0.172 m3 per X-1148
 Additional branches (C-109, D-113, E-110, F-107, G-158 and deeper children) may add further demand.
 
 This demonstrates why MOP needs a recursive explosion engine with quantity multiplication across levels.
+
+
+## 8. Costing pseudo-operations vs physical production operations
+
+The parent article `X-1148` shows:
+- operation `FIN / COSTEAR COMPONENTES`;
+- executor `5555 / MAQUINA FICTICIA (COSTO)`.
+
+This must not automatically become a schedulable production resource in APS.
+
+By contrast:
+- `A-115`: `ARMAR COMPONENTES` executed by `0050 / CALESITA DE ARMADO`;
+- `B-104`: `SOLDAR COMPONENTES` executed by `0160 / ROBOT SOLD.N°3`;
+
+represent physical production operations/resources.
+
+Therefore imported source operations require classification, for example:
+
+```text
+operation_kind:
+  PHYSICAL_PRODUCTION
+  COSTING_ONLY
+  ADMINISTRATIVE
+  UNKNOWN
+```
+
+and resources require:
+
+```text
+resource_kind:
+  PHYSICAL_MACHINE
+  MANUAL_STATION
+  LABOR_RESOURCE
+  COSTING_PSEUDO_RESOURCE
+  UNKNOWN
+```
+
+Only validated physical production operations/resources may contribute finite capacity to APS.
