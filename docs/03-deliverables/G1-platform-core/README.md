@@ -36,7 +36,7 @@ G1 must conform to:
 - **G1.3 — Organization model — COMPLETED:** Organization, Plant, Area, WorkCenter and Resource persisted through contextual business-code constraints and versioned REST APIs.
 - **G1.4 — Identity/RBAC — COMPLETED:** local users, Argon2 password hashing, opaque server-side sessions, roles, seeded permissions, scoped assignments and server-side authorization.
 - **G1.5 — Audit — COMPLETED:** PostgreSQL-enforced append-only audit events for authentication, IAM administration and privileged/core mutations, with read-only RBAC-protected query API.
-- **G1.6 — Frontend shell:** React/TypeScript/Vite application shell consuming the documented API.
+- **G1.6 — Frontend shell — COMPLETED:** React/TypeScript/Vite browser shell with secure login, session bootstrap, permission-driven navigation, organization/plant context, backend readiness, audit view and CI build/test gate.
 - **G1.7 — Runtime:** Docker Compose DEV/TEST topology and configuration examples without committed secrets.
 - **G1.8 — Gate hardening:** tests, evidence, security review and release-facing summary.
 
@@ -107,3 +107,17 @@ G1 becomes **RELEASED** only after explicit approval.
 - G0 regression: 5 passed;
 - G1 suite: 24 passed;
 - next slice: **G1.6 — Frontend shell**.
+
+### G1.6 — Frontend shell
+- implementation head: `acf5ecfff66088482683eb6114ed32b5a24a70b2`;
+- GitHub Actions: `G1 Platform Core` run #81;
+- result: **SUCCESS**;
+- Node.js CI: 26.13.0 LTS;
+- React: 19.3.1;
+- Vite: 8.3.5;
+- TypeScript: 7.0.2;
+- frontend typecheck: passed;
+- frontend tests: 6 passed;
+- production build: passed;
+- backend regression: G0 5 passed / G1 24 passed;
+- next slice: **G1.7 — Runtime**.
