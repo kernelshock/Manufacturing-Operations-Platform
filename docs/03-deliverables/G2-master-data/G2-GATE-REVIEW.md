@@ -2,7 +2,7 @@
 
 Date: 2026-10-29  
 Gate: G2 — Master Data  
-Decision: **VALIDATED — RELEASE APPROVAL PENDING**
+Decision: **RELEASED**
 
 ## Scope reviewed
 G2.1 through G2.8:
@@ -73,6 +73,14 @@ Canonical hardening validation:
 ## Governance decision
 G2 may transition from **IN PROGRESS** to **VALIDATED**.
 
-G2 may **not** transition to RELEASED yet.
+Explicit release approval was received on 2026-10-29. PR #8 was marked ready and merged to `main` as `e476edb8f1862613ff90f2a22a514d3f53a05ec5`.
 
-PR #8 remains DRAFT. Merge/release requires an explicit release decision under ADR-0004.
+Final disposition: **RELEASED** under ADR-0004.
+
+
+## Release execution
+- explicit approval received after the VALIDATED checkpoint;
+- final validated head: `846db245cff59d86c26807bd6d256fa77ab68189`;
+- PR #8: merged;
+- release merge commit: `e476edb8f1862613ff90f2a22a514d3f53a05ec5`;
+- no unresolved release blocker remained at merge time.

@@ -1,6 +1,6 @@
 # G2 — Master Data
 
-Status: **VALIDATED**  
+Status: **RELEASED**  
 Started: 2026-10-29  
 Base: released G1 main `ac8e27f7596fda999f17253a646c06386ed1cfae`
 
@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current status
-G2 is **VALIDATED** and awaiting an explicit release decision. PR #8 remains DRAFT; validation does not authorize merge or release.
+G2 is **RELEASED**. Explicit release approval was received on 2026-10-29; PR #8 was marked ready and merged to `main` as `e476edb8f1862613ff90f2a22a514d3f53a05ec5`.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -211,4 +211,15 @@ G2 is **VALIDATED** and awaiting an explicit release decision. PR #8 remains DRA
 
 Hardening exposed one pre-existing metadata drift in G1 IAM index naming. The physical schema was already correct: migrations contained `ix_iam_assignment_user_id` and `ix_iam_assignment_role_id`, while ORM `index=True` generated different expected names. The ORM metadata now declares the persisted index names explicitly; no data migration or schema rewrite was required.
 
-Exit assessment: **VALIDATED**. Release remains governed by ADR-0004 and requires explicit approval before PR merge/release.
+Exit assessment: **RELEASED**. Explicit approval was received and PR #8 was merged to `main` on 2026-10-29.
+
+
+## Release record — 2026-10-29
+- final validated branch head: `846db245cff59d86c26807bd6d256fa77ab68189`;
+- final G2 push run #53: **SUCCESS**;
+- final G2 PR run #54: **SUCCESS**;
+- final G0 PR run #106: **SUCCESS**;
+- final G1 PR run #121: **SUCCESS**;
+- PR #8 marked ready and merged;
+- merge commit: `e476edb8f1862613ff90f2a22a514d3f53a05ec5`;
+- gate lifecycle: `PLANNED → IN PROGRESS → VALIDATED → RELEASED`.

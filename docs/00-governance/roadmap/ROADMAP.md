@@ -12,7 +12,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 |---|---|---|---|
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
-| G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | IN PROGRESS |
+| G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
@@ -142,3 +142,16 @@ Resolved/deferred for G0:
 - implementation follows the G0 Master Data/BOM/BOP schema and Prolowin import contract;
 - G2.1 starts with Article/ArticleRevision and UoM/UoMAlias as the prerequisite canonical identities;
 - G2 status: **IN PROGRESS**.
+
+
+## G2 release record — 2026-10-29
+- explicit release approval received through project direction: **"avanza al siguiente"**, following the recorded G2 VALIDATED checkpoint and release-decision request;
+- final validated branch head: `846db245cff59d86c26807bd6d256fa77ab68189`;
+- hardening implementation head: `3ee6e6b1f83346a3a6a78702ccaa68a9a39913f7`;
+- G2 Master Data final push run #53: **SUCCESS**;
+- G2 Master Data final PR run #54: **SUCCESS**;
+- G0 Architecture Structure final PR run #106: **SUCCESS**;
+- G1 Platform Core final PR run #121: **SUCCESS**;
+- PR #8 marked ready and merged into `main`;
+- release merge commit: `e476edb8f1862613ff90f2a22a514d3f53a05ec5`;
+- G2 status: **RELEASED**.
