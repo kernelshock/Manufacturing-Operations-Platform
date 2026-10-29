@@ -4,6 +4,7 @@ import type { CurrentUser } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { visibleModules, type ModuleId } from "../lib/permissions";
 import { AuditPanel } from "./AuditPanel";
+import { MasterDataPanel } from "./MasterDataPanel";
 import {
   ContextSelector,
   type PlantContext
@@ -116,6 +117,7 @@ export function AppShell({ user }: { user: CurrentUser }) {
           {activeModule.id === "structure" ? (
             <StructurePanel context={context} />
           ) : null}
+          {activeModule.id === "master-data" ? <MasterDataPanel /> : null}
           {activeModule.id === "audit" ? <AuditPanel /> : null}
           {activeModule.id === "admin" ? (
             <AdminPanel permissions={user.permissions} />

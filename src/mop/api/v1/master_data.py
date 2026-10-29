@@ -14,6 +14,8 @@ from mop.master_data.schemas import (
     ArticleRead,
     ArticleRevisionCreate,
     ArticleRevisionRead,
+    ProductConfigurationCreate,
+    ProductConfigurationRead,
     UnitOfMeasureAliasCreate,
     UnitOfMeasureAliasRead,
     UnitOfMeasureCreate,
@@ -22,6 +24,7 @@ from mop.master_data.schemas import (
 from mop.master_data.service import (
     MasterDataConflictError,
     MasterDataNotFoundError,
+    MasterDataRuleError,
     MasterDataService,
 )
 from mop.persistence.dependencies import get_session
@@ -40,6 +43,10 @@ def _translate(operation):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except MasterDataConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except MasterDataRuleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 def _audit(
@@ -206,3 +213,59 @@ def list_article_revisions(
     _: User = Depends(require_global_permission("masterdata.read")),
 ):
     return _translate(lambda: app.list_article_revisions(article_id))
+
+
+@router.post(
+    "/product-configurations",
+    response_model=ProductConfigurationRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_product_configuration(
+    payload: ProductConfigurationCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_product_configuration(payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.product_configuration.create",
+        object_type="product_configuration",
+        object_id=created.id,
+        details={
+            "article_id": str(created.article_id),
+            "family_code": created.family_code,
+            "model_code": created.model_code,
+            "product_class": created.product_class,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/product-configurations",
+    response_model=list[ProductConfigurationRead],
+)
+def list_product_configurations(
+    family_code: str | None = None,
+    model_code: str | None = None,
+    active: bool | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_product_configurations(family_code, model_code, active)
+
+
+@router.get(
+    "/articles/{article_id}/product-configuration",
+    response_model=ProductConfigurationRead,
+)
+def get_product_configuration(
+    article_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(lambda: app.get_product_configuration(article_id))

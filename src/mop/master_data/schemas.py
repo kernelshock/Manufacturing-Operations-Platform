@@ -131,3 +131,37 @@ class ArticleRevisionRead(BaseModel):
     source_batch_id: UUID | None
     approved_at: datetime | None
     approved_by: UUID | None
+
+
+class ProductConfigurationCreate(BaseModel):
+    article_id: UUID
+    family_code: str = Field(min_length=1, max_length=64)
+    family_name: str = Field(min_length=1, max_length=255)
+    model_code: str = Field(min_length=1, max_length=64)
+    model_name: str = Field(min_length=1, max_length=255)
+    product_class: str = Field(min_length=1, max_length=64)
+    width: Decimal | None = Field(default=None, gt=0)
+    width_uom_id: UUID | None = None
+    configuration_string: str = Field(min_length=1, max_length=4000)
+    active: bool = True
+
+    _family_code = field_validator("family_code")(_upper_trim)
+    _family_name = field_validator("family_name")(_trim)
+    _model_code = field_validator("model_code")(_upper_trim)
+    _model_name = field_validator("model_name")(_trim)
+    _product_class = field_validator("product_class")(_trim)
+    _configuration = field_validator("configuration_string")(_trim)
+
+    @model_validator(mode="after")
+    def validate_width_unit_pair(self) -> "ProductConfigurationCreate":
+        if (self.width is None) != (self.width_uom_id is None):
+            raise ValueError("width and width_uom_id must be provided together")
+        return self
+
+
+class ProductConfigurationRead(ProductConfigurationCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime
+    updated_at: datetime

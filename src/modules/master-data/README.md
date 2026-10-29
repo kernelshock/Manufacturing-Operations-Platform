@@ -18,3 +18,16 @@ Important boundaries:
 - no delete/update endpoint is introduced for historical definitions;
 - Resource remains owned by G1 Core and is only referenced by later Routing/BOP records;
 - raw FAIC/Prolowin source files remain outside the public repository.
+
+
+Implemented in G2.2:
+- ProductConfiguration as a one-to-one commercial/manufacturing projection of an exact FINISHED_PRODUCT Article;
+- family and model codes/names;
+- explicit product class;
+- Decimal width with mandatory active canonical LENGTH UoM;
+- human-readable configuration string;
+- filtered read API and exact Article lookup;
+- permission-driven frontend read surface;
+- immutable audit event on configuration creation.
+
+ProductConfiguration never becomes the BOM/Routing key: the exact Article/ArticleRevision remains authoritative.

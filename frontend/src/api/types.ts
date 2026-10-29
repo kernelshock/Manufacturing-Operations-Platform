@@ -49,3 +49,27 @@ export type AuditEntry = {
   outcome: string;
   request_id: string | null;
 };
+
+export type UnitOfMeasure = {
+  id: string;
+  code: string;
+  dimension: "COUNT" | "LENGTH" | "MASS" | "VOLUME" | "OTHER";
+  canonical: boolean;
+  active: boolean;
+};
+
+export type ProductConfiguration = {
+  id: string;
+  article_id: string;
+  family_code: string;
+  family_name: string;
+  model_code: string;
+  model_name: string;
+  product_class: string;
+  width: string | null;
+  width_uom_id: string | null;
+  configuration_string: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};

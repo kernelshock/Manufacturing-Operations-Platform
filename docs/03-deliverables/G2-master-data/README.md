@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current slice
-G2.1 — Article & UoM foundation.
+G2.2 — Product configurations.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;

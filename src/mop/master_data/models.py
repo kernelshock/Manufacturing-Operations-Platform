@@ -39,6 +39,9 @@ class UnitOfMeasure(Base):
 
     aliases: Mapped[list["UnitOfMeasureAlias"]] = relationship(back_populates="uom")
     articles: Mapped[list["Article"]] = relationship(back_populates="default_uom")
+    product_configuration_widths: Mapped[list["ProductConfiguration"]] = relationship(
+        back_populates="width_uom"
+    )
 
 
 class UnitOfMeasureAlias(Base):
@@ -110,6 +113,9 @@ class Article(Base):
     revisions: Mapped[list["ArticleRevision"]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
     )
+    product_configuration: Mapped["ProductConfiguration | None"] = relationship(
+        back_populates="article", uselist=False
+    )
 
 
 class ArticleRevision(Base):
@@ -140,3 +146,46 @@ class ArticleRevision(Base):
     )
 
     article: Mapped[Article] = relationship(back_populates="revisions")
+
+
+class ProductConfiguration(Base):
+    __tablename__ = "md_product_configuration"
+    __table_args__ = (
+        UniqueConstraint("article_id", name="uq_md_product_configuration_article"),
+        CheckConstraint(
+            "width IS NULL OR width > 0",
+            name="ck_md_product_configuration_width_positive",
+        ),
+        CheckConstraint(
+            "(width IS NULL AND width_uom_id IS NULL) OR "
+            "(width IS NOT NULL AND width_uom_id IS NOT NULL)",
+            name="ck_md_product_configuration_width_pair",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    article_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_article.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    family_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    family_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    product_class: Mapped[str] = mapped_column("class", String(64), nullable=False)
+    width: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    width_uom_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_uom.id", ondelete="RESTRICT"), nullable=True
+    )
+    configuration_string: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    article: Mapped[Article] = relationship(back_populates="product_configuration")
+    width_uom: Mapped[UnitOfMeasure | None] = relationship(
+        back_populates="product_configuration_widths"
+    )

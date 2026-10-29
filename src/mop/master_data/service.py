@@ -8,16 +8,27 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mop.master_data.models import Article, ArticleRevision, UnitOfMeasure, UnitOfMeasureAlias
+from mop.master_data.models import (
+    Article,
+    ArticleRevision,
+    ProductConfiguration,
+    UnitOfMeasure,
+    UnitOfMeasureAlias,
+)
 from mop.master_data.schemas import (
     ArticleCreate,
     ArticleRevisionCreate,
+    ProductConfigurationCreate,
     UnitOfMeasureAliasCreate,
     UnitOfMeasureCreate,
 )
 
 
 class MasterDataConflictError(ValueError):
+    pass
+
+
+class MasterDataRuleError(ValueError):
     pass
 
 
@@ -116,3 +127,67 @@ class MasterDataService:
             .where(ArticleRevision.article_id == article_id)
             .order_by(ArticleRevision.valid_from.desc())
         ).all()
+
+    def create_product_configuration(
+        self,
+        data: ProductConfigurationCreate,
+    ) -> ProductConfiguration:
+        article = self.session.get(Article, data.article_id)
+        if article is None:
+            raise MasterDataNotFoundError("article not found")
+        if article.article_kind != "FINISHED_PRODUCT":
+            raise MasterDataRuleError(
+                "product configuration requires a FINISHED_PRODUCT article"
+            )
+
+        if data.width_uom_id is not None:
+            width_uom = self.session.get(UnitOfMeasure, data.width_uom_id)
+            if width_uom is None:
+                raise MasterDataNotFoundError("width unit of measure not found")
+            if (
+                width_uom.dimension != "LENGTH"
+                or not width_uom.canonical
+                or not width_uom.active
+            ):
+                raise MasterDataRuleError(
+                    "width unit must be an active canonical LENGTH unit"
+                )
+
+        return self._commit(ProductConfiguration(**data.model_dump()))
+
+    def list_product_configurations(
+        self,
+        family_code: str | None = None,
+        model_code: str | None = None,
+        active: bool | None = None,
+    ) -> Sequence[ProductConfiguration]:
+        query = select(ProductConfiguration)
+        if family_code:
+            query = query.where(
+                ProductConfiguration.family_code == family_code.strip().upper()
+            )
+        if model_code:
+            query = query.where(
+                ProductConfiguration.model_code == model_code.strip().upper()
+            )
+        if active is not None:
+            query = query.where(ProductConfiguration.active == active)
+        return self.session.scalars(
+            query.order_by(
+                ProductConfiguration.family_code,
+                ProductConfiguration.model_code,
+                ProductConfiguration.configuration_string,
+            )
+        ).all()
+
+    def get_product_configuration(self, article_id: UUID) -> ProductConfiguration:
+        if self.session.get(Article, article_id) is None:
+            raise MasterDataNotFoundError("article not found")
+        configuration = self.session.scalar(
+            select(ProductConfiguration).where(
+                ProductConfiguration.article_id == article_id
+            )
+        )
+        if configuration is None:
+            raise MasterDataNotFoundError("product configuration not found")
+        return configuration

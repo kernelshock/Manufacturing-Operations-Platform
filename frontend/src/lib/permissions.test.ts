@@ -20,6 +20,15 @@ describe("permission-driven navigation", () => {
     expect(modules).toContain("structure");
   });
 
+  it("exposes Master Data only with a Master Data capability", () => {
+    expect(
+      visibleModules(["masterdata.read"]).map((item) => item.id)
+    ).toContain("master-data");
+    expect(
+      visibleModules(["masterdata.edit"]).map((item) => item.id)
+    ).toContain("master-data");
+  });
+
   it("exposes administration with either administrative capability", () => {
     expect(
       visibleModules(["admin.users"]).map((item) => item.id)
