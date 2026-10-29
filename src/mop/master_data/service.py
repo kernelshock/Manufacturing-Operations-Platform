@@ -1467,6 +1467,7 @@ class MasterDataService:
     def _assert_calendar_publishable(
         self,
         calendar: ManufacturingCalendar,
+        ignore_calendar_id: UUID | None = None,
     ) -> None:
         windows = self.session.scalars(
             select(CalendarWeeklyWindow).where(
@@ -1493,6 +1494,8 @@ class MasterDataService:
             )
         ).all()
         for existing in active_calendars:
+            if existing.id == ignore_calendar_id:
+                continue
             existing_scope, existing_target_id = self._calendar_target(existing)
             if (
                 existing_scope == target_scope
@@ -1575,7 +1578,10 @@ class MasterDataService:
             )
 
         replacement.valid_from = effective_on
-        self._assert_calendar_publishable(replacement)
+        self._assert_calendar_publishable(
+            replacement,
+            ignore_calendar_id=active.id,
+        )
 
         active.valid_to = effective_on
         active.status = "SUPERSEDED"
