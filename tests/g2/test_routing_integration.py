@@ -342,13 +342,13 @@ def test_routing_supersede_preserves_history() -> None:
 
     with TestClient(create_app(settings, database=database)) as client:
         _login_admin(client, database, suffix)
-        article_id, revision_1 = _article_revision(client, suffix, "g")
+        article_id, revision_1 = _article_revision(client, suffix, "a")
 
         revision_2_response = client.post(
             f"/api/v1/master-data/articles/{article_id}/revisions",
             json={
-                "revision_label": "h",
-                "source_fingerprint": "h" * 64,
+                "revision_label": "b",
+                "source_fingerprint": "b" * 64,
             },
         )
         assert revision_2_response.status_code == 201
