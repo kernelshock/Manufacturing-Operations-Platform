@@ -18,7 +18,7 @@ services:
       POSTGRES_USER: ${MOP_POSTGRES_USER:-mop}
       POSTGRES_PASSWORD: ${MOP_POSTGRES_PASSWORD:?Set MOP_POSTGRES_PASSWORD in the runtime env file}
     volumes:
-      - mop_postgres_data:/var/lib/postgresql/data
+      - mop_postgres_data:/var/lib/postgresql
     healthcheck:
       test:
         - CMD-SHELL
