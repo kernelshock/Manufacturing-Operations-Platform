@@ -360,9 +360,11 @@ class ProlowinService:
             )
             if root_article is not None:
                 root_revision = self.session.scalar(
-                    select(ArticleRevision)
-                    .where(ArticleRevision.article_id == root_article.id)
-                    .order_by(ArticleRevision.valid_from.desc())
+                    select(ArticleRevision).where(
+                        ArticleRevision.article_id == root_article.id,
+                        ArticleRevision.source_fingerprint
+                        == snapshot.normalized_fingerprint,
+                    )
                 )
                 if root_revision is not None:
                     root_revision_id = root_revision.id
@@ -1286,19 +1288,9 @@ class ProlowinService:
         )
 
         if snapshot.root_article_code != root_article.external_code:
-            blockers.append(
-                self._issue(
-                    batch_id=batch.id,
-                    entity_type="reconciliation",
-                    entity_key=root_article.external_code,
-                    rule_code="PLW_RECONCILIATION_ROOT_MISMATCH",
-                    severity="BLOCKER",
-                    message="Complete FIN snapshot root does not match BOM root article",
-                    source_value=snapshot.root_article_code,
-                    suggested_action="Select the BOM revision for the same exact root article.",
-                )
+            raise ProlowinRuleError(
+                "complete FIN snapshot root does not match BOM root article"
             )
-            self.session.flush()
 
         if blockers:
             run = ReconciliationRun(
