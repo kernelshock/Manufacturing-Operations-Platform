@@ -1,6 +1,6 @@
 # G2 — Master Data
 
-Status: **IN PROGRESS**  
+Status: **VALIDATED**  
 Started: 2026-10-29  
 Base: released G1 main `ac8e27f7596fda999f17253a646c06386ed1cfae`
 
@@ -25,7 +25,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 - **G2.5 — Routing/BOP — COMPLETED:** revisioned Routing/BOP, operation semantics, effectivity and references to G1 Area/WorkCenter/Resource identities.
 - **G2.6 — Calendars/effectivity — COMPLETED:** versioned manufacturing calendars, hierarchical Plant/Area/WorkCenter/Resource resolution, weekly capacity windows, dated exceptions and historical effectivity.
 - **G2.7 — Prolowin assimilation — COMPLETED:** immutable staging, FIN normalization, routing evidence separation, direct parent-child candidate BOMs, DQ quarantine and canonical reconciliation.
-- **G2.8 — Gate hardening:** regression corpus, import/reconciliation evidence, security and release-facing summary.
+- **G2.8 — Gate hardening — COMPLETED:** migration drift detection, full downgrade/replay, regression corpus, dependency/security gates, runtime validation and release-facing evidence.
 
 ## G2 exit criteria
 G2 is eligible for VALIDATED only when:
@@ -44,8 +44,8 @@ G2 is eligible for VALIDATED only when:
 - G0/G1 regression, G2 tests, dependency audits and runtime regression are green;
 - explicit release approval is received before merge/release.
 
-## Current slice
-G2.8 — Gate hardening.
+## Current status
+G2 is **VALIDATED** and awaiting an explicit release decision. PR #8 remains DRAFT; validation does not authorize merge or release.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -189,3 +189,26 @@ G2.8 — Gate hardening.
 - npm audit: 0 vulnerabilities;
 - runtime regression: passed;
 - next slice: **G2.8 — Gate hardening**.
+
+
+### G2.8 — Gate hardening
+- hardening implementation head: `3ee6e6b1f83346a3a6a78702ccaa68a9a39913f7`;
+- GitHub Actions: `G2 Master Data` push run #51 — **SUCCESS**;
+- Alembic: exactly one head, `0012_g2_7`;
+- clean PostgreSQL upgrade from base to head: **PASS**;
+- SQLAlchemy/Alembic schema drift check: **PASS**;
+- full `downgrade base` then `upgrade head` replay: **PASS**;
+- G0 regression: **5 passed**;
+- G1 regression: **30 passed**;
+- G2 regression: **48 passed**;
+- frontend: **7 passed** + typecheck + production build;
+- repository secret scan and supply-chain pin checks: **PASS**;
+- Python dependency audit: **no known vulnerabilities**;
+- npm audit: **0 vulnerabilities**;
+- released-runtime regression: **PASS**;
+- G2 aggregate gate: **PASS**;
+- no release action performed.
+
+Hardening exposed one pre-existing metadata drift in G1 IAM index naming. The physical schema was already correct: migrations contained `ix_iam_assignment_user_id` and `ix_iam_assignment_role_id`, while ORM `index=True` generated different expected names. The ORM metadata now declares the persisted index names explicitly; no data migration or schema rewrite was required.
+
+Exit assessment: **VALIDATED**. Release remains governed by ADR-0004 and requires explicit approval before PR merge/release.
