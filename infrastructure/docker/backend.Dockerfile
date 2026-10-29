@@ -8,12 +8,12 @@ WORKDIR /app
 
 RUN groupadd --system mop && useradd --system --gid mop --home-dir /app mop
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements-prod.lock.txt ./
 COPY src ./src
 COPY migrations ./migrations
 COPY alembic.ini ./
 
-RUN python -m pip install --no-cache-dir .
+RUN python -m pip install --no-cache-dir -c requirements-prod.lock.txt .
 
 RUN chown -R mop:mop /app
 USER mop

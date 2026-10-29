@@ -29,10 +29,15 @@ vite = "8.3.5"
 typescript = "7.0.2"
 vite_react_plugin = "6.1.2"
 vitest = "5.0.5"
+lockfile = "frontend/package-lock.json"
+
+[python]
+production_lock = "requirements-prod.lock.txt"
+development_lock = "requirements-dev.lock.txt"
 
 [notes]
 postgresql_19 = "Not approved for this baseline; 19 is still release-candidate as of 2026-10-28."
-dependency_lockfiles = "Generated and promoted during G1.8 hardening."
+dependency_lockfiles = "Promoted from validated Python 3.14 / Node 26 CI resolution and enforced by CI/runtime builds."
 background_worker = "Deferred until the persistent job/outbox worker contract exists."
 backup_restore = "Operational backup automation and restore evidence required before Parallel/Production per ADR-0017; not a DEV/TEST G1 blocker."
 
