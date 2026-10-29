@@ -204,7 +204,7 @@ def test_recursive_bom_explosion_multiplies_quantities_and_retains_paths() -> No
         assert sub_line["leaf"] is False
         assert sub_line["path_component_ids"] == [sub_component_id]
 
-        assert material_line["quantity"] == "13.2000000000000000"
+        assert Decimal(material_line["quantity"]) == Decimal("13.2")
         assert material_line["leaf"] is True
         assert material_line["path_article_codes"] == [
             f"ROOT-{suffix}",
