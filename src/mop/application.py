@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from typing import Protocol
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from mop import __version__
 from mop.api.health import router as health_router
@@ -44,6 +44,18 @@ def create_app(
     )
     app.state.settings = runtime_settings
     app.state.database = runtime_database
+
+    @app.middleware("http")
+    async def sensitive_response_cache_control(request: Request, call_next):
+        response = await call_next(request)
+        sensitive_prefixes = (
+            f"{runtime_settings.api_prefix}/auth",
+            f"{runtime_settings.api_prefix}/iam",
+            f"{runtime_settings.api_prefix}/audit",
+        )
+        if request.url.path.startswith(sensitive_prefixes):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     app.include_router(health_router)
     app.include_router(api_v1_router, prefix=runtime_settings.api_prefix)

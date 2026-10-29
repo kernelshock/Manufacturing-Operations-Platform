@@ -26,8 +26,9 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Direct URL remains available for manual/local development and CI.
+    # No password is embedded in source control.
     database_url: str = (
-        "postgresql+psycopg://mop:mop_dev_only@127.0.0.1:5432/mop?connect_timeout=2"
+        "postgresql+psycopg://mop@127.0.0.1:5432/mop?connect_timeout=2"
     )
 
     # Container/runtime deployments may provide discrete components so
@@ -41,6 +42,8 @@ class Settings(BaseSettings):
     session_cookie_name: str = "mop_session"
     session_ttl_minutes: int = 480
     session_cookie_secure: bool = False
+    login_max_failures: int = 5
+    login_lockout_minutes: int = 15
 
     model_config = SettingsConfigDict(
         env_prefix="MOP_",
@@ -97,6 +100,13 @@ class Settings(BaseSettings):
         if prefix != "/" and prefix.endswith("/"):
             prefix = prefix.rstrip("/")
         return prefix
+
+    @field_validator("login_max_failures", "login_lockout_minutes")
+    @classmethod
+    def validate_positive_security_integer(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("security thresholds must be positive")
+        return value
 
 
 @lru_cache

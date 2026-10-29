@@ -5,7 +5,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mop.persistence.base import Base
@@ -19,12 +30,31 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_login_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
-    role_assignments: Mapped[list["UserRoleAssignment"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    sessions: Mapped[list["AuthSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    role_assignments: Mapped[list["UserRoleAssignment"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    sessions: Mapped[list["AuthSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Role(Base):
@@ -36,10 +66,16 @@ class Role(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
-    permissions: Mapped[list["RolePermission"]] = relationship(back_populates="role", cascade="all, delete-orphan")
-    assignments: Mapped[list["UserRoleAssignment"]] = relationship(back_populates="role")
+    permissions: Mapped[list["RolePermission"]] = relationship(
+        back_populates="role", cascade="all, delete-orphan"
+    )
+    assignments: Mapped[list["UserRoleAssignment"]] = relationship(
+        back_populates="role"
+    )
 
 
 class Permission(Base):
@@ -49,14 +85,20 @@ class Permission(Base):
     code: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     description: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    roles: Mapped[list["RolePermission"]] = relationship(back_populates="permission", cascade="all, delete-orphan")
+    roles: Mapped[list["RolePermission"]] = relationship(
+        back_populates="permission", cascade="all, delete-orphan"
+    )
 
 
 class RolePermission(Base):
     __tablename__ = "iam_role_permission"
 
-    role_id: Mapped[UUID] = mapped_column(ForeignKey("iam_role.id", ondelete="CASCADE"), primary_key=True)
-    permission_id: Mapped[UUID] = mapped_column(ForeignKey("iam_permission.id", ondelete="CASCADE"), primary_key=True)
+    role_id: Mapped[UUID] = mapped_column(
+        ForeignKey("iam_role.id", ondelete="CASCADE"), primary_key=True
+    )
+    permission_id: Mapped[UUID] = mapped_column(
+        ForeignKey("iam_permission.id", ondelete="CASCADE"), primary_key=True
+    )
 
     role: Mapped[Role] = relationship(back_populates="permissions")
     permission: Mapped[Permission] = relationship(back_populates="roles")
@@ -89,11 +131,19 @@ class UserRoleAssignment(Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("iam_user.id", ondelete="CASCADE"), nullable=False, index=True)
-    role_id: Mapped[UUID] = mapped_column(ForeignKey("iam_role.id", ondelete="RESTRICT"), nullable=False, index=True)
-    scope_type: Mapped[str] = mapped_column(String(32), nullable=False, default="global")
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role_id: Mapped[UUID] = mapped_column(
+        ForeignKey("iam_role.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    scope_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="global"
+    )
     scope_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="role_assignments")
     role: Mapped[Role] = relationship(back_populates="assignments")
@@ -103,11 +153,21 @@ class AuthSession(Base):
     __tablename__ = "iam_session"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("iam_user.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped[User] = relationship(back_populates="sessions")

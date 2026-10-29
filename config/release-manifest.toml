@@ -11,6 +11,12 @@ container_topology = "docker-compose-dev-test"
 published_boundary = "frontend-reverse-proxy-only"
 postgresql_volume_root = "/var/lib/postgresql"
 
+[container_images]
+python = "python:3.14-slim@sha256:cd89c30eda26ee911a4611b18680086e0ea42e6f5f8cbe653d07fa7958c9cec8"
+node = "node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94"
+nginx = "nginx:alpine@sha256:785835ea65db4bba6f021acc0f3be91b0fef76a53fe41f8588c6698d2aed0606"
+postgresql = "postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4"
+
 [persistence]
 sqlalchemy_series = "2.1"
 alembic_series = "1.20"
@@ -26,10 +32,14 @@ vitest = "5.0.5"
 
 [notes]
 postgresql_19 = "Not approved for this baseline; 19 is still release-candidate as of 2026-10-28."
-container_digest_pinning = "Deferred to G1.8 gate hardening."
+dependency_lockfiles = "Generated and promoted during G1.8 hardening."
 background_worker = "Deferred until the persistent job/outbox worker contract exists."
+backup_restore = "Operational backup automation and restore evidence required before Parallel/Production per ADR-0017; not a DEV/TEST G1 blocker."
 
 [security]
 pwdlib_series = "0.3"
 password_hash = "argon2"
 session_model = "opaque-server-side-cookie"
+login_max_failures = 5
+login_lockout_minutes = 15
+reverse_proxy_login_rate = "10r/m burst 5"

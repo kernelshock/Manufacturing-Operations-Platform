@@ -1,6 +1,6 @@
 """Identity lifecycle and RBAC assignment services."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from mop.core.models import Area, Organization, Plant
 from mop.iam.models import Permission, Role, RolePermission, User, UserRoleAssignment
 from mop.iam.schemas import RoleAssignmentCreate, RoleCreate, UserCreate
-from mop.iam.security import hash_password, verify_password
+from mop.iam.security import hash_password, verify_password_or_dummy
 
 
 class IdentityConflictError(ValueError):
@@ -65,31 +65,63 @@ class IdentityService:
     def list_permissions(self):
         return self.session.scalars(select(Permission).order_by(Permission.code)).all()
 
-    def authenticate(self, username: str, password: str) -> User | None:
+    def authenticate(
+        self,
+        username: str,
+        password: str,
+        *,
+        max_failures: int = 5,
+        lockout_minutes: int = 15,
+    ) -> User | None:
         normalized = username.strip().lower()
         user = self.session.scalar(select(User).where(User.username == normalized))
+
+        password_valid = verify_password_or_dummy(
+            password,
+            user.password_hash if user is not None else None,
+        )
         if user is None or not user.enabled:
             return None
-        if not verify_password(password, user.password_hash):
+
+        now = datetime.now(timezone.utc)
+        if user.locked_until is not None and user.locked_until > now:
             return None
-        user.last_login_at = datetime.now(timezone.utc)
+
+        if not password_valid:
+            user.failed_login_count += 1
+            if user.failed_login_count >= max_failures:
+                user.locked_until = now + timedelta(minutes=lockout_minutes)
+            self.session.commit()
+            return None
+
+        user.failed_login_count = 0
+        user.locked_until = None
+        user.last_login_at = now
         self.session.commit()
         self.session.refresh(user)
         return user
 
-    def grant_permission(self, role_id: UUID, permission_code: str) -> RolePermission:
+    def grant_permission(
+        self, role_id: UUID, permission_code: str
+    ) -> RolePermission:
         role = self.session.get(Role, role_id)
         if role is None:
             raise IdentityNotFoundError("role not found")
-        permission = self.session.scalar(select(Permission).where(Permission.code == permission_code))
+        permission = self.session.scalar(
+            select(Permission).where(Permission.code == permission_code)
+        )
         if permission is None:
             raise IdentityNotFoundError("permission not found")
         existing = self.session.get(RolePermission, (role.id, permission.id))
         if existing is not None:
             return existing
-        return self._commit(RolePermission(role_id=role.id, permission_id=permission.id))
+        return self._commit(
+            RolePermission(role_id=role.id, permission_id=permission.id)
+        )
 
-    def assign_role(self, user_id: UUID, data: RoleAssignmentCreate) -> UserRoleAssignment:
+    def assign_role(
+        self, user_id: UUID, data: RoleAssignmentCreate
+    ) -> UserRoleAssignment:
         user = self.session.get(User, user_id)
         if user is None:
             raise IdentityNotFoundError("user not found")

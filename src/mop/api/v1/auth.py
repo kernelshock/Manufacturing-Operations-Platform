@@ -25,17 +25,25 @@ def login(
 ):
     settings = request.app.state.settings
     audit_context = request_audit_context(request)
-    user = IdentityService(session).authenticate(payload.username, payload.password)
+    user = IdentityService(session).authenticate(
+        payload.username,
+        payload.password,
+        max_failures=settings.login_max_failures,
+        lockout_minutes=settings.login_lockout_minutes,
+    )
     if user is None:
         AuditService(session).record(
             action="auth.login.failure",
             object_type="user_session",
             outcome="failure",
             actor_username=payload.username,
-            details={"reason": "invalid_credentials"},
+            details={"reason": "invalid_credentials_or_locked"},
             **audit_context,
         )
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid credentials",
+        )
 
     raw_token = SessionService(session, settings.session_ttl_minutes).create(user)
     AuditService(session).record(
