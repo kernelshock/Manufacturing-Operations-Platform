@@ -1,5 +1,7 @@
 """Canonical Master Data API."""
 
+from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -14,6 +16,12 @@ from mop.master_data.schemas import (
     ArticleRead,
     ArticleRevisionCreate,
     ArticleRevisionRead,
+    BOMComponentCreate,
+    BOMComponentRead,
+    BOMExplosionRead,
+    BOMRevisionCreate,
+    BOMRevisionRead,
+    BOMSupersedeRequest,
     ProductConfigurationCreate,
     ProductConfigurationRead,
     SupplierArticleCreate,
@@ -400,3 +408,175 @@ def list_supplier_articles(
     _: User = Depends(require_global_permission("masterdata.read")),
 ):
     return app.list_supplier_articles(supplier_id, article_id, active)
+
+
+
+@router.post(
+    "/bom-revisions",
+    response_model=BOMRevisionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_bom_revision(
+    payload: BOMRevisionCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_bom_revision(payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.bom_revision.create",
+        object_type="bom_revision",
+        object_id=created.id,
+        details={
+            "parent_article_revision_id": str(created.parent_article_revision_id),
+            "revision_no": created.revision_no,
+            "source_system": created.source_system,
+            "source_fingerprint": created.source_fingerprint,
+            "status": created.status,
+        },
+    )
+    return created
+
+
+@router.get("/bom-revisions", response_model=list[BOMRevisionRead])
+def list_bom_revisions(
+    parent_article_revision_id: UUID | None = None,
+    status_filter: str | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_bom_revisions(parent_article_revision_id, status_filter)
+
+
+@router.post(
+    "/bom-revisions/{bom_revision_id}/components",
+    response_model=BOMComponentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_bom_component(
+    bom_revision_id: UUID,
+    payload: BOMComponentCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.add_bom_component(bom_revision_id, payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.bom_component.create",
+        object_type="bom_component",
+        object_id=created.id,
+        details={
+            "bom_revision_id": str(created.bom_revision_id),
+            "child_article_id": str(created.child_article_id),
+            "child_revision_id": (
+                str(created.child_revision_id) if created.child_revision_id else None
+            ),
+            "quantity": str(created.quantity),
+            "source_uom_raw": created.source_uom_raw,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/bom-revisions/{bom_revision_id}/components",
+    response_model=list[BOMComponentRead],
+)
+def list_bom_components(
+    bom_revision_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(lambda: app.list_bom_components(bom_revision_id))
+
+
+@router.post(
+    "/bom-revisions/{bom_revision_id}/publish",
+    response_model=BOMRevisionRead,
+)
+def publish_bom_revision(
+    bom_revision_id: UUID,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    published = _translate(lambda: app.publish_bom_revision(bom_revision_id))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.bom_revision.publish",
+        object_type="bom_revision",
+        object_id=published.id,
+        details={
+            "parent_article_revision_id": str(
+                published.parent_article_revision_id
+            ),
+            "revision_no": published.revision_no,
+            "status": published.status,
+        },
+    )
+    return published
+
+
+@router.post(
+    "/bom-revisions/{bom_revision_id}/supersede",
+    response_model=BOMRevisionRead,
+)
+def supersede_bom_revision(
+    bom_revision_id: UUID,
+    payload: BOMSupersedeRequest,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    current, replacement = _translate(
+        lambda: app.supersede_bom_revision(
+            bom_revision_id,
+            payload.replacement_bom_revision_id,
+            payload.effective_at,
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.bom_revision.supersede",
+        object_type="bom_revision",
+        object_id=current.id,
+        details={
+            "replacement_bom_revision_id": str(replacement.id),
+            "effective_at": replacement.valid_from.isoformat(),
+        },
+    )
+    return replacement
+
+
+@router.get(
+    "/bom-revisions/{bom_revision_id}/explode",
+    response_model=BOMExplosionRead,
+)
+def explode_bom(
+    bom_revision_id: UUID,
+    quantity: Decimal = Decimal("1"),
+    effective_at: datetime | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.explode_bom(
+            bom_revision_id,
+            root_quantity=quantity,
+            effective_at=effective_at,
+        )
+    )

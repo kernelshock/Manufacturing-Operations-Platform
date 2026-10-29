@@ -293,3 +293,102 @@ class SupplierArticle(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+
+class BOMRevision(Base):
+    __tablename__ = "md_bom_revision"
+    __table_args__ = (
+        UniqueConstraint(
+            "parent_article_revision_id",
+            "revision_no",
+            name="uq_md_bom_revision_parent_revision_no",
+        ),
+        UniqueConstraint(
+            "parent_article_revision_id",
+            "source_fingerprint",
+            name="uq_md_bom_revision_parent_fingerprint",
+        ),
+        CheckConstraint("revision_no > 0", name="ck_md_bom_revision_no_positive"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'ACTIVE', 'SUPERSEDED', 'REJECTED')",
+            name="ck_md_bom_revision_status",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_md_bom_revision_effectivity",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    parent_article_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_article_revision.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_to: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    source_system: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_batch_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    source_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BOMComponent(Base):
+    __tablename__ = "md_bom_component"
+    __table_args__ = (
+        UniqueConstraint(
+            "bom_revision_id",
+            "source_relation_key",
+            name="uq_md_bom_component_relation_key",
+        ),
+        CheckConstraint("quantity > 0", name="ck_md_bom_component_quantity_positive"),
+        CheckConstraint(
+            "scrap_factor IS NULL OR scrap_factor >= 0",
+            name="ck_md_bom_component_scrap_nonnegative",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_from IS NULL OR effective_to > effective_from",
+            name="ck_md_bom_component_effectivity",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    bom_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_bom_revision.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    child_article_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_article.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    child_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_article_revision.id", ondelete="RESTRICT"), nullable=True
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(24, 8), nullable=False)
+    source_uom_raw: Mapped[str] = mapped_column(String(80), nullable=False)
+    uom_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_uom.id", ondelete="RESTRICT"), nullable=True
+    )
+    sequence_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_relation_key: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )
+    scrap_factor: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 8), nullable=True
+    )
+    effective_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    effective_to: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

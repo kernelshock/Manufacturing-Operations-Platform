@@ -20,6 +20,7 @@ ArticleKind = Literal[
 ArticleRevisionStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
 SupplierCategory = Literal["UNKNOWN", "PRODUCT", "PROCESS", "SERVICE", "MIXED"]
 SupplierMappingStatus = Literal["MAPPED", "REVIEW_REQUIRED", "REJECTED"]
+BOMRevisionStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
 
 
 def _upper_trim(value: str) -> str:
@@ -258,3 +259,123 @@ class SupplierArticleRead(SupplierArticleCreate):
 
     id: UUID
     created_at: datetime
+
+
+
+class BOMRevisionCreate(BaseModel):
+    parent_article_revision_id: UUID
+    revision_no: int = Field(gt=0)
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    source_system: str = Field(min_length=1, max_length=40)
+    source_batch_id: UUID | None = None
+    source_fingerprint: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+
+    _source_system = field_validator("source_system")(_upper_trim)
+
+    @field_validator("source_fingerprint")
+    @classmethod
+    def normalize_bom_fingerprint(cls, value: str) -> str:
+        return value.lower()
+
+    @model_validator(mode="after")
+    def validate_effectivity(self) -> "BOMRevisionCreate":
+        if (
+            self.valid_from is not None
+            and self.valid_to is not None
+            and self.valid_to <= self.valid_from
+        ):
+            raise ValueError("valid_to must be later than valid_from")
+        return self
+
+
+class BOMRevisionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    parent_article_revision_id: UUID
+    revision_no: int
+    valid_from: datetime
+    valid_to: datetime | None
+    status: BOMRevisionStatus
+    source_system: str
+    source_batch_id: UUID | None
+    source_fingerprint: str
+    created_at: datetime
+
+
+class BOMComponentCreate(BaseModel):
+    child_article_id: UUID
+    child_revision_id: UUID | None = None
+    quantity: Decimal = Field(gt=0)
+    source_uom_raw: str = Field(min_length=1, max_length=80)
+    uom_id: UUID | None = None
+    sequence_no: int | None = Field(default=None, ge=0)
+    source_relation_key: str | None = Field(default=None, max_length=200)
+    scrap_factor: Decimal | None = Field(default=None, ge=0)
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
+
+    _source_uom_raw = field_validator("source_uom_raw")(_trim)
+
+    @field_validator("source_relation_key")
+    @classmethod
+    def normalize_relation_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_effectivity(self) -> "BOMComponentCreate":
+        if (
+            self.effective_from is not None
+            and self.effective_to is not None
+            and self.effective_to <= self.effective_from
+        ):
+            raise ValueError("effective_to must be later than effective_from")
+        return self
+
+
+class BOMComponentRead(BOMComponentCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    bom_revision_id: UUID
+    created_at: datetime
+
+
+class BOMSupersedeRequest(BaseModel):
+    replacement_bom_revision_id: UUID
+    effective_at: datetime | None = None
+
+
+class BOMExplosionLine(BaseModel):
+    component_id: UUID
+    bom_revision_id: UUID
+    article_id: UUID
+    article_code: str
+    quantity: Decimal
+    uom_id: UUID | None
+    source_uom_raw: str
+    depth: int
+    leaf: bool
+    path_article_ids: list[UUID]
+    path_article_codes: list[str]
+    path_component_ids: list[UUID]
+
+
+class BOMExplosionAggregate(BaseModel):
+    article_id: UUID
+    article_code: str
+    quantity: Decimal
+    uom_id: UUID | None
+    source_uom_raw: str
+
+
+class BOMExplosionRead(BaseModel):
+    root_bom_revision_id: UUID
+    root_quantity: Decimal
+    effective_at: datetime
+    paths: list[BOMExplosionLine]
+    aggregate: list[BOMExplosionAggregate]

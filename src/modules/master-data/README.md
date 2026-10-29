@@ -43,3 +43,17 @@ Implemented in G2.3:
 - immutable audit events for supplier, source-mapping and supplier-article creation.
 
 Purchasing transactions, prices, approvals, receipts and supplier evaluation remain owned by the future Purchasing module.
+
+
+Implemented in G2.4:
+- revisioned BOMs tied to exact ArticleRevision identities;
+- immutable published component structures (only DRAFT BOMs may receive components);
+- Decimal(24,8) component quantities and source-UoM preservation;
+- optional canonical UoM, pinned child revision, sequence, idempotency relation key, scrap and line effectivity;
+- controlled publish/supersede lifecycle;
+- effectivity-aware recursive explosion;
+- path provenance retained before aggregation;
+- indirect cycle detection;
+- ambiguity rejection when an unpinned child Article has multiple effective active BOMs.
+
+The complete Prolowin report remains reconciliation evidence only. It does not author parent-child edges because that report is flattened.
