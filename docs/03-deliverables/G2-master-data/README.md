@@ -19,7 +19,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 
 ## Planned slices
 - **G2.1 — Article & UoM foundation — COMPLETED:** Article, ArticleRevision, UoM, UoM aliases, RBAC, audit and API.
-- **G2.2 — Product configurations:** commercial/manufacturing configuration metadata tied to exact Article identity.
+- **G2.2 — Product configurations — COMPLETED:** commercial/manufacturing configuration metadata tied to exact Article identity, dimension-safe width and permission-driven frontend visibility.
 - **G2.3 — Supplier master:** supplier identity and source mappings required by purchasing/material flows.
 - **G2.4 — BOM:** revisioned BOM and recursive component relations with Decimal-safe quantities and cycle detection.
 - **G2.5 — Routing/BOP:** routing revisions, operations and references to G1 resources.
@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current slice
-G2.2 — Product configurations.
+G2.3 — Supplier master.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -60,3 +60,19 @@ G2.2 — Product configurations.
 - npm audit: 0 vulnerabilities;
 - runtime regression: passed;
 - next slice: **G2.2 — Product configurations**.
+
+### G2.2 — Product configurations
+- implementation head: `f2f07b68ea21b475d3fdc4faf87c5306ba76ec54`;
+- GitHub Actions: `G2 Master Data` run #6;
+- result: **SUCCESS**;
+- Alembic head: `0007_g2_2`;
+- one ProductConfiguration per exact FINISHED_PRODUCT Article;
+- width uses Decimal semantics and requires an active canonical LENGTH UoM;
+- G0 regression: 5 passed;
+- G1 regression: 30 passed;
+- G2 tests: 12 passed with no application deprecation warnings;
+- frontend regression: 7 passed + typecheck + production build;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- runtime regression: passed;
+- next slice: **G2.3 — Supplier master**.
