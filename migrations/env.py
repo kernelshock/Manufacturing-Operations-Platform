@@ -8,6 +8,7 @@ from mop.config import get_settings
 from mop.core import models as core_models  # noqa: F401
 from mop.iam import models as iam_models  # noqa: F401
 from mop.master_data import models as master_data_models  # noqa: F401
+from mop.prolowin import models as prolowin_models  # noqa: F401
 from mop.persistence.base import Base
 
 config = context.config
