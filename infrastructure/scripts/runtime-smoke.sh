@@ -37,6 +37,10 @@ if [[ "$READY" -ne 1 ]]; then
 fi
 
 grep -q '"status":"ready"' /tmp/mop-ready.json
+
+docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api \
+  python -c "from zoneinfo import ZoneInfo; assert ZoneInfo('America/Argentina/Cordoba').key == 'America/Argentina/Cordoba'"
+
 curl --fail --silent --show-error -D "$HEADER_FILE" "http://127.0.0.1:$WEB_PORT/" -o /tmp/mop-index.html
 grep -q "MOP · Manufacturing Operations Platform" /tmp/mop-index.html
 grep -qi '^X-Content-Type-Options: nosniff' "$HEADER_FILE"
