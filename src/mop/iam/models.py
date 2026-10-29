@@ -112,6 +112,8 @@ class UserRoleAssignment(Base):
             "(scope_type IN ('organization', 'plant', 'area') AND scope_id IS NOT NULL)",
             name="ck_iam_assignment_scope",
         ),
+        Index("ix_iam_assignment_user_id", "user_id"),
+        Index("ix_iam_assignment_role_id", "role_id"),
         Index(
             "uq_iam_assignment_global",
             "user_id",
@@ -132,10 +134,10 @@ class UserRoleAssignment(Base):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("iam_user.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("iam_user.id", ondelete="CASCADE"), nullable=False
     )
     role_id: Mapped[UUID] = mapped_column(
-        ForeignKey("iam_role.id", ondelete="RESTRICT"), nullable=False, index=True
+        ForeignKey("iam_role.id", ondelete="RESTRICT"), nullable=False
     )
     scope_type: Mapped[str] = mapped_column(
         String(32), nullable=False, default="global"
