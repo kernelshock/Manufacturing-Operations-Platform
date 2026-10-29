@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G2.1 canonical Article/ArticleRevision and Unit-of-Measure foundation with Master Data RBAC/audit/API baseline.
 - G1 Platform Core executable backend, PostgreSQL/Alembic persistence, organizational hierarchy and local scoped RBAC.
 - Local session authentication with Argon2 password hashing and server-side opaque sessions.
 - Append-only PostgreSQL audit trail for authentication, IAM administration and privileged core mutations.

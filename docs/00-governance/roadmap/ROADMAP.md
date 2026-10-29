@@ -12,7 +12,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 |---|---|---|---|
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
-| G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | PLANNED |
+| G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | IN PROGRESS |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
@@ -135,3 +135,10 @@ Resolved/deferred for G0:
 - PR #6 marked ready and merged into `main`;
 - release merge commit: `3412a9b3f78303166f81e22e32a7b167ad2dc19e`;
 - G1 status: **RELEASED**.
+
+## G2 start record — 2026-10-29
+- branch: `feat/G2-master-data`;
+- base: released G1/main commit `ac8e27f7596fda999f17253a646c06386ed1cfae`;
+- implementation follows the G0 Master Data/BOM/BOP schema and Prolowin import contract;
+- G2.1 starts with Article/ArticleRevision and UoM/UoMAlias as the prerequisite canonical identities;
+- G2 status: **IN PROGRESS**.
