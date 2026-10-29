@@ -25,7 +25,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - Automated G0 repository structure check.
 
 ### Changed
-- G1 Platform Core reached VALIDATED on 2026-10-29; PR #6 remains draft pending explicit release approval.
+- G1 Platform Core released on 2026-10-29 after explicit approval; PR #6 merged to `main` as `3412a9b3f78303166f81e22e32a7b167ad2dc19e`.
 - G0 Architecture Foundation released on 2026-10-28 after explicit approval; PR #1 merged to `main` as `6f79f82155789c02c8138b2caec1f617b46619db`.
 
 ### Project baseline

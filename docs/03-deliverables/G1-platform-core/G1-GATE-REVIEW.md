@@ -1,8 +1,8 @@
 # G1 Gate Review — Platform Core
 
 Date: 2026-10-29  
-Status: **VALIDATED — AWAITING EXPLICIT RELEASE APPROVAL**  
-PR: #6 — draft
+Status: **RELEASED**  
+PR: #6 — merged
 
 ## Gate objective
 Provide the executable, secure and reproducible platform foundation required by G2+ business modules without implementing those modules prematurely.
@@ -52,11 +52,11 @@ Test/security results:
 ## Release decision
 Technical recommendation: **eligible for release**.
 
-Current disposition: **DO NOT MERGE / DO NOT MARK RELEASED** until explicit release authorization is received.
+Release authorization was received on 2026-10-29. PR #6 was marked ready and merged to `main`.
 
-Upon explicit approval:
-1. record approval on PR #6;
-2. mark PR #6 ready for review;
-3. merge to `main`;
-4. create a G1 release record with the merge commit;
-5. update roadmap/changelog from VALIDATED to RELEASED.
+Release completion:
+1. explicit approval recorded on PR #6;
+2. PR #6 marked ready for review;
+3. PR #6 merged to `main`;
+4. release merge commit: `3412a9b3f78303166f81e22e32a7b167ad2dc19e`;
+5. G1 release record created and roadmap/changelog moved to RELEASED.
