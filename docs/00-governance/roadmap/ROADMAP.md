@@ -1,6 +1,6 @@
 # Manufacturing Operations Platform — Roadmap
 
-Last updated: 2026-10-28  
+Last updated: 2026-10-29  
 Baseline: G0 Architecture Foundation
 
 ## Objective
@@ -11,7 +11,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | Gate | Scope | Demonstrable outcome | Status |
 |---|---|---|---|
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
-| G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | PLANNED |
+| G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | VALIDATED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | PLANNED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
@@ -103,3 +103,25 @@ Resolved/deferred for G0:
 - release merge commit: `6f79f82155789c02c8138b2caec1f617b46619db`;
 - GitHub Actions `G0 Architecture Structure` run #72: SUCCESS;
 - G0 status: **RELEASED**.
+
+## G1 start record — 2026-10-28
+- branch: `feat/G1-platform-core`;
+- base: released `main` commit `4ca6a279ba661a813598c745befd9639435c2e8f`;
+- implementation must conform to ADR-0014 through ADR-0018;
+- G1 status: **IN PROGRESS**.
+
+## G1 validation record — 2026-10-29
+- branch: `feat/G1-platform-core`;
+- base: released G0/main commit `4ca6a279ba661a813598c745befd9639435c2e8f`;
+- validated implementation head: `127f894aad161f152878c6212df06fc3523547ef`;
+- GitHub Actions `G1 Platform Core` run #91: **SUCCESS**;
+- Alembic head: `0005_g1_8`;
+- G0 regression: 5 passed;
+- G1 backend: 30 passed;
+- frontend: 6 tests + typecheck + production build passed;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- full Docker Compose runtime smoke: passed;
+- PR #6 opened as **DRAFT**;
+- G1 status: **VALIDATED — awaiting explicit release approval**;
+- no merge/release is authorized by validation alone.
