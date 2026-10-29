@@ -19,3 +19,16 @@ Boundaries:
 - G6/G7 own inventory/replenishment and purchasing effects.
 
 The first implementation slice is G3.1 — Production Plan & Taquilla Foundation.
+
+
+Implemented in G3.1:
+- ProductionPlan with stable UUID identity and editable business plan number;
+- Taquilla with stable UUID identity, globally unique business code and explicit sequence inside a Plan;
+- one-to-many Plan → Taquilla membership;
+- controlled non-reversible lifecycle transitions;
+- terminal-state identity protection;
+- global `demand.read` / `demand.edit` RBAC capabilities;
+- authenticated REST API and append-only audit integration;
+- Alembic migration `0013_g3_1`.
+
+G3.1 deliberately does not store product lines, deck allocation, routing selection, APS timestamps or MES actuals.

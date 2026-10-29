@@ -50,7 +50,7 @@ G3 introduces the canonical transactional identities for:
 
 ## Planned slices
 
-- **G3.1 — Production Plan & Taquilla Foundation:** stable identities, editable business numbers, plan→taquilla membership, lifecycle, RBAC, audit and API.
+- **G3.1 — Production Plan & Taquilla Foundation — COMPLETED:** stable identities, editable business numbers, plan→taquilla membership, lifecycle, RBAC, audit and API.
 - **G3.2 — Taquilla Product Composition:** multiple G2 Articles per Taquilla, Decimal requested quantities, ordering and idempotent line identity.
 - **G3.3 — Vehicle / Deck Topology:** SIMPLE / DOUBLE_DECK, explicit UPPER / LOWER allocation and source-document grouping without implicit inference.
 - **G3.4 — Routing Binding:** exact G2 RoutingRevision selection/resolution, effectivity checks and explicit override provenance.
@@ -78,4 +78,23 @@ G3 is eligible for VALIDATED only when:
 
 ## Current slice
 
-**G3.1 — Production Plan & Taquilla Foundation**
+**G3.2 — Taquilla Product Composition**
+
+### G3.1 — Production Plan & Taquilla Foundation
+- implementation head: `50835bc3f349fb5d7e19991bc4106a237a548859`;
+- GitHub Actions: `G3 Demand Plan Taquilla Routing` push run #4 — **SUCCESS**;
+- Alembic head: `0013_g3_1`;
+- stable UUID identity for ProductionPlan and Taquilla;
+- plan business number is editable while non-terminal without changing canonical identity;
+- one Plan supports multiple ordered Taquillas;
+- Taquilla business code is globally unique and sequence is unique inside its Plan;
+- controlled Plan lifecycle: DRAFT → OPEN → COMPLETED, with CANCELLED terminal path;
+- controlled Taquilla lifecycle: DRAFT → READY → COMPLETED, with CANCELLED terminal path;
+- terminal Plan identity fields are protected from later business-number mutation;
+- `demand.read` / `demand.edit` permissions are seeded and ADMIN receives both;
+- REST API is protected by server-side RBAC;
+- create, number-change and status-transition mutations emit append-only audit evidence;
+- schema drift check and full migration downgrade/replay pass;
+- G0/G1/G2 regressions, G3 suite, frontend, dependency/security and runtime gates pass;
+- next slice: **G3.2 — Taquilla Product Composition**.
+
