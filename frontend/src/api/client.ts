@@ -4,8 +4,11 @@ import type {
   LoginPayload,
   Organization,
   Plant,
+  ProductConfiguration,
   ReadyStatus,
-  ServiceMeta
+  ServiceMeta,
+  Supplier,
+  UnitOfMeasure
 } from "./types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -74,5 +77,12 @@ export const api = {
       `/api/v1/core/plants?organization_id=${encodeURIComponent(organizationId)}`
     ),
   audit: (limit = 20) =>
-    apiFetch<AuditEntry[]>(`/api/v1/audit/events?limit=${limit}`)
+    apiFetch<AuditEntry[]>(`/api/v1/audit/events?limit=${limit}`),
+  uoms: () => apiFetch<UnitOfMeasure[]>("/api/v1/master-data/uoms"),
+  productConfigurations: () =>
+    apiFetch<ProductConfiguration[]>(
+      "/api/v1/master-data/product-configurations?active=true"
+    ),
+  suppliers: () =>
+    apiFetch<Supplier[]>("/api/v1/master-data/suppliers?active=true")
 };

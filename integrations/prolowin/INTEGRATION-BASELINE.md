@@ -94,7 +94,35 @@ Contact the vendor/support or inspect installed-version technical documentation 
 The normalized transport contract is defined in:
 - `integrations/prolowin/contracts/IMPORT-CONTRACT.md`
 - `integrations/prolowin/contracts/complete-structure-batch.schema.json`
+- `integrations/prolowin/contracts/direct-structure-batch.schema.json`
 
 The transport is deliberately independent of PDF/CSV/XLSX/API. Every adapter must produce the same normalized contract before canonical application.
 
 Canonical application targets **Master Data**. Materials and APS consume approved definitions; they do not own imported BOM/routing masters.
+
+
+## G2.7 implemented assimilation boundary
+
+The executable boundary now distinguishes two source contracts:
+
+1. `COMPLETE_ARTICLE_STRUCTURE`
+   - immutable source-row staging;
+   - exactly-one-FIN validation;
+   - FIN flattened requirement projection;
+   - non-FIN SourceOperationState evidence;
+   - Article discovery/upsert;
+   - UoM alias discovery/review;
+   - reconciliation oracle only.
+
+2. `DIRECT_ARTICLE_STRUCTURE`
+   - immutable parent→child relation staging;
+   - reachability, duplicate and cycle validation;
+   - content-addressed ArticleRevision candidates;
+   - DRAFT BOMRevision/BOMComponent candidates;
+   - no automatic publication.
+
+The complete report never fabricates recursive hierarchy. Only a source that preserves direct parent-child relations can author candidate BOM edges.
+
+Reconciliation compares the candidate recursive explosion against the validated complete-report FIN projection. Blocking DQ prevents canonical application; warnings remain visible and can yield MATCH_WITH_WARNINGS.
+
+The public repository contains only non-proprietary derived corpus metadata for X-1148, X-1149, X-2209, X-6111 and X-7070. Raw FAIC PDFs remain outside the repository.

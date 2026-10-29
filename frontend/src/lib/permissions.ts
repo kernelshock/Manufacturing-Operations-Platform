@@ -1,6 +1,7 @@
 export type ModuleId =
   | "home"
   | "structure"
+  | "master-data"
   | "audit"
   | "admin";
 
@@ -28,6 +29,12 @@ export const navigationModules: NavigationModule[] = [
       "core.workcenter.read",
       "core.resource.read"
     ]
+  },
+  {
+    id: "master-data",
+    label: "Datos maestros",
+    description: "Artículos y configuraciones",
+    requiredAny: ["masterdata.read", "masterdata.edit"]
   },
   {
     id: "audit",
