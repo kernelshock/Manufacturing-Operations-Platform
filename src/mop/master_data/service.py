@@ -1,20 +1,24 @@
 """Application service for canonical Master Data."""
 
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mop.core.models import Area, Resource, WorkCenter
+from mop.core.models import Area, Plant, Resource, WorkCenter
 from mop.master_data.models import (
     Article,
     ArticleRevision,
     BOMComponent,
     BOMRevision,
+    CalendarException,
+    CalendarWeeklyWindow,
+    ManufacturingCalendar,
     ProductConfiguration,
     ResourceAssignment,
     RoutingOperation,
@@ -33,6 +37,13 @@ from mop.master_data.schemas import (
     BOMExplosionLine,
     BOMExplosionRead,
     BOMRevisionCreate,
+    CalendarExceptionCreate,
+    CalendarExceptionRead,
+    CalendarResolutionRead,
+    CalendarWeeklyWindowCreate,
+    CalendarWeeklyWindowRead,
+    ManufacturingCalendarCreate,
+    ManufacturingCalendarRead,
     ResourceAssignmentCreate,
     ResourceAssignmentRead,
     RoutingDefinitionRead,
@@ -1161,4 +1172,689 @@ class MasterDataService:
         return RoutingDefinitionRead(
             routing=RoutingRevisionRead.model_validate(routing),
             operations=definitions,
+        )
+
+
+    @staticmethod
+    def _calendar_target(
+        calendar: ManufacturingCalendar,
+    ) -> tuple[str, UUID]:
+        if calendar.resource_id is not None:
+            return "resource", calendar.resource_id
+        if calendar.work_center_id is not None:
+            return "work_center", calendar.work_center_id
+        if calendar.area_id is not None:
+            return "area", calendar.area_id
+        if calendar.plant_id is not None:
+            return "plant", calendar.plant_id
+        raise MasterDataRuleError("calendar has no target")
+
+    @staticmethod
+    def _date_window_contains(
+        valid_from: date,
+        valid_to: date | None,
+        at: date,
+    ) -> bool:
+        return valid_from <= at and (valid_to is None or at < valid_to)
+
+    @staticmethod
+    def _date_windows_overlap(
+        first_from: date,
+        first_to: date | None,
+        second_from: date,
+        second_to: date | None,
+    ) -> bool:
+        date_max = date.max
+        return (
+            first_from < (second_to or date_max)
+            and second_from < (first_to or date_max)
+        )
+
+    def _validate_calendar_target(
+        self,
+        data: ManufacturingCalendarCreate,
+    ) -> tuple[str, UUID]:
+        if data.resource_id is not None:
+            target = self.session.get(Resource, data.resource_id)
+            if target is None:
+                raise MasterDataNotFoundError("calendar resource not found")
+            if not target.active:
+                raise MasterDataRuleError("calendar resource must be active")
+            return "resource", target.id
+
+        if data.work_center_id is not None:
+            target = self.session.get(WorkCenter, data.work_center_id)
+            if target is None:
+                raise MasterDataNotFoundError("calendar work center not found")
+            if not target.active:
+                raise MasterDataRuleError(
+                    "calendar work center must be active"
+                )
+            return "work_center", target.id
+
+        if data.area_id is not None:
+            target = self.session.get(Area, data.area_id)
+            if target is None:
+                raise MasterDataNotFoundError("calendar area not found")
+            if not target.active:
+                raise MasterDataRuleError("calendar area must be active")
+            return "area", target.id
+
+        if data.plant_id is not None:
+            target = self.session.get(Plant, data.plant_id)
+            if target is None:
+                raise MasterDataNotFoundError("calendar plant not found")
+            if not target.active:
+                raise MasterDataRuleError("calendar plant must be active")
+            return "plant", target.id
+
+        raise MasterDataRuleError("calendar target is required")
+
+    def create_manufacturing_calendar(
+        self,
+        data: ManufacturingCalendarCreate,
+    ) -> ManufacturingCalendar:
+        target_scope, target_id = self._validate_calendar_target(data)
+
+        existing_versions = self.session.scalars(
+            select(ManufacturingCalendar).where(
+                ManufacturingCalendar.code == data.code
+            )
+        ).all()
+        for existing in existing_versions:
+            existing_scope, existing_target_id = self._calendar_target(existing)
+            if (
+                existing_scope != target_scope
+                or existing_target_id != target_id
+            ):
+                raise MasterDataRuleError(
+                    "calendar code cannot change target across revisions"
+                )
+            if existing.timezone != data.timezone:
+                raise MasterDataRuleError(
+                    "calendar code cannot change timezone across revisions"
+                )
+
+        return self._commit(
+            ManufacturingCalendar(
+                **data.model_dump(),
+                status="DRAFT",
+            )
+        )
+
+    def list_manufacturing_calendars(
+        self,
+        code: str | None = None,
+        status: str | None = None,
+    ) -> Sequence[ManufacturingCalendar]:
+        query = select(ManufacturingCalendar)
+        if code:
+            query = query.where(
+                ManufacturingCalendar.code == code.strip().upper()
+            )
+        if status:
+            query = query.where(
+                ManufacturingCalendar.status == status
+            )
+        return self.session.scalars(
+            query.order_by(
+                ManufacturingCalendar.code,
+                ManufacturingCalendar.revision_no,
+            )
+        ).all()
+
+    @staticmethod
+    def _weekly_ranges(
+        weekday: int,
+        start_minute: int,
+        end_minute: int,
+        spans_midnight: bool,
+    ) -> list[tuple[int, int]]:
+        start = weekday * 1440 + start_minute
+        if not spans_midnight:
+            return [(start, weekday * 1440 + end_minute)]
+
+        end = (weekday + 1) * 1440 + end_minute
+        week_minutes = 7 * 1440
+        if end <= week_minutes:
+            return [(start, end)]
+        return [(start, week_minutes), (0, end - week_minutes)]
+
+    @classmethod
+    def _weekly_windows_overlap(
+        cls,
+        first: CalendarWeeklyWindowCreate,
+        second: CalendarWeeklyWindow,
+    ) -> bool:
+        first_ranges = cls._weekly_ranges(
+            first.weekday,
+            first.start_minute,
+            first.end_minute,
+            first.spans_midnight,
+        )
+        second_ranges = cls._weekly_ranges(
+            second.weekday,
+            second.start_minute,
+            second.end_minute,
+            second.spans_midnight,
+        )
+        return any(
+            first_start < second_end and second_start < first_end
+            for first_start, first_end in first_ranges
+            for second_start, second_end in second_ranges
+        )
+
+    def add_calendar_weekly_window(
+        self,
+        calendar_id: UUID,
+        data: CalendarWeeklyWindowCreate,
+    ) -> CalendarWeeklyWindow:
+        calendar = self.session.get(ManufacturingCalendar, calendar_id)
+        if calendar is None:
+            raise MasterDataNotFoundError(
+                "manufacturing calendar not found"
+            )
+        if calendar.status != "DRAFT":
+            raise MasterDataRuleError(
+                "weekly windows can only be added to a DRAFT calendar"
+            )
+
+        existing = self.session.scalars(
+            select(CalendarWeeklyWindow).where(
+                CalendarWeeklyWindow.calendar_id == calendar_id,
+                CalendarWeeklyWindow.active.is_(True),
+            )
+        ).all()
+        if data.active and any(
+            self._weekly_windows_overlap(data, window)
+            for window in existing
+        ):
+            raise MasterDataRuleError(
+                "calendar weekly windows cannot overlap"
+            )
+
+        return self._commit(
+            CalendarWeeklyWindow(
+                calendar_id=calendar_id,
+                **data.model_dump(),
+            )
+        )
+
+    def list_calendar_weekly_windows(
+        self,
+        calendar_id: UUID,
+    ) -> Sequence[CalendarWeeklyWindow]:
+        if self.session.get(ManufacturingCalendar, calendar_id) is None:
+            raise MasterDataNotFoundError(
+                "manufacturing calendar not found"
+            )
+        return self.session.scalars(
+            select(CalendarWeeklyWindow)
+            .where(CalendarWeeklyWindow.calendar_id == calendar_id)
+            .order_by(
+                CalendarWeeklyWindow.weekday,
+                CalendarWeeklyWindow.start_minute,
+            )
+        ).all()
+
+    @staticmethod
+    def _exception_interval(
+        exception: CalendarException | CalendarExceptionCreate,
+    ) -> tuple[int, int]:
+        if exception.start_minute is None:
+            return 0, 1440
+        assert exception.end_minute is not None
+        return exception.start_minute, exception.end_minute
+
+    def add_calendar_exception(
+        self,
+        calendar_id: UUID,
+        data: CalendarExceptionCreate,
+    ) -> CalendarException:
+        calendar = self.session.get(ManufacturingCalendar, calendar_id)
+        if calendar is None:
+            raise MasterDataNotFoundError(
+                "manufacturing calendar not found"
+            )
+        if calendar.status != "DRAFT":
+            raise MasterDataRuleError(
+                "exceptions can only be added to a DRAFT calendar"
+            )
+
+        existing = self.session.scalars(
+            select(CalendarException).where(
+                CalendarException.calendar_id == calendar_id,
+                CalendarException.local_date == data.local_date,
+                CalendarException.active.is_(True),
+            )
+        ).all()
+        new_start, new_end = self._exception_interval(data)
+        if data.active and any(
+            (
+                new_start < self._exception_interval(item)[1]
+                and self._exception_interval(item)[0] < new_end
+            )
+            for item in existing
+        ):
+            raise MasterDataRuleError(
+                "calendar exceptions cannot overlap on the same local date"
+            )
+
+        return self._commit(
+            CalendarException(
+                calendar_id=calendar_id,
+                **data.model_dump(),
+            )
+        )
+
+    def list_calendar_exceptions(
+        self,
+        calendar_id: UUID,
+    ) -> Sequence[CalendarException]:
+        if self.session.get(ManufacturingCalendar, calendar_id) is None:
+            raise MasterDataNotFoundError(
+                "manufacturing calendar not found"
+            )
+        return self.session.scalars(
+            select(CalendarException)
+            .where(CalendarException.calendar_id == calendar_id)
+            .order_by(
+                CalendarException.local_date,
+                CalendarException.start_minute.asc().nullsfirst(),
+            )
+        ).all()
+
+    def _assert_calendar_publishable(
+        self,
+        calendar: ManufacturingCalendar,
+    ) -> None:
+        windows = self.session.scalars(
+            select(CalendarWeeklyWindow).where(
+                CalendarWeeklyWindow.calendar_id == calendar.id,
+                CalendarWeeklyWindow.active.is_(True),
+            )
+        ).all()
+        exceptions = self.session.scalars(
+            select(CalendarException).where(
+                CalendarException.calendar_id == calendar.id,
+                CalendarException.active.is_(True),
+            )
+        ).all()
+        if not windows and not exceptions:
+            raise MasterDataRuleError(
+                "manufacturing calendar requires at least one availability rule"
+            )
+
+        target_scope, target_id = self._calendar_target(calendar)
+        active_calendars = self.session.scalars(
+            select(ManufacturingCalendar).where(
+                ManufacturingCalendar.status == "ACTIVE",
+                ManufacturingCalendar.id != calendar.id,
+            )
+        ).all()
+        for existing in active_calendars:
+            existing_scope, existing_target_id = self._calendar_target(existing)
+            if (
+                existing_scope == target_scope
+                and existing_target_id == target_id
+                and self._date_windows_overlap(
+                    existing.valid_from,
+                    existing.valid_to,
+                    calendar.valid_from,
+                    calendar.valid_to,
+                )
+            ):
+                raise MasterDataRuleError(
+                    "an overlapping ACTIVE calendar already exists "
+                    "for this target"
+                )
+
+    def publish_manufacturing_calendar(
+        self,
+        calendar_id: UUID,
+    ) -> ManufacturingCalendar:
+        calendar = self.session.get(ManufacturingCalendar, calendar_id)
+        if calendar is None:
+            raise MasterDataNotFoundError(
+                "manufacturing calendar not found"
+            )
+        if calendar.status != "DRAFT":
+            raise MasterDataRuleError(
+                "only a DRAFT calendar can be published"
+            )
+        self._assert_calendar_publishable(calendar)
+        calendar.status = "ACTIVE"
+        return self._commit(calendar)
+
+    def supersede_manufacturing_calendar(
+        self,
+        active_calendar_id: UUID,
+        replacement_calendar_id: UUID,
+        effective_on: date,
+    ) -> tuple[ManufacturingCalendar, ManufacturingCalendar]:
+        active = self.session.get(
+            ManufacturingCalendar, active_calendar_id
+        )
+        replacement = self.session.get(
+            ManufacturingCalendar, replacement_calendar_id
+        )
+        if active is None or replacement is None:
+            raise MasterDataNotFoundError(
+                "manufacturing calendar not found"
+            )
+        if active.status != "ACTIVE":
+            raise MasterDataRuleError(
+                "current manufacturing calendar is not ACTIVE"
+            )
+        if replacement.status != "DRAFT":
+            raise MasterDataRuleError(
+                "replacement manufacturing calendar must be DRAFT"
+            )
+        if active.code != replacement.code:
+            raise MasterDataRuleError(
+                "replacement calendar must use the same calendar code"
+            )
+        if self._calendar_target(active) != self._calendar_target(replacement):
+            raise MasterDataRuleError(
+                "replacement calendar must use the same target"
+            )
+        if active.timezone != replacement.timezone:
+            raise MasterDataRuleError(
+                "replacement calendar must use the same timezone"
+            )
+        if effective_on <= active.valid_from:
+            raise MasterDataRuleError(
+                "effective_on must be later than current valid_from"
+            )
+        if (
+            replacement.valid_to is not None
+            and replacement.valid_to <= effective_on
+        ):
+            raise MasterDataRuleError(
+                "replacement valid_to must be later than effective_on"
+            )
+
+        replacement.valid_from = effective_on
+        self._assert_calendar_publishable(replacement)
+
+        active.valid_to = effective_on
+        active.status = "SUPERSEDED"
+        replacement.status = "ACTIVE"
+
+        try:
+            self.session.add_all([active, replacement])
+            self.session.commit()
+            self.session.refresh(active)
+            self.session.refresh(replacement)
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MasterDataConflictError(
+                "calendar supersede operation conflicts with existing master data"
+            ) from exc
+        return active, replacement
+
+    def _calendar_hierarchy(
+        self,
+        *,
+        plant_id: UUID | None = None,
+        area_id: UUID | None = None,
+        work_center_id: UUID | None = None,
+        resource_id: UUID | None = None,
+    ) -> list[tuple[str, UUID]]:
+        if sum(
+            value is not None
+            for value in (
+                plant_id,
+                area_id,
+                work_center_id,
+                resource_id,
+            )
+        ) != 1:
+            raise MasterDataRuleError(
+                "exactly one calendar-resolution target is required"
+            )
+
+        if resource_id is not None:
+            resource = self.session.get(Resource, resource_id)
+            if resource is None:
+                raise MasterDataNotFoundError("resource not found")
+            work_center = self.session.get(
+                WorkCenter, resource.work_center_id
+            )
+            if work_center is None:
+                raise MasterDataNotFoundError("work center not found")
+            area = self.session.get(Area, work_center.area_id)
+            if area is None:
+                raise MasterDataNotFoundError("area not found")
+            return [
+                ("resource", resource.id),
+                ("work_center", work_center.id),
+                ("area", area.id),
+                ("plant", area.plant_id),
+            ]
+
+        if work_center_id is not None:
+            work_center = self.session.get(WorkCenter, work_center_id)
+            if work_center is None:
+                raise MasterDataNotFoundError("work center not found")
+            area = self.session.get(Area, work_center.area_id)
+            if area is None:
+                raise MasterDataNotFoundError("area not found")
+            return [
+                ("work_center", work_center.id),
+                ("area", area.id),
+                ("plant", area.plant_id),
+            ]
+
+        if area_id is not None:
+            area = self.session.get(Area, area_id)
+            if area is None:
+                raise MasterDataNotFoundError("area not found")
+            return [
+                ("area", area.id),
+                ("plant", area.plant_id),
+            ]
+
+        assert plant_id is not None
+        if self.session.get(Plant, plant_id) is None:
+            raise MasterDataNotFoundError("plant not found")
+        return [("plant", plant_id)]
+
+    @staticmethod
+    def _calendar_matches_target(
+        calendar: ManufacturingCalendar,
+        scope: str,
+        target_id: UUID,
+    ) -> bool:
+        calendar_scope, calendar_target_id = (
+            MasterDataService._calendar_target(calendar)
+        )
+        return calendar_scope == scope and calendar_target_id == target_id
+
+    def _effective_calendar_for_hierarchy(
+        self,
+        hierarchy: list[tuple[str, UUID]],
+        at: datetime,
+    ) -> ManufacturingCalendar:
+        candidates = self.session.scalars(
+            select(ManufacturingCalendar).where(
+                ManufacturingCalendar.status == "ACTIVE"
+            )
+        ).all()
+
+        for scope, target_id in hierarchy:
+            matches = []
+            for calendar in candidates:
+                if not self._calendar_matches_target(
+                    calendar, scope, target_id
+                ):
+                    continue
+                local_date = at.astimezone(
+                    ZoneInfo(calendar.timezone)
+                ).date()
+                if self._date_window_contains(
+                    calendar.valid_from,
+                    calendar.valid_to,
+                    local_date,
+                ):
+                    matches.append(calendar)
+
+            if len(matches) > 1:
+                raise MasterDataRuleError(
+                    "multiple effective active calendars found for target"
+                )
+            if matches:
+                return matches[0]
+
+        raise MasterDataNotFoundError(
+            "effective manufacturing calendar not found"
+        )
+
+    @staticmethod
+    def _weekly_window_matches(
+        window: CalendarWeeklyWindow,
+        local_at: datetime,
+    ) -> bool:
+        seconds = (
+            local_at.hour * 3600
+            + local_at.minute * 60
+            + local_at.second
+        )
+        start_seconds = window.start_minute * 60
+        end_seconds = window.end_minute * 60
+        weekday = local_at.weekday()
+
+        if not window.spans_midnight:
+            return (
+                window.weekday == weekday
+                and start_seconds <= seconds < end_seconds
+            )
+
+        if window.weekday == weekday and seconds >= start_seconds:
+            return True
+        next_weekday = (window.weekday + 1) % 7
+        return next_weekday == weekday and seconds < end_seconds
+
+    def resolve_calendar_availability(
+        self,
+        *,
+        at: datetime,
+        plant_id: UUID | None = None,
+        area_id: UUID | None = None,
+        work_center_id: UUID | None = None,
+        resource_id: UUID | None = None,
+    ) -> CalendarResolutionRead:
+        if at.tzinfo is None or at.utcoffset() is None:
+            raise MasterDataRuleError(
+                "calendar resolution timestamp must be timezone-aware"
+            )
+
+        hierarchy = self._calendar_hierarchy(
+            plant_id=plant_id,
+            area_id=area_id,
+            work_center_id=work_center_id,
+            resource_id=resource_id,
+        )
+        calendar = self._effective_calendar_for_hierarchy(
+            hierarchy,
+            at,
+        )
+        target_scope, target_id = self._calendar_target(calendar)
+        local_at = at.astimezone(ZoneInfo(calendar.timezone))
+        minute_of_day = local_at.hour * 60 + local_at.minute
+
+        exceptions = self.session.scalars(
+            select(CalendarException).where(
+                CalendarException.calendar_id == calendar.id,
+                CalendarException.local_date == local_at.date(),
+                CalendarException.active.is_(True),
+            )
+        ).all()
+        matching_exceptions = []
+        for exception in exceptions:
+            start_minute, end_minute = self._exception_interval(exception)
+            if start_minute <= minute_of_day < end_minute:
+                matching_exceptions.append(exception)
+
+        if len(matching_exceptions) > 1:
+            raise MasterDataRuleError(
+                "multiple calendar exceptions match requested timestamp"
+            )
+        if matching_exceptions:
+            exception = matching_exceptions[0]
+            if exception.exception_kind == "CLOSED":
+                return CalendarResolutionRead(
+                    calendar_id=calendar.id,
+                    calendar_code=calendar.code,
+                    calendar_revision_no=calendar.revision_no,
+                    target_scope=target_scope,
+                    target_id=target_id,
+                    timezone=calendar.timezone,
+                    at=at,
+                    local_at=local_at,
+                    available=False,
+                    capacity_factor=Decimal("0"),
+                    source="EXCEPTION_CLOSED",
+                    exception_id=exception.id,
+                )
+            assert exception.capacity_factor is not None
+            return CalendarResolutionRead(
+                calendar_id=calendar.id,
+                calendar_code=calendar.code,
+                calendar_revision_no=calendar.revision_no,
+                target_scope=target_scope,
+                target_id=target_id,
+                timezone=calendar.timezone,
+                at=at,
+                local_at=local_at,
+                available=True,
+                capacity_factor=exception.capacity_factor,
+                source="EXCEPTION_OVERRIDE",
+                exception_id=exception.id,
+            )
+
+        windows = self.session.scalars(
+            select(CalendarWeeklyWindow).where(
+                CalendarWeeklyWindow.calendar_id == calendar.id,
+                CalendarWeeklyWindow.active.is_(True),
+            )
+        ).all()
+        matching_windows = [
+            window
+            for window in windows
+            if self._weekly_window_matches(window, local_at)
+        ]
+        if len(matching_windows) > 1:
+            raise MasterDataRuleError(
+                "multiple calendar weekly windows match requested timestamp"
+            )
+        if matching_windows:
+            window = matching_windows[0]
+            return CalendarResolutionRead(
+                calendar_id=calendar.id,
+                calendar_code=calendar.code,
+                calendar_revision_no=calendar.revision_no,
+                target_scope=target_scope,
+                target_id=target_id,
+                timezone=calendar.timezone,
+                at=at,
+                local_at=local_at,
+                available=True,
+                capacity_factor=window.capacity_factor,
+                source="WEEKLY_WINDOW",
+                weekly_window_id=window.id,
+            )
+
+        return CalendarResolutionRead(
+            calendar_id=calendar.id,
+            calendar_code=calendar.code,
+            calendar_revision_no=calendar.revision_no,
+            target_scope=target_scope,
+            target_id=target_id,
+            timezone=calendar.timezone,
+            at=at,
+            local_at=local_at,
+            available=False,
+            capacity_factor=Decimal("0"),
+            source="NO_WINDOW",
         )

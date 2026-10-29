@@ -72,3 +72,16 @@ Implemented in G2.5:
 - effectivity-aware effective-routing lookup and definition projection.
 
 A standalone canonical Process master is not invented in G2.5. The optional process_id from the G0 physical baseline remains deferred until Process has its own identity/governance contract.
+
+
+Implemented in G2.6:
+- versioned manufacturing calendars bound to exactly one G1 Plant, Area, WorkCenter or Resource;
+- IANA timezone identity per calendar series;
+- local weekly availability windows with Decimal capacity factor and overnight-shift support;
+- dated CLOSED and AVAILABLE_OVERRIDE exceptions;
+- deterministic resolution precedence Resource > WorkCenter > Area > Plant;
+- exception precedence over recurring weekly windows;
+- immutable ACTIVE calendars with controlled supersede/effectivity;
+- availability resolution returns nominal capacity evidence for APS without creating or modifying APS schedules.
+
+Calendar effectivity is day-granular; recurring windows are minute-granular in the calendar's local timezone. APS remains responsible for order sequencing, finite scheduling and transactional schedule state.

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -545,6 +546,175 @@ class ResourceAssignment(Base):
         Numeric(12, 8), nullable=True
     )
     source_batch_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+
+class ManufacturingCalendar(Base):
+    __tablename__ = "md_manufacturing_calendar"
+    __table_args__ = (
+        UniqueConstraint(
+            "code",
+            "revision_no",
+            name="uq_md_manufacturing_calendar_code_revision",
+        ),
+        CheckConstraint(
+            "revision_no > 0",
+            name="ck_md_manufacturing_calendar_revision_positive",
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT', 'ACTIVE', 'SUPERSEDED', 'REJECTED')",
+            name="ck_md_manufacturing_calendar_status",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_md_manufacturing_calendar_effectivity",
+        ),
+        CheckConstraint(
+            "("
+            "CASE WHEN plant_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN area_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN work_center_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN resource_id IS NOT NULL THEN 1 ELSE 0 END"
+            ") = 1",
+            name="ck_md_manufacturing_calendar_one_target",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    timezone: Mapped[str] = mapped_column(String(80), nullable=False)
+    plant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_plant.id", ondelete="RESTRICT"), nullable=True
+    )
+    area_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_area.id", ondelete="RESTRICT"), nullable=True
+    )
+    work_center_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_work_center.id", ondelete="RESTRICT"), nullable=True
+    )
+    resource_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_resource.id", ondelete="RESTRICT"), nullable=True
+    )
+    valid_from: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="DRAFT"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CalendarWeeklyWindow(Base):
+    __tablename__ = "md_calendar_weekly_window"
+    __table_args__ = (
+        UniqueConstraint(
+            "calendar_id",
+            "weekday",
+            "start_minute",
+            "end_minute",
+            "spans_midnight",
+            name="uq_md_calendar_weekly_window_exact",
+        ),
+        CheckConstraint(
+            "weekday >= 0 AND weekday <= 6",
+            name="ck_md_calendar_weekly_window_weekday",
+        ),
+        CheckConstraint(
+            "start_minute >= 0 AND start_minute <= 1439",
+            name="ck_md_calendar_weekly_window_start",
+        ),
+        CheckConstraint(
+            "end_minute >= 1 AND end_minute <= 1440",
+            name="ck_md_calendar_weekly_window_end",
+        ),
+        CheckConstraint(
+            "(NOT spans_midnight AND end_minute > start_minute) OR "
+            "(spans_midnight AND end_minute < start_minute)",
+            name="ck_md_calendar_weekly_window_shape",
+        ),
+        CheckConstraint(
+            "capacity_factor > 0",
+            name="ck_md_calendar_weekly_window_capacity_positive",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    calendar_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_manufacturing_calendar.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    weekday: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_minute: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_minute: Mapped[int] = mapped_column(Integer, nullable=False)
+    spans_midnight: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    capacity_factor: Mapped[Decimal] = mapped_column(
+        Numeric(12, 8), nullable=False, default=Decimal("1")
+    )
+    label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CalendarException(Base):
+    __tablename__ = "md_calendar_exception"
+    __table_args__ = (
+        CheckConstraint(
+            "exception_kind IN ('CLOSED', 'AVAILABLE_OVERRIDE')",
+            name="ck_md_calendar_exception_kind",
+        ),
+        CheckConstraint(
+            "(start_minute IS NULL AND end_minute IS NULL) OR "
+            "(start_minute IS NOT NULL AND end_minute IS NOT NULL)",
+            name="ck_md_calendar_exception_minute_pair",
+        ),
+        CheckConstraint(
+            "start_minute IS NULL OR "
+            "(start_minute >= 0 AND start_minute <= 1439)",
+            name="ck_md_calendar_exception_start",
+        ),
+        CheckConstraint(
+            "end_minute IS NULL OR "
+            "(end_minute >= 1 AND end_minute <= 1440)",
+            name="ck_md_calendar_exception_end",
+        ),
+        CheckConstraint(
+            "start_minute IS NULL OR end_minute > start_minute",
+            name="ck_md_calendar_exception_shape",
+        ),
+        CheckConstraint(
+            "(exception_kind = 'CLOSED' AND capacity_factor IS NULL) OR "
+            "(exception_kind = 'AVAILABLE_OVERRIDE' AND "
+            "start_minute IS NOT NULL AND capacity_factor > 0)",
+            name="ck_md_calendar_exception_semantics",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    calendar_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_manufacturing_calendar.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    local_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    exception_kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    start_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    capacity_factor: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 8), nullable=True
+    )
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

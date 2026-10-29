@@ -1,9 +1,10 @@
 """Transport schemas for canonical Master Data."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -28,6 +29,14 @@ RoutingOperationKind = Literal[
     "ADMINISTRATIVE",
     "COMPLETION_MARKER",
     "UNKNOWN",
+]
+CalendarStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
+CalendarExceptionKind = Literal["CLOSED", "AVAILABLE_OVERRIDE"]
+CalendarResolutionSource = Literal[
+    "EXCEPTION_CLOSED",
+    "EXCEPTION_OVERRIDE",
+    "WEEKLY_WINDOW",
+    "NO_WINDOW",
 ]
 
 
@@ -511,3 +520,170 @@ class RoutingOperationDefinition(BaseModel):
 class RoutingDefinitionRead(BaseModel):
     routing: RoutingRevisionRead
     operations: list[RoutingOperationDefinition]
+
+
+
+class ManufacturingCalendarCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=255)
+    revision_no: int = Field(gt=0)
+    timezone: str = Field(min_length=1, max_length=80)
+    plant_id: UUID | None = None
+    area_id: UUID | None = None
+    work_center_id: UUID | None = None
+    resource_id: UUID | None = None
+    valid_from: date
+    valid_to: date | None = None
+
+    _code = field_validator("code")(_upper_trim)
+    _name = field_validator("name")(_trim)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        value = value.strip()
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("timezone must be a valid IANA timezone") from exc
+        return value
+
+    @model_validator(mode="after")
+    def validate_calendar(self) -> "ManufacturingCalendarCreate":
+        targets = [
+            self.plant_id,
+            self.area_id,
+            self.work_center_id,
+            self.resource_id,
+        ]
+        if sum(target is not None for target in targets) != 1:
+            raise ValueError(
+                "exactly one calendar target must be provided"
+            )
+        if self.valid_to is not None and self.valid_to <= self.valid_from:
+            raise ValueError("valid_to must be later than valid_from")
+        return self
+
+
+class ManufacturingCalendarRead(ManufacturingCalendarCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: CalendarStatus
+    created_at: datetime
+
+
+class CalendarWeeklyWindowCreate(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    start_minute: int = Field(ge=0, le=1439)
+    end_minute: int = Field(ge=1, le=1440)
+    spans_midnight: bool = False
+    capacity_factor: Decimal = Field(default=Decimal("1"), gt=0)
+    label: str | None = Field(default=None, max_length=120)
+    active: bool = True
+
+    @field_validator("label")
+    @classmethod
+    def normalize_window_label(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_window_shape(self) -> "CalendarWeeklyWindowCreate":
+        if self.spans_midnight:
+            if self.end_minute >= self.start_minute:
+                raise ValueError(
+                    "overnight window end_minute must be earlier than start_minute"
+                )
+        elif self.end_minute <= self.start_minute:
+            raise ValueError(
+                "same-day window end_minute must be later than start_minute"
+            )
+        return self
+
+
+class CalendarWeeklyWindowRead(CalendarWeeklyWindowCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    calendar_id: UUID
+    created_at: datetime
+
+
+class CalendarExceptionCreate(BaseModel):
+    local_date: date
+    exception_kind: CalendarExceptionKind
+    start_minute: int | None = Field(default=None, ge=0, le=1439)
+    end_minute: int | None = Field(default=None, ge=1, le=1440)
+    capacity_factor: Decimal | None = Field(default=None, gt=0)
+    reason: str | None = Field(default=None, max_length=255)
+    active: bool = True
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_exception_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_exception(self) -> "CalendarExceptionCreate":
+        if (self.start_minute is None) != (self.end_minute is None):
+            raise ValueError(
+                "start_minute and end_minute must be provided together"
+            )
+        if (
+            self.start_minute is not None
+            and self.end_minute is not None
+            and self.end_minute <= self.start_minute
+        ):
+            raise ValueError(
+                "calendar exceptions cannot span midnight"
+            )
+        if self.exception_kind == "CLOSED":
+            if self.capacity_factor is not None:
+                raise ValueError(
+                    "CLOSED exception cannot have capacity_factor"
+                )
+        else:
+            if self.start_minute is None:
+                raise ValueError(
+                    "AVAILABLE_OVERRIDE requires a time window"
+                )
+            if self.capacity_factor is None:
+                raise ValueError(
+                    "AVAILABLE_OVERRIDE requires capacity_factor"
+                )
+        return self
+
+
+class CalendarExceptionRead(CalendarExceptionCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    calendar_id: UUID
+    created_at: datetime
+
+
+class CalendarSupersedeRequest(BaseModel):
+    replacement_calendar_id: UUID
+    effective_on: date
+
+
+class CalendarResolutionRead(BaseModel):
+    calendar_id: UUID
+    calendar_code: str
+    calendar_revision_no: int
+    target_scope: Literal["plant", "area", "work_center", "resource"]
+    target_id: UUID
+    timezone: str
+    at: datetime
+    local_at: datetime
+    available: bool
+    capacity_factor: Decimal
+    source: CalendarResolutionSource
+    weekly_window_id: UUID | None = None
+    exception_id: UUID | None = None

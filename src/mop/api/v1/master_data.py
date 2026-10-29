@@ -1,6 +1,6 @@
 """Canonical Master Data API."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -22,6 +22,14 @@ from mop.master_data.schemas import (
     BOMRevisionCreate,
     BOMRevisionRead,
     BOMSupersedeRequest,
+    CalendarExceptionCreate,
+    CalendarExceptionRead,
+    CalendarResolutionRead,
+    CalendarSupersedeRequest,
+    CalendarWeeklyWindowCreate,
+    CalendarWeeklyWindowRead,
+    ManufacturingCalendarCreate,
+    ManufacturingCalendarRead,
     ResourceAssignmentCreate,
     ResourceAssignmentRead,
     RoutingDefinitionRead,
@@ -838,3 +846,239 @@ def supersede_routing_revision(
         },
     )
     return replacement
+
+
+
+@router.post(
+    "/calendars",
+    response_model=ManufacturingCalendarRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_manufacturing_calendar(
+    payload: ManufacturingCalendarCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(
+        lambda: app.create_manufacturing_calendar(payload)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.calendar.create",
+        object_type="manufacturing_calendar",
+        object_id=created.id,
+        details={
+            "code": created.code,
+            "revision_no": created.revision_no,
+            "timezone": created.timezone,
+            "status": created.status,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/calendars",
+    response_model=list[ManufacturingCalendarRead],
+)
+def list_manufacturing_calendars(
+    code: str | None = None,
+    status_filter: str | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_manufacturing_calendars(code, status_filter)
+
+
+@router.post(
+    "/calendars/{calendar_id}/weekly-windows",
+    response_model=CalendarWeeklyWindowRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_calendar_weekly_window(
+    calendar_id: UUID,
+    payload: CalendarWeeklyWindowCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(
+        lambda: app.add_calendar_weekly_window(calendar_id, payload)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.calendar_weekly_window.create",
+        object_type="calendar_weekly_window",
+        object_id=created.id,
+        details={
+            "calendar_id": str(created.calendar_id),
+            "weekday": created.weekday,
+            "start_minute": created.start_minute,
+            "end_minute": created.end_minute,
+            "spans_midnight": created.spans_midnight,
+            "capacity_factor": str(created.capacity_factor),
+        },
+    )
+    return created
+
+
+@router.get(
+    "/calendars/{calendar_id}/weekly-windows",
+    response_model=list[CalendarWeeklyWindowRead],
+)
+def list_calendar_weekly_windows(
+    calendar_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.list_calendar_weekly_windows(calendar_id)
+    )
+
+
+@router.post(
+    "/calendars/{calendar_id}/exceptions",
+    response_model=CalendarExceptionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_calendar_exception(
+    calendar_id: UUID,
+    payload: CalendarExceptionCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(
+        lambda: app.add_calendar_exception(calendar_id, payload)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.calendar_exception.create",
+        object_type="calendar_exception",
+        object_id=created.id,
+        details={
+            "calendar_id": str(created.calendar_id),
+            "local_date": created.local_date.isoformat(),
+            "exception_kind": created.exception_kind,
+            "start_minute": created.start_minute,
+            "end_minute": created.end_minute,
+            "capacity_factor": (
+                str(created.capacity_factor)
+                if created.capacity_factor is not None
+                else None
+            ),
+        },
+    )
+    return created
+
+
+@router.get(
+    "/calendars/{calendar_id}/exceptions",
+    response_model=list[CalendarExceptionRead],
+)
+def list_calendar_exceptions(
+    calendar_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.list_calendar_exceptions(calendar_id)
+    )
+
+
+@router.post(
+    "/calendars/{calendar_id}/publish",
+    response_model=ManufacturingCalendarRead,
+)
+def publish_manufacturing_calendar(
+    calendar_id: UUID,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    published = _translate(
+        lambda: app.publish_manufacturing_calendar(calendar_id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.calendar.publish",
+        object_type="manufacturing_calendar",
+        object_id=published.id,
+        details={
+            "code": published.code,
+            "revision_no": published.revision_no,
+            "status": published.status,
+        },
+    )
+    return published
+
+
+@router.post(
+    "/calendars/{calendar_id}/supersede",
+    response_model=ManufacturingCalendarRead,
+)
+def supersede_manufacturing_calendar(
+    calendar_id: UUID,
+    payload: CalendarSupersedeRequest,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    current, replacement = _translate(
+        lambda: app.supersede_manufacturing_calendar(
+            calendar_id,
+            payload.replacement_calendar_id,
+            payload.effective_on,
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.calendar.supersede",
+        object_type="manufacturing_calendar",
+        object_id=current.id,
+        details={
+            "replacement_calendar_id": str(replacement.id),
+            "effective_on": payload.effective_on.isoformat(),
+        },
+    )
+    return replacement
+
+
+@router.get(
+    "/calendars/resolve",
+    response_model=CalendarResolutionRead,
+)
+def resolve_calendar_availability(
+    at: datetime,
+    plant_id: UUID | None = None,
+    area_id: UUID | None = None,
+    work_center_id: UUID | None = None,
+    resource_id: UUID | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.resolve_calendar_availability(
+            at=at,
+            plant_id=plant_id,
+            area_id=area_id,
+            work_center_id=work_center_id,
+            resource_id=resource_id,
+        )
+    )
