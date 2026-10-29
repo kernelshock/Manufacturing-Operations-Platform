@@ -392,3 +392,159 @@ class BOMComponent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+
+class RoutingRevision(Base):
+    __tablename__ = "md_routing_revision"
+    __table_args__ = (
+        UniqueConstraint(
+            "article_revision_id",
+            "revision_no",
+            name="uq_md_routing_revision_article_revision_no",
+        ),
+        UniqueConstraint(
+            "article_revision_id",
+            "source_fingerprint",
+            name="uq_md_routing_revision_article_fingerprint",
+        ),
+        CheckConstraint(
+            "revision_no > 0",
+            name="ck_md_routing_revision_no_positive",
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT', 'ACTIVE', 'SUPERSEDED', 'REJECTED')",
+            name="ck_md_routing_revision_status",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to > valid_from",
+            name="ck_md_routing_revision_effectivity",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    article_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_article_revision.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    valid_to: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="DRAFT"
+    )
+    source_system: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_batch_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    source_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RoutingOperation(Base):
+    __tablename__ = "md_routing_operation"
+    __table_args__ = (
+        UniqueConstraint(
+            "routing_revision_id",
+            "sequence_no",
+            name="uq_md_routing_operation_sequence",
+        ),
+        CheckConstraint(
+            "sequence_no > 0",
+            name="ck_md_routing_operation_sequence_positive",
+        ),
+        CheckConstraint(
+            "operation_kind IN "
+            "('PHYSICAL_PRODUCTION', 'COSTING_ONLY', 'ADMINISTRATIVE', "
+            "'COMPLETION_MARKER', 'UNKNOWN')",
+            name="ck_md_routing_operation_kind",
+        ),
+        CheckConstraint(
+            "nominal_rate IS NULL OR nominal_rate > 0",
+            name="ck_md_routing_operation_nominal_rate_positive",
+        ),
+        CheckConstraint(
+            "(nominal_rate IS NULL AND rate_uom IS NULL) OR "
+            "(nominal_rate IS NOT NULL AND rate_uom IS NOT NULL)",
+            name="ck_md_routing_operation_rate_pair",
+        ),
+        CheckConstraint(
+            "NOT completion_marker OR NOT schedulable",
+            name="ck_md_routing_operation_completion_not_schedulable",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    routing_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_routing_revision.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    source_operation_code: Mapped[str] = mapped_column(
+        String(30), nullable=False
+    )
+    sequence_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_description: Mapped[str] = mapped_column(Text, nullable=False)
+    area_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_area.id", ondelete="RESTRICT"), nullable=True
+    )
+    work_center_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_work_center.id", ondelete="RESTRICT"), nullable=True
+    )
+    operation_kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    schedulable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    completion_marker: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    nominal_rate: Mapped[Decimal | None] = mapped_column(
+        Numeric(24, 8), nullable=True
+    )
+    rate_uom: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ResourceAssignment(Base):
+    __tablename__ = "md_resource_assignment"
+    __table_args__ = (
+        UniqueConstraint(
+            "routing_operation_id",
+            "resource_id",
+            name="uq_md_resource_assignment_operation_resource",
+        ),
+        CheckConstraint(
+            "capacity_factor IS NULL OR capacity_factor > 0",
+            name="ck_md_resource_assignment_capacity_positive",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    routing_operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_routing_operation.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    resource_id: Mapped[UUID] = mapped_column(
+        ForeignKey("core_resource.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    principal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    capacity_factor: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 8), nullable=True
+    )
+    source_batch_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

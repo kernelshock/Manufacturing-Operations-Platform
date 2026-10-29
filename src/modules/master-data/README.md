@@ -57,3 +57,18 @@ Implemented in G2.4:
 - ambiguity rejection when an unpinned child Article has multiple effective active BOMs.
 
 The complete Prolowin report remains reconciliation evidence only. It does not author parent-child edges because that report is flattened.
+
+
+Implemented in G2.5:
+- revisioned Routing/BOP definitions tied to exact ArticleRevision identities;
+- source operation code/description preserved separately from BOM demand;
+- operation classification into PHYSICAL_PRODUCTION, COSTING_ONLY, ADMINISTRATIVE, COMPLETION_MARKER or UNKNOWN;
+- APS-facing schedulable flag and explicit completion-marker semantics;
+- optional Decimal nominal rate + rate UoM;
+- references to G1 Area and WorkCenter;
+- ResourceAssignment references G1 Resource directly and validates hierarchy;
+- one optional principal resource per operation at the service boundary;
+- immutable published routings with controlled publish/supersede lifecycle;
+- effectivity-aware effective-routing lookup and definition projection.
+
+A standalone canonical Process master is not invented in G2.5. The optional process_id from the G0 physical baseline remains deferred until Process has its own identity/governance contract.

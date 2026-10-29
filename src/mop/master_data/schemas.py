@@ -21,6 +21,14 @@ ArticleRevisionStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
 SupplierCategory = Literal["UNKNOWN", "PRODUCT", "PROCESS", "SERVICE", "MIXED"]
 SupplierMappingStatus = Literal["MAPPED", "REVIEW_REQUIRED", "REJECTED"]
 BOMRevisionStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
+RoutingRevisionStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
+RoutingOperationKind = Literal[
+    "PHYSICAL_PRODUCTION",
+    "COSTING_ONLY",
+    "ADMINISTRATIVE",
+    "COMPLETION_MARKER",
+    "UNKNOWN",
+]
 
 
 def _upper_trim(value: str) -> str:
@@ -379,3 +387,127 @@ class BOMExplosionRead(BaseModel):
     effective_at: datetime
     paths: list[BOMExplosionLine]
     aggregate: list[BOMExplosionAggregate]
+
+
+
+class RoutingRevisionCreate(BaseModel):
+    article_revision_id: UUID
+    revision_no: int = Field(gt=0)
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    source_system: str = Field(min_length=1, max_length=40)
+    source_batch_id: UUID | None = None
+    source_fingerprint: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+
+    _source_system = field_validator("source_system")(_upper_trim)
+
+    @field_validator("source_fingerprint")
+    @classmethod
+    def normalize_routing_fingerprint(cls, value: str) -> str:
+        return value.lower()
+
+    @model_validator(mode="after")
+    def validate_effectivity(self) -> "RoutingRevisionCreate":
+        if (
+            self.valid_from is not None
+            and self.valid_to is not None
+            and self.valid_to <= self.valid_from
+        ):
+            raise ValueError("valid_to must be later than valid_from")
+        return self
+
+
+class RoutingRevisionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    article_revision_id: UUID
+    revision_no: int
+    valid_from: datetime
+    valid_to: datetime | None
+    status: RoutingRevisionStatus
+    source_system: str
+    source_batch_id: UUID | None
+    source_fingerprint: str
+    created_at: datetime
+
+
+class RoutingOperationCreate(BaseModel):
+    source_operation_code: str = Field(min_length=1, max_length=30)
+    sequence_no: int = Field(gt=0)
+    source_description: str = Field(min_length=1, max_length=4000)
+    area_id: UUID | None = None
+    work_center_id: UUID | None = None
+    operation_kind: RoutingOperationKind = "UNKNOWN"
+    schedulable: bool = False
+    completion_marker: bool = False
+    nominal_rate: Decimal | None = Field(default=None, gt=0)
+    rate_uom: str | None = Field(default=None, max_length=50)
+    active: bool = True
+
+    _source_operation_code = field_validator("source_operation_code")(_upper_trim)
+    _source_description = field_validator("source_description")(_trim)
+
+    @field_validator("rate_uom")
+    @classmethod
+    def normalize_rate_uom(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_operation_semantics(self) -> "RoutingOperationCreate":
+        if (self.nominal_rate is None) != (self.rate_uom is None):
+            raise ValueError("nominal_rate and rate_uom must be provided together")
+        if self.completion_marker != (
+            self.operation_kind == "COMPLETION_MARKER"
+        ):
+            raise ValueError(
+                "completion_marker must match COMPLETION_MARKER operation_kind"
+            )
+        if self.completion_marker and self.schedulable:
+            raise ValueError("completion marker cannot be schedulable")
+        if self.schedulable and self.operation_kind != "PHYSICAL_PRODUCTION":
+            raise ValueError(
+                "only PHYSICAL_PRODUCTION operations can be schedulable"
+            )
+        return self
+
+
+class RoutingOperationRead(RoutingOperationCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    routing_revision_id: UUID
+    created_at: datetime
+
+
+class ResourceAssignmentCreate(BaseModel):
+    resource_id: UUID
+    principal: bool = False
+    capacity_factor: Decimal | None = Field(default=None, gt=0)
+    source_batch_id: UUID | None = None
+
+
+class ResourceAssignmentRead(ResourceAssignmentCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    routing_operation_id: UUID
+    created_at: datetime
+
+
+class RoutingSupersedeRequest(BaseModel):
+    replacement_routing_revision_id: UUID
+    effective_at: datetime | None = None
+
+
+class RoutingOperationDefinition(BaseModel):
+    operation: RoutingOperationRead
+    resources: list[ResourceAssignmentRead]
+
+
+class RoutingDefinitionRead(BaseModel):
+    routing: RoutingRevisionRead
+    operations: list[RoutingOperationDefinition]

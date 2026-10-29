@@ -9,12 +9,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from mop.core.models import Area, Resource, WorkCenter
 from mop.master_data.models import (
     Article,
     ArticleRevision,
     BOMComponent,
     BOMRevision,
     ProductConfiguration,
+    ResourceAssignment,
+    RoutingOperation,
+    RoutingRevision,
     Supplier,
     SupplierArticle,
     SupplierSourceMapping,
@@ -29,6 +33,14 @@ from mop.master_data.schemas import (
     BOMExplosionLine,
     BOMExplosionRead,
     BOMRevisionCreate,
+    ResourceAssignmentCreate,
+    ResourceAssignmentRead,
+    RoutingDefinitionRead,
+    RoutingOperationCreate,
+    RoutingOperationDefinition,
+    RoutingOperationRead,
+    RoutingRevisionCreate,
+    RoutingRevisionRead,
     ProductConfigurationCreate,
     SupplierArticleCreate,
     SupplierCreate,
@@ -740,4 +752,413 @@ class MasterDataService:
                     item.source_uom_raw,
                 ),
             ),
+        )
+
+
+    def create_routing_revision(
+        self,
+        data: RoutingRevisionCreate,
+    ) -> RoutingRevision:
+        if self.session.get(ArticleRevision, data.article_revision_id) is None:
+            raise MasterDataNotFoundError("article revision not found")
+
+        valid_from = data.valid_from or datetime.now(timezone.utc)
+        if data.valid_to is not None and data.valid_to <= valid_from:
+            raise MasterDataRuleError("valid_to must be later than valid_from")
+
+        return self._commit(
+            RoutingRevision(
+                article_revision_id=data.article_revision_id,
+                revision_no=data.revision_no,
+                valid_from=valid_from,
+                valid_to=data.valid_to,
+                status="DRAFT",
+                source_system=data.source_system,
+                source_batch_id=data.source_batch_id,
+                source_fingerprint=data.source_fingerprint,
+            )
+        )
+
+    def list_routing_revisions(
+        self,
+        article_revision_id: UUID | None = None,
+        status: str | None = None,
+    ) -> Sequence[RoutingRevision]:
+        query = select(RoutingRevision)
+        if article_revision_id is not None:
+            query = query.where(
+                RoutingRevision.article_revision_id == article_revision_id
+            )
+        if status:
+            query = query.where(RoutingRevision.status == status)
+        return self.session.scalars(
+            query.order_by(
+                RoutingRevision.article_revision_id,
+                RoutingRevision.revision_no,
+            )
+        ).all()
+
+    def add_routing_operation(
+        self,
+        routing_revision_id: UUID,
+        data: RoutingOperationCreate,
+    ) -> RoutingOperation:
+        routing = self.session.get(RoutingRevision, routing_revision_id)
+        if routing is None:
+            raise MasterDataNotFoundError("routing revision not found")
+        if routing.status != "DRAFT":
+            raise MasterDataRuleError(
+                "operations can only be added to a DRAFT routing revision"
+            )
+
+        area_id = data.area_id
+        work_center_id = data.work_center_id
+
+        if area_id is not None:
+            area = self.session.get(Area, area_id)
+            if area is None:
+                raise MasterDataNotFoundError("area not found")
+            if not area.active:
+                raise MasterDataRuleError("routing area must be active")
+
+        if work_center_id is not None:
+            work_center = self.session.get(WorkCenter, work_center_id)
+            if work_center is None:
+                raise MasterDataNotFoundError("work center not found")
+            if not work_center.active:
+                raise MasterDataRuleError("routing work center must be active")
+            if area_id is None:
+                area_id = work_center.area_id
+            elif work_center.area_id != area_id:
+                raise MasterDataRuleError(
+                    "work center does not belong to routing area"
+                )
+
+        payload = data.model_dump()
+        payload["area_id"] = area_id
+        payload["work_center_id"] = work_center_id
+        return self._commit(
+            RoutingOperation(
+                routing_revision_id=routing_revision_id,
+                **payload,
+            )
+        )
+
+    def list_routing_operations(
+        self,
+        routing_revision_id: UUID,
+    ) -> Sequence[RoutingOperation]:
+        if self.session.get(RoutingRevision, routing_revision_id) is None:
+            raise MasterDataNotFoundError("routing revision not found")
+        return self.session.scalars(
+            select(RoutingOperation)
+            .where(
+                RoutingOperation.routing_revision_id == routing_revision_id
+            )
+            .order_by(RoutingOperation.sequence_no)
+        ).all()
+
+    def add_resource_assignment(
+        self,
+        routing_operation_id: UUID,
+        data: ResourceAssignmentCreate,
+    ) -> ResourceAssignment:
+        operation = self.session.get(RoutingOperation, routing_operation_id)
+        if operation is None:
+            raise MasterDataNotFoundError("routing operation not found")
+
+        routing = self.session.get(
+            RoutingRevision, operation.routing_revision_id
+        )
+        if routing is None:
+            raise MasterDataNotFoundError("routing revision not found")
+        if routing.status != "DRAFT":
+            raise MasterDataRuleError(
+                "resources can only be assigned to a DRAFT routing revision"
+            )
+        if operation.completion_marker:
+            raise MasterDataRuleError(
+                "completion marker cannot have resource assignments"
+            )
+
+        resource = self.session.get(Resource, data.resource_id)
+        if resource is None:
+            raise MasterDataNotFoundError("resource not found")
+        if not resource.active:
+            raise MasterDataRuleError("routing resource must be active")
+
+        work_center = self.session.get(
+            WorkCenter, resource.work_center_id
+        )
+        if work_center is None:
+            raise MasterDataNotFoundError("resource work center not found")
+        if not work_center.active:
+            raise MasterDataRuleError("resource work center must be active")
+
+        if (
+            operation.work_center_id is not None
+            and operation.work_center_id != resource.work_center_id
+        ):
+            raise MasterDataRuleError(
+                "resource does not belong to routing work center"
+            )
+        if (
+            operation.area_id is not None
+            and operation.area_id != work_center.area_id
+        ):
+            raise MasterDataRuleError(
+                "resource does not belong to routing area"
+            )
+
+        if data.principal:
+            existing_principal = self.session.scalar(
+                select(ResourceAssignment).where(
+                    ResourceAssignment.routing_operation_id
+                    == routing_operation_id,
+                    ResourceAssignment.principal.is_(True),
+                )
+            )
+            if existing_principal is not None:
+                raise MasterDataRuleError(
+                    "routing operation already has a principal resource"
+                )
+
+        return self._commit(
+            ResourceAssignment(
+                routing_operation_id=routing_operation_id,
+                **data.model_dump(),
+            )
+        )
+
+    def list_resource_assignments(
+        self,
+        routing_operation_id: UUID,
+    ) -> Sequence[ResourceAssignment]:
+        if self.session.get(RoutingOperation, routing_operation_id) is None:
+            raise MasterDataNotFoundError("routing operation not found")
+        return self.session.scalars(
+            select(ResourceAssignment)
+            .where(
+                ResourceAssignment.routing_operation_id
+                == routing_operation_id
+            )
+            .order_by(
+                ResourceAssignment.principal.desc(),
+                ResourceAssignment.created_at,
+                ResourceAssignment.id,
+            )
+        ).all()
+
+    def _routing_parent_article(self, routing: RoutingRevision) -> Article:
+        revision = self.session.get(
+            ArticleRevision, routing.article_revision_id
+        )
+        if revision is None:
+            raise MasterDataNotFoundError("article revision not found")
+        article = self.session.get(Article, revision.article_id)
+        if article is None:
+            raise MasterDataNotFoundError("article not found")
+        return article
+
+    def _assert_routing_publishable(
+        self,
+        routing: RoutingRevision,
+    ) -> None:
+        operations = list(self.list_routing_operations(routing.id))
+        active_operations = [operation for operation in operations if operation.active]
+        if not active_operations:
+            raise MasterDataRuleError(
+                "routing revision requires at least one active operation"
+            )
+
+        completion_markers = [
+            operation
+            for operation in active_operations
+            if operation.completion_marker
+        ]
+        if len(completion_markers) > 1:
+            raise MasterDataRuleError(
+                "routing revision cannot have multiple completion markers"
+            )
+
+        for operation in active_operations:
+            if operation.completion_marker:
+                continue
+
+            assignments = list(
+                self.list_resource_assignments(operation.id)
+            )
+            for assignment in assignments:
+                resource = self.session.get(Resource, assignment.resource_id)
+                if resource is None:
+                    raise MasterDataNotFoundError("resource not found")
+                if not resource.active:
+                    raise MasterDataRuleError(
+                        "routing resource must be active at publication"
+                    )
+
+            if operation.schedulable:
+                if (
+                    operation.work_center_id is None
+                    and not assignments
+                ):
+                    raise MasterDataRuleError(
+                        "schedulable operation requires a work center "
+                        "or resource assignment"
+                    )
+
+        active_for_revision = self.session.scalars(
+            select(RoutingRevision).where(
+                RoutingRevision.article_revision_id
+                == routing.article_revision_id,
+                RoutingRevision.status == "ACTIVE",
+                RoutingRevision.id != routing.id,
+            )
+        ).all()
+        if any(
+            self._windows_overlap(
+                existing.valid_from,
+                existing.valid_to,
+                routing.valid_from,
+                routing.valid_to,
+            )
+            for existing in active_for_revision
+        ):
+            raise MasterDataRuleError(
+                "an overlapping ACTIVE routing already exists "
+                "for this article revision"
+            )
+
+    def publish_routing_revision(
+        self,
+        routing_revision_id: UUID,
+    ) -> RoutingRevision:
+        routing = self.session.get(RoutingRevision, routing_revision_id)
+        if routing is None:
+            raise MasterDataNotFoundError("routing revision not found")
+        if routing.status != "DRAFT":
+            raise MasterDataRuleError(
+                "only a DRAFT routing revision can be published"
+            )
+
+        self._assert_routing_publishable(routing)
+        routing.status = "ACTIVE"
+        return self._commit(routing)
+
+    def supersede_routing_revision(
+        self,
+        active_routing_revision_id: UUID,
+        replacement_routing_revision_id: UUID,
+        effective_at: datetime | None = None,
+    ) -> tuple[RoutingRevision, RoutingRevision]:
+        active = self.session.get(
+            RoutingRevision, active_routing_revision_id
+        )
+        replacement = self.session.get(
+            RoutingRevision, replacement_routing_revision_id
+        )
+        if active is None or replacement is None:
+            raise MasterDataNotFoundError("routing revision not found")
+        if active.status != "ACTIVE":
+            raise MasterDataRuleError("current routing revision is not ACTIVE")
+        if replacement.status != "DRAFT":
+            raise MasterDataRuleError(
+                "replacement routing revision must be DRAFT"
+            )
+
+        active_parent = self._routing_parent_article(active)
+        replacement_parent = self._routing_parent_article(replacement)
+        if active_parent.id != replacement_parent.id:
+            raise MasterDataRuleError(
+                "replacement routing must belong to the same article"
+            )
+
+        at = effective_at or datetime.now(timezone.utc)
+        if at <= active.valid_from:
+            raise MasterDataRuleError(
+                "supersede effective_at must be later than current valid_from"
+            )
+        if replacement.valid_to is not None and replacement.valid_to <= at:
+            raise MasterDataRuleError(
+                "replacement valid_to must be later than supersede effective_at"
+            )
+
+        replacement.valid_from = at
+        self._assert_routing_publishable(replacement)
+
+        active.valid_to = at
+        active.status = "SUPERSEDED"
+        replacement.status = "ACTIVE"
+
+        try:
+            self.session.add_all([active, replacement])
+            self.session.commit()
+            self.session.refresh(active)
+            self.session.refresh(replacement)
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MasterDataConflictError(
+                "routing supersede operation conflicts with existing master data"
+            ) from exc
+        return active, replacement
+
+    def get_effective_routing(
+        self,
+        article_revision_id: UUID,
+        effective_at: datetime | None = None,
+    ) -> RoutingRevision:
+        if self.session.get(ArticleRevision, article_revision_id) is None:
+            raise MasterDataNotFoundError("article revision not found")
+
+        at = effective_at or datetime.now(timezone.utc)
+        candidates = [
+            routing
+            for routing in self.session.scalars(
+                select(RoutingRevision).where(
+                    RoutingRevision.article_revision_id
+                    == article_revision_id,
+                    RoutingRevision.status == "ACTIVE",
+                )
+            ).all()
+            if self._window_contains(
+                routing.valid_from,
+                routing.valid_to,
+                at,
+            )
+        ]
+        if not candidates:
+            raise MasterDataNotFoundError(
+                "effective routing revision not found"
+            )
+        if len(candidates) > 1:
+            raise MasterDataRuleError(
+                "multiple effective active routing revisions found"
+            )
+        return candidates[0]
+
+    def get_routing_definition(
+        self,
+        routing_revision_id: UUID,
+    ) -> RoutingDefinitionRead:
+        routing = self.session.get(RoutingRevision, routing_revision_id)
+        if routing is None:
+            raise MasterDataNotFoundError("routing revision not found")
+
+        definitions = []
+        for operation in self.list_routing_operations(routing_revision_id):
+            definitions.append(
+                RoutingOperationDefinition(
+                    operation=RoutingOperationRead.model_validate(operation),
+                    resources=[
+                        ResourceAssignmentRead.model_validate(assignment)
+                        for assignment in self.list_resource_assignments(
+                            operation.id
+                        )
+                    ],
+                )
+            )
+
+        return RoutingDefinitionRead(
+            routing=RoutingRevisionRead.model_validate(routing),
+            operations=definitions,
         )

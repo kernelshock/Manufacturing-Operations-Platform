@@ -22,6 +22,14 @@ from mop.master_data.schemas import (
     BOMRevisionCreate,
     BOMRevisionRead,
     BOMSupersedeRequest,
+    ResourceAssignmentCreate,
+    ResourceAssignmentRead,
+    RoutingDefinitionRead,
+    RoutingOperationCreate,
+    RoutingOperationRead,
+    RoutingRevisionCreate,
+    RoutingRevisionRead,
+    RoutingSupersedeRequest,
     ProductConfigurationCreate,
     ProductConfigurationRead,
     SupplierArticleCreate,
@@ -580,3 +588,253 @@ def explode_bom(
             effective_at=effective_at,
         )
     )
+
+
+
+@router.post(
+    "/routing-revisions",
+    response_model=RoutingRevisionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_routing_revision(
+    payload: RoutingRevisionCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_routing_revision(payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.routing_revision.create",
+        object_type="routing_revision",
+        object_id=created.id,
+        details={
+            "article_revision_id": str(created.article_revision_id),
+            "revision_no": created.revision_no,
+            "source_system": created.source_system,
+            "source_fingerprint": created.source_fingerprint,
+            "status": created.status,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/routing-revisions",
+    response_model=list[RoutingRevisionRead],
+)
+def list_routing_revisions(
+    article_revision_id: UUID | None = None,
+    status_filter: str | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_routing_revisions(
+        article_revision_id,
+        status_filter,
+    )
+
+
+@router.get(
+    "/routing-revisions/effective",
+    response_model=RoutingRevisionRead,
+)
+def get_effective_routing(
+    article_revision_id: UUID,
+    effective_at: datetime | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.get_effective_routing(
+            article_revision_id,
+            effective_at,
+        )
+    )
+
+
+@router.post(
+    "/routing-revisions/{routing_revision_id}/operations",
+    response_model=RoutingOperationRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_routing_operation(
+    routing_revision_id: UUID,
+    payload: RoutingOperationCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(
+        lambda: app.add_routing_operation(
+            routing_revision_id,
+            payload,
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.routing_operation.create",
+        object_type="routing_operation",
+        object_id=created.id,
+        details={
+            "routing_revision_id": str(created.routing_revision_id),
+            "source_operation_code": created.source_operation_code,
+            "sequence_no": created.sequence_no,
+            "operation_kind": created.operation_kind,
+            "schedulable": created.schedulable,
+            "completion_marker": created.completion_marker,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/routing-revisions/{routing_revision_id}/operations",
+    response_model=list[RoutingOperationRead],
+)
+def list_routing_operations(
+    routing_revision_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.list_routing_operations(routing_revision_id)
+    )
+
+
+@router.post(
+    "/routing-operations/{routing_operation_id}/resources",
+    response_model=ResourceAssignmentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_resource_assignment(
+    routing_operation_id: UUID,
+    payload: ResourceAssignmentCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(
+        lambda: app.add_resource_assignment(
+            routing_operation_id,
+            payload,
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.resource_assignment.create",
+        object_type="resource_assignment",
+        object_id=created.id,
+        details={
+            "routing_operation_id": str(created.routing_operation_id),
+            "resource_id": str(created.resource_id),
+            "principal": created.principal,
+            "capacity_factor": (
+                str(created.capacity_factor)
+                if created.capacity_factor is not None
+                else None
+            ),
+        },
+    )
+    return created
+
+
+@router.get(
+    "/routing-operations/{routing_operation_id}/resources",
+    response_model=list[ResourceAssignmentRead],
+)
+def list_resource_assignments(
+    routing_operation_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.list_resource_assignments(routing_operation_id)
+    )
+
+
+@router.get(
+    "/routing-revisions/{routing_revision_id}/definition",
+    response_model=RoutingDefinitionRead,
+)
+def get_routing_definition(
+    routing_revision_id: UUID,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return _translate(
+        lambda: app.get_routing_definition(routing_revision_id)
+    )
+
+
+@router.post(
+    "/routing-revisions/{routing_revision_id}/publish",
+    response_model=RoutingRevisionRead,
+)
+def publish_routing_revision(
+    routing_revision_id: UUID,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    published = _translate(
+        lambda: app.publish_routing_revision(routing_revision_id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.routing_revision.publish",
+        object_type="routing_revision",
+        object_id=published.id,
+        details={
+            "article_revision_id": str(published.article_revision_id),
+            "revision_no": published.revision_no,
+            "status": published.status,
+        },
+    )
+    return published
+
+
+@router.post(
+    "/routing-revisions/{routing_revision_id}/supersede",
+    response_model=RoutingRevisionRead,
+)
+def supersede_routing_revision(
+    routing_revision_id: UUID,
+    payload: RoutingSupersedeRequest,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    current, replacement = _translate(
+        lambda: app.supersede_routing_revision(
+            routing_revision_id,
+            payload.replacement_routing_revision_id,
+            payload.effective_at,
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.routing_revision.supersede",
+        object_type="routing_revision",
+        object_id=current.id,
+        details={
+            "replacement_routing_revision_id": str(replacement.id),
+            "effective_at": replacement.valid_from.isoformat(),
+        },
+    )
+    return replacement
