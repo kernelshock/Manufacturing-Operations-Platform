@@ -23,7 +23,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 - **G2.3 — Supplier master — COMPLETED:** canonical supplier identity, Prolowin/CRM source mappings and Article sourcing data for purchasing/material flows.
 - **G2.4 — BOM — COMPLETED:** revisioned BOM, immutable published component structures, Decimal-safe recursive explosion, effectivity, path provenance and cycle detection.
 - **G2.5 — Routing/BOP — COMPLETED:** revisioned Routing/BOP, operation semantics, effectivity and references to G1 Area/WorkCenter/Resource identities.
-- **G2.6 — Calendars/effectivity:** manufacturing calendars and effectivity rules consumed by scheduling.
+- **G2.6 — Calendars/effectivity — COMPLETED:** versioned manufacturing calendars, hierarchical Plant/Area/WorkCenter/Resource resolution, weekly capacity windows, dated exceptions and historical effectivity.
 - **G2.7 — Prolowin assimilation:** immutable staging, FIN normalization, data-quality quarantine and reconciliation.
 - **G2.8 — Gate hardening:** regression corpus, import/reconciliation evidence, security and release-facing summary.
 
@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current slice
-G2.6 — Calendars/effectivity.
+G2.7 — Prolowin assimilation.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -138,3 +138,26 @@ G2.6 — Calendars/effectivity.
 - npm audit: 0 vulnerabilities;
 - runtime regression: passed;
 - next slice: **G2.6 — Calendars/effectivity**.
+
+### G2.6 — Calendars/effectivity
+- implementation head: `647e2af2ceaebe3b14a6f2add17b9e6a475c2339`;
+- GitHub Actions: `G2 Master Data` run #32;
+- result: **SUCCESS**;
+- Alembic head: `0011_g2_6`;
+- calendar revisions bind to exactly one G1 Plant, Area, WorkCenter or Resource;
+- IANA timezone is explicit and stable across one calendar code's revisions;
+- weekly availability is minute-granular, Decimal capacity-safe and supports overnight shifts;
+- dated CLOSED / AVAILABLE_OVERRIDE exceptions override recurring windows;
+- runtime resolution precedence is Resource > WorkCenter > Area > Plant;
+- published calendars are immutable and supersede preserves historical effectivity;
+- historical resolution includes SUPERSEDED revisions inside their closed effectivity window;
+- the backend runtime image explicitly resolves `America/Argentina/Cordoba`;
+- APS receives nominal availability/capacity evidence but remains owner of production scheduling;
+- G0 regression: 5 passed;
+- G1 regression: 30 passed;
+- G2 tests: 39 passed;
+- frontend regression: 7 passed + typecheck + production build;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- runtime regression: passed;
+- next slice: **G2.7 — Prolowin assimilation**.
