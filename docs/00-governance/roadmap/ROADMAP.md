@@ -11,7 +11,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | Gate | Scope | Demonstrable outcome | Status |
 |---|---|---|---|
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
-| G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | VALIDATED |
+| G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | PLANNED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
@@ -125,3 +125,13 @@ Resolved/deferred for G0:
 - PR #6 opened as **DRAFT**;
 - G1 status: **VALIDATED — awaiting explicit release approval**;
 - no merge/release is authorized by validation alone.
+
+## G1 release record — 2026-10-29
+- explicit release approval received: **"Autorizo la liberación de G1"**;
+- final validated branch head: `57f5b154e4a07e463ebe6ec7efb53cf45980e690`;
+- G1 Platform Core push run #93: **SUCCESS**;
+- G1 Platform Core PR run #94: **SUCCESS**;
+- G0 Architecture Structure PR run #77: **SUCCESS**;
+- PR #6 marked ready and merged into `main`;
+- release merge commit: `3412a9b3f78303166f81e22e32a7b167ad2dc19e`;
+- G1 status: **RELEASED**.

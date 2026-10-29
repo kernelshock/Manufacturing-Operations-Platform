@@ -2,7 +2,7 @@
 
 Date: 2026-10-29  
 Audience: Direction / project governance  
-Status: **VALIDATED — release approval pending**
+Status: **RELEASED**
 
 ## What G1 delivers
 G1 turns the G0 architecture into a working platform foundation.
@@ -53,5 +53,5 @@ Before later production stages, separate gates still have to address:
 - business-module validation with FAIC data;
 - operational pilot/shadow/parallel evidence.
 
-## Decision requested
-G1 is technically eligible to move from **VALIDATED** to **RELEASED**. That transition requires explicit approval; until then PR #6 remains draft and no merge is authorized.
+## Release decision
+Explicit release approval was received on 2026-10-29. PR #6 was merged to `main`; G1 — Platform Core is **RELEASED**. This does not change the later production-stage obligations listed above.

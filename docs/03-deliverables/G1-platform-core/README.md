@@ -1,8 +1,9 @@
 # G1 — Platform Core
 
-Status: **VALIDATED — AWAITING RELEASE APPROVAL**  
+Status: **RELEASED**  
 Started: 2026-10-28  
 Validated: 2026-10-29  
+Released: 2026-10-29  
 Branch: `feat/G1-platform-core`  
 Base release: G0 commit `4ca6a279ba661a813598c745befd9639435c2e8f`
 
@@ -150,11 +151,13 @@ G1 becomes **RELEASED** only after explicit approval.
 - frontend: typecheck passed / 6 tests passed / production build passed;
 - runtime smoke: passed, including security headers, no-store responses, admin bootstrap, login/session/audit and login-rate-limit verification;
 - dependency resolution: Python production/dev locks and npm package lock committed and enforced;
-- PR: #6, intentionally **DRAFT**;
-- gate status: **VALIDATED — awaiting explicit release approval**.
+- PR: #6, approved and merged;
+- final validated branch head: `57f5b154e4a07e463ebe6ec7efb53cf45980e690`;
+- release merge commit: `3412a9b3f78303166f81e22e32a7b167ad2dc19e`;
+- gate status: **RELEASED**.
 
 ## Gate disposition
-All G1 exit criteria are satisfied for the DEV/TEST Platform Core baseline. G1 is not released by this validation alone.
+All G1 exit criteria are satisfied for the DEV/TEST Platform Core baseline. Explicit release approval was received and PR #6 was merged to `main`.
 
 Explicitly deferred, non-G1 blockers:
 - production HTTPS/certificate and plant-network exposure configuration: required by ADR-0015 before production deployment;
@@ -162,4 +165,4 @@ Explicitly deferred, non-G1 blockers:
 - durable background worker/outbox execution process: introduced when the persistent worker contract exists;
 - OIDC enterprise federation: preserved behind the authentication boundary for a later gate.
 
-Release action remains a human gate. PR #6 must remain draft until explicit approval.
+The human release gate was satisfied on 2026-10-29. G1 is released; later-stage deferred controls remain governed by their respective ADRs and gates.
