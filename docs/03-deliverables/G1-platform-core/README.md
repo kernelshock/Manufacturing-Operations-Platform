@@ -1,7 +1,8 @@
 # G1 — Platform Core
 
-Status: **IN PROGRESS**  
+Status: **VALIDATED — AWAITING RELEASE APPROVAL**  
 Started: 2026-10-28  
+Validated: 2026-10-29  
 Branch: `feat/G1-platform-core`  
 Base release: G0 commit `4ca6a279ba661a813598c745befd9639435c2e8f`
 
@@ -38,7 +39,7 @@ G1 must conform to:
 - **G1.5 — Audit — COMPLETED:** PostgreSQL-enforced append-only audit events for authentication, IAM administration and privileged/core mutations, with read-only RBAC-protected query API.
 - **G1.6 — Frontend shell — COMPLETED:** React/TypeScript/Vite browser shell with secure login, session bootstrap, permission-driven navigation, organization/plant context, backend readiness, audit view and CI build/test gate.
 - **G1.7 — Runtime — COMPLETED:** Docker Compose DEV/TEST topology with PostgreSQL 18, one-shot Alembic migration gate, FastAPI, nginx/React public boundary, secret-safe database configuration, admin bootstrap and end-to-end runtime smoke test.
-- **G1.8 — Gate hardening:** tests, evidence, security review and release-facing summary.
+- **G1.8 — Gate hardening — COMPLETED:** authentication hardening, dependency/security audits, immutable supply-chain pins, reproducible dependency locks, security headers/rate limiting, final evidence and release-facing gate package.
 
 ## Exit criteria
 G1 can move to **VALIDATED** only when:
@@ -134,3 +135,31 @@ G1 becomes **RELEASED** only after explicit approval.
 - backend regression: G0 5 passed / G1 26 passed;
 - frontend: typecheck passed / 6 tests passed / production build passed;
 - next slice: **G1.8 — Gate hardening**.
+
+### G1.8 — Gate hardening
+- validated implementation head: `127f894aad161f152878c6212df06fc3523547ef`;
+- GitHub Actions: `G1 Platform Core` run #91;
+- result: **SUCCESS**;
+- Alembic head: `0005_g1_8`;
+- repository secret baseline: passed;
+- supply-chain pin baseline: passed;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- G0 regression: 5 passed;
+- G1 backend: 30 passed;
+- frontend: typecheck passed / 6 tests passed / production build passed;
+- runtime smoke: passed, including security headers, no-store responses, admin bootstrap, login/session/audit and login-rate-limit verification;
+- dependency resolution: Python production/dev locks and npm package lock committed and enforced;
+- PR: #6, intentionally **DRAFT**;
+- gate status: **VALIDATED — awaiting explicit release approval**.
+
+## Gate disposition
+All G1 exit criteria are satisfied for the DEV/TEST Platform Core baseline. G1 is not released by this validation alone.
+
+Explicitly deferred, non-G1 blockers:
+- production HTTPS/certificate and plant-network exposure configuration: required by ADR-0015 before production deployment;
+- operational backup automation, separated backup storage and restore-test evidence: required by ADR-0017 before Parallel/Production;
+- durable background worker/outbox execution process: introduced when the persistent worker contract exists;
+- OIDC enterprise federation: preserved behind the authentication boundary for a later gate.
+
+Release action remains a human gate. PR #6 must remain draft until explicit approval.

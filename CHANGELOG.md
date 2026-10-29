@@ -10,6 +10,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - Append-only PostgreSQL audit trail for authentication, IAM administration and privileged core mutations.
 - React/TypeScript/Vite frontend shell with session login, RBAC-driven navigation, operational context and system status surfaces.
 - Reproducible Docker Compose DEV/TEST runtime with PostgreSQL 18, Alembic migration gate, FastAPI, nginx frontend boundary and end-to-end smoke validation.
+- G1 gate hardening with persistent login lockout, nginx rate limiting/security headers, secret scanning, vulnerability audits, pinned Actions/container images and enforced dependency lockfiles.
 - Prolowin manufacturing-definition import contract and JSON Schema.
 - Five-product Prolowin reference-corpus analysis and reconciliation rules.
 - Recursive BOM/ABM and separate BOP/Routing canonical model.
@@ -24,6 +25,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - Automated G0 repository structure check.
 
 ### Changed
+- G1 Platform Core reached VALIDATED on 2026-10-29; PR #6 remains draft pending explicit release approval.
 - G0 Architecture Foundation released on 2026-10-28 after explicit approval; PR #1 merged to `main` as `6f79f82155789c02c8138b2caec1f617b46619db`.
 
 ### Project baseline
