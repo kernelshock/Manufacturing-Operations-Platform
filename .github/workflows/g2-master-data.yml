@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: g2-master-data-${{ github.ref }}
@@ -77,7 +78,19 @@ jobs:
       - name: Verify migration head
         run: python -m alembic current
       - name: Verify model and migration schema are synchronized
-        run: python -m alembic check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          output="$(python -m alembic check 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$rc" -ne 0 ]; then
+            printf '### G2.8 Alembic drift diagnostic\n\n\`\`\`text\n%s\n\`\`\`\n' "$output" > /tmp/alembic-drift.md
+            gh pr comment 8 --body-file /tmp/alembic-drift.md
+            exit "$rc"
+          fi
       - name: Verify full migration rollback and replay
         run: |
           python -m alembic downgrade base
