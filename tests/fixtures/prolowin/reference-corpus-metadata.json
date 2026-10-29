@@ -1,0 +1,16 @@
+{
+  "authority": "Derived non-proprietary metadata from the five authoritative Prolowin complete PDFs reviewed in G0",
+  "products": [
+    {"code":"X-1148","pages":7,"source_rows":230,"unique_article_codes":194,"fin_rows":194,"non_fin_rows":36,"multistage_codes":20},
+    {"code":"X-1149","pages":7,"source_rows":222,"unique_article_codes":186,"fin_rows":186,"non_fin_rows":36,"multistage_codes":20},
+    {"code":"X-2209","pages":6,"source_rows":210,"unique_article_codes":187,"fin_rows":187,"non_fin_rows":23,"multistage_codes":16},
+    {"code":"X-6111","pages":5,"source_rows":175,"unique_article_codes":147,"fin_rows":147,"non_fin_rows":28,"multistage_codes":20},
+    {"code":"X-7070","pages":5,"source_rows":172,"unique_article_codes":149,"fin_rows":149,"non_fin_rows":23,"multistage_codes":18}
+  ],
+  "x6111_trace": {
+    "article_code": "14027",
+    "description": "ALAMBRE CHICO RESPALDO MB F10",
+    "quantity": "6.0000",
+    "uom_raw": "UNID."
+  }
+}
