@@ -18,7 +18,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 - raw proprietary FAIC evidence remains outside this public repository.
 
 ## Planned slices
-- **G2.1 — Article & UoM foundation:** Article, ArticleRevision, UoM, UoM aliases, RBAC, audit and API.
+- **G2.1 — Article & UoM foundation — COMPLETED:** Article, ArticleRevision, UoM, UoM aliases, RBAC, audit and API.
 - **G2.2 — Product configurations:** commercial/manufacturing configuration metadata tied to exact Article identity.
 - **G2.3 — Supplier master:** supplier identity and source mappings required by purchasing/material flows.
 - **G2.4 — BOM:** revisioned BOM and recursive component relations with Decimal-safe quantities and cycle detection.
@@ -46,3 +46,17 @@ G2 is eligible for VALIDATED only when:
 
 ## Current slice
 G2.1 — Article & UoM foundation.
+
+### G2.1 — Article & UoM foundation
+- implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
+- GitHub Actions: `G2 Master Data` run #1;
+- result: **SUCCESS**;
+- Alembic head: `0006_g2_1`;
+- G0 regression: 5 passed;
+- G1 regression: 30 passed;
+- G2 tests: 6 passed;
+- frontend regression: 6 passed + typecheck + production build;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- runtime regression: passed;
+- next slice: **G2.2 — Product configurations**.
