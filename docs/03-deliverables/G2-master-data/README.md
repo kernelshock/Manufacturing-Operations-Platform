@@ -22,7 +22,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 - **G2.2 — Product configurations — COMPLETED:** commercial/manufacturing configuration metadata tied to exact Article identity, dimension-safe width and permission-driven frontend visibility.
 - **G2.3 — Supplier master — COMPLETED:** canonical supplier identity, Prolowin/CRM source mappings and Article sourcing data for purchasing/material flows.
 - **G2.4 — BOM — COMPLETED:** revisioned BOM, immutable published component structures, Decimal-safe recursive explosion, effectivity, path provenance and cycle detection.
-- **G2.5 — Routing/BOP:** routing revisions, operations and references to G1 resources.
+- **G2.5 — Routing/BOP — COMPLETED:** revisioned Routing/BOP, operation semantics, effectivity and references to G1 Area/WorkCenter/Resource identities.
 - **G2.6 — Calendars/effectivity:** manufacturing calendars and effectivity rules consumed by scheduling.
 - **G2.7 — Prolowin assimilation:** immutable staging, FIN normalization, data-quality quarantine and reconciliation.
 - **G2.8 — Gate hardening:** regression corpus, import/reconciliation evidence, security and release-facing summary.
@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current slice
-G2.5 — Routing/BOP.
+G2.6 — Calendars/effectivity.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -114,3 +114,27 @@ G2.5 — Routing/BOP.
 - npm audit: 0 vulnerabilities;
 - runtime regression: passed;
 - next slice: **G2.5 — Routing/BOP**.
+
+### G2.5 — Routing/BOP
+- implementation head: `5938a427a8128b99bfd6fc0d06d88fc75adde63f`;
+- GitHub Actions: `G2 Master Data` run #22;
+- result: **SUCCESS**;
+- Alembic head: `0010_g2_5`;
+- RoutingRevision is tied to an exact ArticleRevision and begins as DRAFT;
+- operations preserve source code/description independently from BOM demand;
+- operation kind, schedulability and completion-marker semantics are explicit;
+- routing operations reference G1 Area/WorkCenter and ResourceAssignment references G1 Resource;
+- work-center/resource hierarchy is validated and no duplicate resource master is introduced;
+- nominal rate uses Decimal semantics with an explicit rate UoM;
+- only DRAFT routings accept operations/resource assignments;
+- controlled publish/supersede lifecycle preserves historical effectivity;
+- effective-routing lookup and complete definition projection are available for APS/MES consumers;
+- standalone canonical Process identity is intentionally deferred because no governed Process master exists yet;
+- G0 regression: 5 passed;
+- G1 regression: 30 passed;
+- G2 tests: 32 passed;
+- frontend regression: 7 passed + typecheck + production build;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- runtime regression: passed;
+- next slice: **G2.6 — Calendars/effectivity**.
