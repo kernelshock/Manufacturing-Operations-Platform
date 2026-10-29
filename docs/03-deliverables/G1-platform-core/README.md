@@ -37,7 +37,7 @@ G1 must conform to:
 - **G1.4 — Identity/RBAC — COMPLETED:** local users, Argon2 password hashing, opaque server-side sessions, roles, seeded permissions, scoped assignments and server-side authorization.
 - **G1.5 — Audit — COMPLETED:** PostgreSQL-enforced append-only audit events for authentication, IAM administration and privileged/core mutations, with read-only RBAC-protected query API.
 - **G1.6 — Frontend shell — COMPLETED:** React/TypeScript/Vite browser shell with secure login, session bootstrap, permission-driven navigation, organization/plant context, backend readiness, audit view and CI build/test gate.
-- **G1.7 — Runtime:** Docker Compose DEV/TEST topology and configuration examples without committed secrets.
+- **G1.7 — Runtime — COMPLETED:** Docker Compose DEV/TEST topology with PostgreSQL 18, one-shot Alembic migration gate, FastAPI, nginx/React public boundary, secret-safe database configuration, admin bootstrap and end-to-end runtime smoke test.
 - **G1.8 — Gate hardening:** tests, evidence, security review and release-facing summary.
 
 ## Exit criteria
@@ -121,3 +121,16 @@ G1 becomes **RELEASED** only after explicit approval.
 - production build: passed;
 - backend regression: G0 5 passed / G1 24 passed;
 - next slice: **G1.7 — Runtime**.
+
+### G1.7 — Runtime
+- implementation head: `aedff6e3e0889046622bf5d834d615ab12b3897d`;
+- GitHub Actions: `G1 Platform Core` run #85;
+- result: **SUCCESS**;
+- Docker Compose observed in CI: v5.1.3;
+- PostgreSQL: 18 with persistent volume mounted at `/var/lib/postgresql`;
+- migrations: one-shot Alembic service blocks API start until schema is current;
+- published boundary: frontend/reverse-proxy only;
+- runtime smoke: clean DB → migrations → API ready → UI → admin bootstrap → login → /auth/me → audit;
+- backend regression: G0 5 passed / G1 26 passed;
+- frontend: typecheck passed / 6 tests passed / production build passed;
+- next slice: **G1.8 — Gate hardening**.

@@ -9,6 +9,7 @@ postgresql_major = "18"
 node = "26.13.0"
 container_topology = "docker-compose-dev-test"
 published_boundary = "frontend-reverse-proxy-only"
+postgresql_volume_root = "/var/lib/postgresql"
 
 [persistence]
 sqlalchemy_series = "2.1"
