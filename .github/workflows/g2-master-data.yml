@@ -68,10 +68,22 @@ jobs:
           python -m pip_audit --local --skip-editable
       - name: Compile backend package
         run: python -m compileall -q src/mop
+      - name: Verify a single Alembic head
+        run: |
+          python -m alembic heads | tee /tmp/alembic-heads.txt
+          test "$(grep -c '(head)' /tmp/alembic-heads.txt)" -eq 1
       - name: Apply database migrations from clean PostgreSQL
         run: python -m alembic upgrade head
       - name: Verify migration head
         run: python -m alembic current
+      - name: Verify model and migration schema are synchronized
+        run: python -m alembic check
+      - name: Verify full migration rollback and replay
+        run: |
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+          python -m alembic current
+          python -m alembic check
       - name: Run G0 regression tests
         run: python -m pytest tests/g0 -q
       - name: Run G1 regression tests
