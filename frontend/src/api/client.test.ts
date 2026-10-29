@@ -30,11 +30,10 @@ describe("API client", () => {
       })
     );
 
-    await expect(apiFetch("/api/v1/auth/me")).rejects.toEqual(
-      expect.objectContaining<ApiError>({
-        status: 401,
-        message: "authentication required"
-      })
-    );
+    await expect(apiFetch("/api/v1/auth/me")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 401,
+      message: "authentication required"
+    });
   });
 });
