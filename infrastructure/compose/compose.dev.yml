@@ -1,0 +1,118 @@
+name: mop-dev
+
+x-backend-environment: &backend-environment
+  MOP_ENVIRONMENT: ${MOP_ENVIRONMENT:-development}
+  MOP_DATABASE_HOST: postgres
+  MOP_DATABASE_PORT: "5432"
+  MOP_DATABASE_NAME: ${MOP_POSTGRES_DB:-mop}
+  MOP_DATABASE_USER: ${MOP_POSTGRES_USER:-mop}
+  MOP_DATABASE_PASSWORD: ${MOP_POSTGRES_PASSWORD:?Set MOP_POSTGRES_PASSWORD in the runtime env file}
+  MOP_SESSION_TTL_MINUTES: ${MOP_SESSION_TTL_MINUTES:-480}
+  MOP_SESSION_COOKIE_SECURE: ${MOP_SESSION_COOKIE_SECURE:-false}
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${MOP_POSTGRES_DB:-mop}
+      POSTGRES_USER: ${MOP_POSTGRES_USER:-mop}
+      POSTGRES_PASSWORD: ${MOP_POSTGRES_PASSWORD:?Set MOP_POSTGRES_PASSWORD in the runtime env file}
+    volumes:
+      - mop_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${MOP_POSTGRES_USER:-mop} -d ${MOP_POSTGRES_DB:-mop}
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks:
+      - data
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    environment: *backend-environment
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - data
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    environment: *backend-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - app
+      - data
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/frontend.Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MOP_WEB_HOST_PORT:-8080}:8080"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://127.0.0.1:8080/ >/dev/null 2>&1 || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+    networks:
+      - app
+
+  bootstrap-admin:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/backend.Dockerfile
+    environment:
+      <<: *backend-environment
+      MOP_BOOTSTRAP_ADMIN_PASSWORD: ${MOP_BOOTSTRAP_ADMIN_PASSWORD:-}
+    command:
+      - python
+      - -m
+      - mop.cli.bootstrap_admin
+      - --username
+      - ${MOP_ADMIN_USERNAME:-admin}
+      - --display-name
+      - ${MOP_ADMIN_DISPLAY_NAME:-MOP Administrator}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    profiles:
+      - admin
+    networks:
+      - data
+
+volumes:
+  mop_postgres_data:
+
+networks:
+  app:
+  data:

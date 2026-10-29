@@ -3,8 +3,9 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 Environment = Literal[
     "development",
@@ -23,9 +24,20 @@ class Settings(BaseSettings):
     environment: Environment = "development"
     api_prefix: str = "/api/v1"
     debug: bool = False
+
+    # Direct URL remains available for manual/local development and CI.
     database_url: str = (
         "postgresql+psycopg://mop:mop_dev_only@127.0.0.1:5432/mop?connect_timeout=2"
     )
+
+    # Container/runtime deployments may provide discrete components so
+    # credentials are encoded safely instead of interpolated into a URI.
+    database_host: str | None = None
+    database_port: int = 5432
+    database_name: str | None = None
+    database_user: str | None = None
+    database_password: SecretStr | None = None
+
     session_cookie_name: str = "mop_session"
     session_ttl_minutes: int = 480
     session_cookie_secure: bool = False
@@ -36,6 +48,39 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def build_database_url_from_components(self) -> "Settings":
+        supplied = {
+            "database_host": self.database_host,
+            "database_name": self.database_name,
+            "database_user": self.database_user,
+            "database_password": self.database_password,
+        }
+        if not any(value is not None for value in supplied.values()):
+            return self
+
+        missing = [name for name, value in supplied.items() if value is None]
+        if missing:
+            raise ValueError(
+                "database component configuration is incomplete: "
+                + ", ".join(sorted(missing))
+            )
+
+        assert self.database_host is not None
+        assert self.database_name is not None
+        assert self.database_user is not None
+        assert self.database_password is not None
+
+        self.database_url = URL.create(
+            drivername="postgresql+psycopg",
+            username=self.database_user,
+            password=self.database_password.get_secret_value(),
+            host=self.database_host,
+            port=self.database_port,
+            database=self.database_name,
+        ).render_as_string(hide_password=False)
+        return self
 
     @model_validator(mode="after")
     def enforce_secure_cookie_for_production_stages(self) -> "Settings":

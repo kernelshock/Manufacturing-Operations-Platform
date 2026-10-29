@@ -7,6 +7,8 @@ profile = "development-baseline"
 python_major_minor = "3.14"
 postgresql_major = "18"
 node = "26.13.0"
+container_topology = "docker-compose-dev-test"
+published_boundary = "frontend-reverse-proxy-only"
 
 [persistence]
 sqlalchemy_series = "2.1"
@@ -23,6 +25,8 @@ vitest = "5.0.5"
 
 [notes]
 postgresql_19 = "Not approved for this baseline; 19 is still release-candidate as of 2026-10-28."
+container_digest_pinning = "Deferred to G1.8 gate hardening."
+background_worker = "Deferred until the persistent job/outbox worker contract exists."
 
 [security]
 pwdlib_series = "0.3"
