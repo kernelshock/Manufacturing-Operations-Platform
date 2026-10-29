@@ -13,7 +13,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
-| G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | PLANNED |
+| G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | IN PROGRESS |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
 | G6 | Materials | ABM/BOM, theoretical demand, actual consumption, inventory and reconciliation | PLANNED |
@@ -155,3 +155,14 @@ Resolved/deferred for G0:
 - PR #8 marked ready and merged into `main`;
 - release merge commit: `e476edb8f1862613ff90f2a22a514d3f53a05ec5`;
 - G2 status: **RELEASED**.
+
+
+## G3 start record — 2026-10-29
+- branch: `feat/G3-demand-plan-routing`;
+- base: released G2/main commit `115b8dfe11a94d1d2587f5c6937b0383f0f05e65`;
+- G3 consumes G2 Article/ProductConfiguration/RoutingRevision identities without duplicating Master Data;
+- G3 owns demand containers, Production Plans, Taquillas, their requested product composition and governed routing selection;
+- APS finite-capacity sequencing, planned operation timestamps and Gantt remain deferred to G4;
+- MES actual execution timestamps/quantities remain deferred to G5;
+- G3.1 starts with stable Plan/Taquilla identity and lifecycle;
+- G3 status: **IN PROGRESS**.
