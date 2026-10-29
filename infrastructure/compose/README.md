@@ -117,3 +117,12 @@ ADR-0015 includes a background worker in the target topology. G1.7 does not crea
 - authenticates through the public runtime boundary;
 - verifies `/auth/me` and audit access;
 - destroys the test volume afterward.
+
+
+## PostgreSQL 18 volume layout
+
+The official PostgreSQL 18 image changed its persistent-volume root. G1.7 therefore mounts the named volume at:
+
+`/var/lib/postgresql`
+
+Do not revert this runtime to the pre-18 mount target `/var/lib/postgresql/data`.
