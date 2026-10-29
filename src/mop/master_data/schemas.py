@@ -18,6 +18,8 @@ ArticleKind = Literal[
     "SERVICE",
 ]
 ArticleRevisionStatus = Literal["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED"]
+SupplierCategory = Literal["UNKNOWN", "PRODUCT", "PROCESS", "SERVICE", "MIXED"]
+SupplierMappingStatus = Literal["MAPPED", "REVIEW_REQUIRED", "REJECTED"]
 
 
 def _upper_trim(value: str) -> str:
@@ -165,3 +167,94 @@ class ProductConfigurationRead(ProductConfigurationCreate):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+class SupplierCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=80)
+    legal_name: str = Field(min_length=1, max_length=255)
+    trade_name: str | None = Field(default=None, max_length=255)
+    supply_category: SupplierCategory = "UNKNOWN"
+    active: bool = True
+
+    _code = field_validator("code")(_upper_trim)
+    _legal_name = field_validator("legal_name")(_trim)
+
+    @field_validator("trade_name")
+    @classmethod
+    def normalize_trade_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+
+class SupplierRead(SupplierCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class SupplierSourceMappingCreate(BaseModel):
+    supplier_id: UUID | None = None
+    external_system: str = Field(min_length=1, max_length=40)
+    external_code: str = Field(min_length=1, max_length=80)
+    source_name: str | None = Field(default=None, max_length=255)
+    source_category_raw: str | None = Field(default=None, max_length=255)
+    mapping_status: SupplierMappingStatus
+    active: bool = True
+
+    _external_system = field_validator("external_system")(_upper_trim)
+    _external_code = field_validator("external_code")(_trim)
+
+    @field_validator("source_name", "source_category_raw")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_mapping(self) -> "SupplierSourceMappingCreate":
+        if self.mapping_status == "MAPPED" and self.supplier_id is None:
+            raise ValueError("MAPPED supplier source requires supplier_id")
+        if self.mapping_status == "REJECTED" and self.supplier_id is not None:
+            raise ValueError("REJECTED supplier source must not have supplier_id")
+        return self
+
+
+class SupplierSourceMappingRead(SupplierSourceMappingCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    approved_at: datetime | None
+    approved_by: UUID | None
+    last_seen_at: datetime
+
+
+class SupplierArticleCreate(BaseModel):
+    supplier_id: UUID
+    article_id: UUID
+    supplier_article_code: str | None = Field(default=None, max_length=120)
+    preferred: bool = False
+    lead_time_days: int | None = Field(default=None, ge=0)
+    minimum_order_quantity: Decimal | None = Field(default=None, gt=0)
+    order_uom_id: UUID | None = None
+    active: bool = True
+
+    @field_validator("supplier_article_code")
+    @classmethod
+    def normalize_supplier_article_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+
+class SupplierArticleRead(SupplierArticleCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime

@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     Text,
@@ -188,4 +189,107 @@ class ProductConfiguration(Base):
     article: Mapped[Article] = relationship(back_populates="product_configuration")
     width_uom: Mapped[UnitOfMeasure | None] = relationship(
         back_populates="product_configuration_widths"
+    )
+
+
+class Supplier(Base):
+    __tablename__ = "md_supplier"
+    __table_args__ = (
+        CheckConstraint(
+            "supply_category IN ('UNKNOWN', 'PRODUCT', 'PROCESS', 'SERVICE', 'MIXED')",
+            name="ck_md_supplier_supply_category",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    legal_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    trade_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    supply_category: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="UNKNOWN"
+    )
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class SupplierSourceMapping(Base):
+    __tablename__ = "md_supplier_source_mapping"
+    __table_args__ = (
+        UniqueConstraint(
+            "external_system",
+            "external_code",
+            name="uq_md_supplier_source_mapping_system_code",
+        ),
+        CheckConstraint(
+            "mapping_status IN ('MAPPED', 'REVIEW_REQUIRED', 'REJECTED')",
+            name="ck_md_supplier_source_mapping_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    supplier_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_supplier.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    external_system: Mapped[str] = mapped_column(String(40), nullable=False)
+    external_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_category_raw: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mapping_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    approved_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SupplierArticle(Base):
+    __tablename__ = "md_supplier_article"
+    __table_args__ = (
+        UniqueConstraint(
+            "supplier_id", "article_id", name="uq_md_supplier_article_pair"
+        ),
+        CheckConstraint(
+            "lead_time_days IS NULL OR lead_time_days >= 0",
+            name="ck_md_supplier_article_lead_time_nonnegative",
+        ),
+        CheckConstraint(
+            "minimum_order_quantity IS NULL OR minimum_order_quantity > 0",
+            name="ck_md_supplier_article_moq_positive",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    supplier_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_supplier.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    article_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_article.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    supplier_article_code: Mapped[str | None] = mapped_column(
+        String(120), nullable=True
+    )
+    preferred: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    lead_time_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    minimum_order_quantity: Mapped[Decimal | None] = mapped_column(
+        Numeric(24, 8), nullable=True
+    )
+    order_uom_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_uom.id", ondelete="RESTRICT"), nullable=True
+    )
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

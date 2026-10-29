@@ -73,3 +73,15 @@ export type ProductConfiguration = {
   created_at: string;
   updated_at: string;
 };
+
+
+export type Supplier = {
+  id: string;
+  code: string;
+  legal_name: string;
+  trade_name: string | null;
+  supply_category: "UNKNOWN" | "PRODUCT" | "PROCESS" | "SERVICE" | "MIXED";
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};

@@ -31,3 +31,15 @@ Implemented in G2.2:
 - immutable audit event on configuration creation.
 
 ProductConfiguration never becomes the BOM/Routing key: the exact Article/ArticleRevision remains authoritative.
+
+
+Implemented in G2.3:
+- canonical Supplier identity with a stable supplier code;
+- legal/trade names and broad PRODUCT / PROCESS / SERVICE / MIXED classification;
+- source-system mappings so Prolowin, CRM and later imports can point to one canonical Supplier;
+- REVIEW_REQUIRED source records for duplicate/consolidation workflows without inventing a match;
+- SupplierArticle sourcing relation with supplier article code, preferred flag, lead time, MOQ and canonical order UoM;
+- permission-driven supplier read surface inside Datos maestros;
+- immutable audit events for supplier, source-mapping and supplier-article creation.
+
+Purchasing transactions, prices, approvals, receipts and supplier evaluation remain owned by the future Purchasing module.

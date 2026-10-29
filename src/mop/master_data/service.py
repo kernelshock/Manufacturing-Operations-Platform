@@ -12,6 +12,9 @@ from mop.master_data.models import (
     Article,
     ArticleRevision,
     ProductConfiguration,
+    Supplier,
+    SupplierArticle,
+    SupplierSourceMapping,
     UnitOfMeasure,
     UnitOfMeasureAlias,
 )
@@ -19,6 +22,9 @@ from mop.master_data.schemas import (
     ArticleCreate,
     ArticleRevisionCreate,
     ProductConfigurationCreate,
+    SupplierArticleCreate,
+    SupplierCreate,
+    SupplierSourceMappingCreate,
     UnitOfMeasureAliasCreate,
     UnitOfMeasureCreate,
 )
@@ -191,3 +197,89 @@ class MasterDataService:
         if configuration is None:
             raise MasterDataNotFoundError("product configuration not found")
         return configuration
+
+    def create_supplier(self, data: SupplierCreate) -> Supplier:
+        return self._commit(Supplier(**data.model_dump()))
+
+    def list_suppliers(
+        self,
+        supply_category: str | None = None,
+        active: bool | None = None,
+    ) -> Sequence[Supplier]:
+        query = select(Supplier)
+        if supply_category:
+            query = query.where(Supplier.supply_category == supply_category)
+        if active is not None:
+            query = query.where(Supplier.active == active)
+        return self.session.scalars(query.order_by(Supplier.code)).all()
+
+    def create_supplier_source_mapping(
+        self,
+        data: SupplierSourceMappingCreate,
+        approved_by: UUID | None = None,
+    ) -> SupplierSourceMapping:
+        if data.supplier_id is not None and self.session.get(Supplier, data.supplier_id) is None:
+            raise MasterDataNotFoundError("supplier not found")
+
+        payload = data.model_dump()
+        if data.mapping_status == "MAPPED":
+            payload["approved_at"] = datetime.now(timezone.utc)
+            payload["approved_by"] = approved_by
+        return self._commit(SupplierSourceMapping(**payload))
+
+    def list_supplier_source_mappings(
+        self,
+        external_system: str | None = None,
+        mapping_status: str | None = None,
+    ) -> Sequence[SupplierSourceMapping]:
+        query = select(SupplierSourceMapping)
+        if external_system:
+            query = query.where(
+                SupplierSourceMapping.external_system == external_system.strip().upper()
+            )
+        if mapping_status:
+            query = query.where(SupplierSourceMapping.mapping_status == mapping_status)
+        return self.session.scalars(
+            query.order_by(
+                SupplierSourceMapping.external_system,
+                SupplierSourceMapping.external_code,
+            )
+        ).all()
+
+    def create_supplier_article(
+        self,
+        data: SupplierArticleCreate,
+    ) -> SupplierArticle:
+        if self.session.get(Supplier, data.supplier_id) is None:
+            raise MasterDataNotFoundError("supplier not found")
+        if self.session.get(Article, data.article_id) is None:
+            raise MasterDataNotFoundError("article not found")
+
+        if data.order_uom_id is not None:
+            order_uom = self.session.get(UnitOfMeasure, data.order_uom_id)
+            if order_uom is None:
+                raise MasterDataNotFoundError("order unit of measure not found")
+            if not order_uom.canonical or not order_uom.active:
+                raise MasterDataRuleError(
+                    "order unit must be an active canonical unit of measure"
+                )
+
+        return self._commit(SupplierArticle(**data.model_dump()))
+
+    def list_supplier_articles(
+        self,
+        supplier_id: UUID | None = None,
+        article_id: UUID | None = None,
+        active: bool | None = None,
+    ) -> Sequence[SupplierArticle]:
+        query = select(SupplierArticle)
+        if supplier_id is not None:
+            query = query.where(SupplierArticle.supplier_id == supplier_id)
+        if article_id is not None:
+            query = query.where(SupplierArticle.article_id == article_id)
+        if active is not None:
+            query = query.where(SupplierArticle.active == active)
+        return self.session.scalars(
+            query.order_by(SupplierArticle.supplier_id, SupplierArticle.article_id)
+        ).all()
+

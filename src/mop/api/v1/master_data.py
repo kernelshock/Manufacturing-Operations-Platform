@@ -16,6 +16,12 @@ from mop.master_data.schemas import (
     ArticleRevisionRead,
     ProductConfigurationCreate,
     ProductConfigurationRead,
+    SupplierArticleCreate,
+    SupplierArticleRead,
+    SupplierCreate,
+    SupplierRead,
+    SupplierSourceMappingCreate,
+    SupplierSourceMappingRead,
     UnitOfMeasureAliasCreate,
     UnitOfMeasureAliasRead,
     UnitOfMeasureCreate,
@@ -269,3 +275,128 @@ def get_product_configuration(
     _: User = Depends(require_global_permission("masterdata.read")),
 ):
     return _translate(lambda: app.get_product_configuration(article_id))
+
+
+@router.post(
+    "/suppliers",
+    response_model=SupplierRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_supplier(
+    payload: SupplierCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_supplier(payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.supplier.create",
+        object_type="supplier",
+        object_id=created.id,
+        details={
+            "code": created.code,
+            "legal_name": created.legal_name,
+            "supply_category": created.supply_category,
+        },
+    )
+    return created
+
+
+@router.get("/suppliers", response_model=list[SupplierRead])
+def list_suppliers(
+    supply_category: str | None = None,
+    active: bool | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_suppliers(supply_category, active)
+
+
+@router.post(
+    "/supplier-source-mappings",
+    response_model=SupplierSourceMappingRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_supplier_source_mapping(
+    payload: SupplierSourceMappingCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(
+        lambda: app.create_supplier_source_mapping(payload, approved_by=actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.supplier_source_mapping.create",
+        object_type="supplier_source_mapping",
+        object_id=created.id,
+        details={
+            "supplier_id": str(created.supplier_id) if created.supplier_id else None,
+            "external_system": created.external_system,
+            "external_code": created.external_code,
+            "mapping_status": created.mapping_status,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/supplier-source-mappings",
+    response_model=list[SupplierSourceMappingRead],
+)
+def list_supplier_source_mappings(
+    external_system: str | None = None,
+    mapping_status: str | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_supplier_source_mappings(external_system, mapping_status)
+
+
+@router.post(
+    "/supplier-articles",
+    response_model=SupplierArticleRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_supplier_article(
+    payload: SupplierArticleCreate,
+    request: Request,
+    app: MasterDataService = Depends(service),
+    actor: User = Depends(require_global_permission("masterdata.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_supplier_article(payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="masterdata.supplier_article.create",
+        object_type="supplier_article",
+        object_id=created.id,
+        details={
+            "supplier_id": str(created.supplier_id),
+            "article_id": str(created.article_id),
+            "preferred": created.preferred,
+            "lead_time_days": created.lead_time_days,
+        },
+    )
+    return created
+
+
+@router.get("/supplier-articles", response_model=list[SupplierArticleRead])
+def list_supplier_articles(
+    supplier_id: UUID | None = None,
+    article_id: UUID | None = None,
+    active: bool | None = None,
+    app: MasterDataService = Depends(service),
+    _: User = Depends(require_global_permission("masterdata.read")),
+):
+    return app.list_supplier_articles(supplier_id, article_id, active)

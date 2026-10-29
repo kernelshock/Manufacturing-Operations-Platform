@@ -7,6 +7,7 @@ import type {
   ProductConfiguration,
   ReadyStatus,
   ServiceMeta,
+  Supplier,
   UnitOfMeasure
 } from "./types";
 
@@ -81,5 +82,7 @@ export const api = {
   productConfigurations: () =>
     apiFetch<ProductConfiguration[]>(
       "/api/v1/master-data/product-configurations?active=true"
-    )
+    ),
+  suppliers: () =>
+    apiFetch<Supplier[]>("/api/v1/master-data/suppliers?active=true")
 };
