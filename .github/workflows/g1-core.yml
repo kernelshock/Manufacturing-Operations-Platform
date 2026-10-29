@@ -59,3 +59,30 @@ jobs:
 
       - name: Run G1 tests
         run: python -m pytest tests/g1 -q
+
+  frontend-shell:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 26 LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: "26.13.0"
+
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Test frontend
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build

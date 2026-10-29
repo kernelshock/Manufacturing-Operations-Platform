@@ -6,11 +6,20 @@ profile = "development-baseline"
 [runtime]
 python_major_minor = "3.14"
 postgresql_major = "18"
+node = "26.13.0"
 
 [persistence]
 sqlalchemy_series = "2.1"
 alembic_series = "1.20"
 psycopg_series = "3.3"
+
+[frontend]
+react = "19.3.1"
+react_dom = "19.3.1"
+vite = "8.3.5"
+typescript = "7.0.2"
+vite_react_plugin = "6.1.2"
+vitest = "5.0.5"
 
 [notes]
 postgresql_19 = "Not approved for this baseline; 19 is still release-candidate as of 2026-10-28."
