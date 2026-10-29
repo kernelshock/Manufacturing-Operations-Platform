@@ -24,7 +24,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 - **G2.4 — BOM — COMPLETED:** revisioned BOM, immutable published component structures, Decimal-safe recursive explosion, effectivity, path provenance and cycle detection.
 - **G2.5 — Routing/BOP — COMPLETED:** revisioned Routing/BOP, operation semantics, effectivity and references to G1 Area/WorkCenter/Resource identities.
 - **G2.6 — Calendars/effectivity — COMPLETED:** versioned manufacturing calendars, hierarchical Plant/Area/WorkCenter/Resource resolution, weekly capacity windows, dated exceptions and historical effectivity.
-- **G2.7 — Prolowin assimilation:** immutable staging, FIN normalization, data-quality quarantine and reconciliation.
+- **G2.7 — Prolowin assimilation — COMPLETED:** immutable staging, FIN normalization, routing evidence separation, direct parent-child candidate BOMs, DQ quarantine and canonical reconciliation.
 - **G2.8 — Gate hardening:** regression corpus, import/reconciliation evidence, security and release-facing summary.
 
 ## G2 exit criteria
@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current slice
-G2.7 — Prolowin assimilation.
+G2.8 — Gate hardening.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -161,3 +161,31 @@ G2.7 — Prolowin assimilation.
 - npm audit: 0 vulnerabilities;
 - runtime regression: passed;
 - next slice: **G2.7 — Prolowin assimilation**.
+
+### G2.7 — Prolowin assimilation
+- implementation head: `89f040cc8c2310688bdc209e529abe5e23555c60`;
+- GitHub Actions: `G2 Master Data` run #41;
+- result: **SUCCESS**;
+- Alembic head: `0012_g2_7`;
+- immutable complete-report and direct-structure staging implemented with PostgreSQL mutation guards;
+- complete report FIN rows become flattened requirements and non-FIN rows become SourceOperationState evidence;
+- exactly-one-FIN/root guards create BLOCKER DQ issues and prevent canonical application;
+- raw Prolowin UoM values are preserved and unresolved aliases enter governed WARNING state;
+- Article identity is globally reused by Prolowin code without prefix inference;
+- complete flattened reports never author BOM parent-child edges;
+- direct parent-child inputs validate reachability, duplicates and cycles before creating DRAFT ArticleRevision/BOMRevision candidates;
+- candidate BOMs remain unpublished pending reconciliation/approval;
+- candidate recursive explosion is compared against the complete FIN projection using Decimal arithmetic and approved UoM mappings/conversions;
+- reconciliation produces MATCH / MATCH_WITH_WARNINGS / MISMATCH / BLOCKED evidence with per-article variance;
+- selection of an unrelated BOM is rejected as a request error and does not contaminate source DQ;
+- material `14027` is covered by an X-6111 regression trace from FIN quantity 6 through two-level canonical explosion;
+- the five authoritative product corpus is represented in the public repository only by non-proprietary derived metadata/counts;
+- identical source+parser replay is idempotent and does not duplicate canonical identities;
+- G0 regression: 5 passed;
+- G1 regression: 30 passed;
+- G2 tests: 48 passed;
+- frontend regression: 7 passed + typecheck + production build;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- runtime regression: passed;
+- next slice: **G2.8 — Gate hardening**.

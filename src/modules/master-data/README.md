@@ -85,3 +85,21 @@ Implemented in G2.6:
 - availability resolution returns nominal capacity evidence for APS without creating or modifying APS schedules.
 
 Calendar effectivity is day-granular; recurring windows are minute-granular in the calendar's local timezone. APS remains responsible for order sequencing, finite scheduling and transactional schedule state.
+
+
+Implemented in G2.7:
+- Prolowin ImportBatch identity by source SHA-256 + parser version;
+- PostgreSQL append-only guards for staged complete-report rows and direct parent-child relations;
+- complete-report FIN normalization into flattened requirement snapshots;
+- non-FIN rows retained independently as SourceOperationState routing evidence;
+- DataQualityIssue quarantine with INFO/WARNING/ERROR/BLOCKER severity and explicit rule codes;
+- governed raw-UoM alias discovery without silently inventing canonical mappings;
+- global Article reuse by exact Prolowin business code;
+- content-addressed root ArticleRevision evidence for complete reports;
+- direct-structure reachability/duplicate/cycle validation;
+- DRAFT ArticleRevision/BOMRevision/BOMComponent candidates from direct hierarchy only;
+- Decimal-safe candidate recursive explosion and FIN reconciliation with approved UoM conversion factors;
+- per-item reconciliation evidence and MATCH / MATCH_WITH_WARNINGS / MISMATCH / BLOCKED outcomes;
+- non-proprietary five-product reference-corpus metadata fixture and X-6111/14027 trace regression.
+
+The complete Prolowin report remains a reconciliation oracle and never authors parent-child BOM relationships. SourceOperationState is evidence for later routing mapping; G2.7 does not guess WorkCenter/Resource assignments from operation codes.

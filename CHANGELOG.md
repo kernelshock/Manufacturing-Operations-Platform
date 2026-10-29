@@ -11,6 +11,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - G2.4 revisioned BOM with immutable published structures, Decimal-safe recursive explosion, path provenance, effectivity and cycle detection.
 - G2.5 revisioned Routing/BOP with operation semantics, effectivity and assignments to G1 Area/WorkCenter/Resource identities.
 - G2.6 versioned manufacturing calendars with hierarchical target resolution, weekly availability, dated exceptions and nominal capacity factors.
+- G2.7 Prolowin assimilation with immutable staging, FIN normalization, direct-hierarchy BOM candidates, DQ quarantine and recursive reconciliation evidence.
 - G1 Platform Core executable backend, PostgreSQL/Alembic persistence, organizational hierarchy and local scoped RBAC.
 - Local session authentication with Argon2 password hashing and server-side opaque sessions.
 - Append-only PostgreSQL audit trail for authentication, IAM administration and privileged core mutations.
