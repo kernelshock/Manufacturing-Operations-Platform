@@ -1,6 +1,6 @@
 import os
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +11,7 @@ from mop.config import Settings
 from mop.iam.models import Role
 from mop.iam.schemas import RoleAssignmentCreate, UserCreate
 from mop.iam.service import IdentityService
-from mop.master_data.models import Article
+from mop.master_data.models import Article, ArticleRevision, BOMRevision
 from mop.persistence.database import DatabaseManager
 from mop.prolowin.models import (
     ImportBatch,
@@ -358,24 +358,30 @@ def test_direct_structure_builds_candidate_boms_and_reconciles_x6111_trace() -> 
 
         candidate_ids = direct.json()["candidate_bom_revision_ids"]
         root_bom_id = None
-        for candidate_id in candidate_ids:
-            # Candidate root is the one whose projection contains A-621.
-            # Reconciliation itself will reject a non-root selection.
-            trial = client.post(
-                "/api/v1/master-data/prolowin/reconciliations",
-                json={
-                    "complete_batch_id": complete.json()["batch"]["id"],
-                    "bom_revision_id": candidate_id,
-                    "tolerance": "0",
-                },
-            )
-            assert trial.status_code == 201
-            if trial.json()["run"]["status"] != "BLOCKED":
-                root_bom_id = candidate_id
-                reconciliation = trial
-                break
+        with database.session() as session:
+            for candidate_id in candidate_ids:
+                bom = session.get(BOMRevision, UUID(candidate_id))
+                assert bom is not None
+                revision = session.get(
+                    ArticleRevision, bom.parent_article_revision_id
+                )
+                assert revision is not None
+                article = session.get(Article, revision.article_id)
+                assert article is not None
+                if article.external_code == root_code:
+                    root_bom_id = candidate_id
+                    break
 
         assert root_bom_id is not None
+        reconciliation = client.post(
+            "/api/v1/master-data/prolowin/reconciliations",
+            json={
+                "complete_batch_id": complete.json()["batch"]["id"],
+                "bom_revision_id": root_bom_id,
+                "tolerance": "0",
+            },
+        )
+        assert reconciliation.status_code == 201
         assert reconciliation.json()["run"]["status"] == "MATCH_WITH_WARNINGS"
         assert reconciliation.json()["run"]["mismatching_items"] == 0
         by_code = {
