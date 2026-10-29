@@ -21,7 +21,7 @@ Implement the canonical manufacturing-definition owner defined in G0 so later AP
 - **G2.1 — Article & UoM foundation — COMPLETED:** Article, ArticleRevision, UoM, UoM aliases, RBAC, audit and API.
 - **G2.2 — Product configurations — COMPLETED:** commercial/manufacturing configuration metadata tied to exact Article identity, dimension-safe width and permission-driven frontend visibility.
 - **G2.3 — Supplier master — COMPLETED:** canonical supplier identity, Prolowin/CRM source mappings and Article sourcing data for purchasing/material flows.
-- **G2.4 — BOM:** revisioned BOM and recursive component relations with Decimal-safe quantities and cycle detection.
+- **G2.4 — BOM — COMPLETED:** revisioned BOM, immutable published component structures, Decimal-safe recursive explosion, effectivity, path provenance and cycle detection.
 - **G2.5 — Routing/BOP:** routing revisions, operations and references to G1 resources.
 - **G2.6 — Calendars/effectivity:** manufacturing calendars and effectivity rules consumed by scheduling.
 - **G2.7 — Prolowin assimilation:** immutable staging, FIN normalization, data-quality quarantine and reconciliation.
@@ -45,7 +45,7 @@ G2 is eligible for VALIDATED only when:
 - explicit release approval is received before merge/release.
 
 ## Current slice
-G2.4 — BOM.
+G2.5 — Routing/BOP.
 
 ### G2.1 — Article & UoM foundation
 - implementation head: `1f3f4649df1370e22a3b46ce087bd0d68f7627f8`;
@@ -93,3 +93,24 @@ G2.4 — BOM.
 - npm audit: 0 vulnerabilities;
 - runtime regression: passed;
 - next slice: **G2.4 — BOM**.
+
+### G2.4 — BOM
+- implementation head: `864b42ffd9018225d2c26df126a481fbdd30b9af`;
+- GitHub Actions: `G2 Master Data` run #16;
+- result: **SUCCESS**;
+- Alembic head: `0009_g2_4`;
+- BOMRevision is attached to an exact ArticleRevision and begins as DRAFT;
+- only DRAFT BOMs accept component changes; published structures are immutable;
+- controlled publish/supersede lifecycle preserves historical effectivity;
+- component quantities use Decimal semantics and preserve raw source UoM;
+- recursive explosion multiplies all levels, retains path provenance and aggregates only after path calculation;
+- cycle detection blocks recursive loops;
+- ambiguous unpinned child revisions are rejected when multiple effective active BOMs exist;
+- G0 regression: 5 passed;
+- G1 regression: 30 passed;
+- G2 tests: 25 passed;
+- frontend regression: 7 passed + typecheck + production build;
+- Python dependency audit: no known vulnerabilities;
+- npm audit: 0 vulnerabilities;
+- runtime regression: passed;
+- next slice: **G2.5 — Routing/BOP**.
