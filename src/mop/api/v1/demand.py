@@ -1,0 +1,208 @@
+"""G3 Demand / Plan / Taquilla API."""
+
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.orm import Session
+
+from mop.audit.context import request_audit_context
+from mop.audit.service import AuditService
+from mop.demand.schemas import (
+    ProductionPlanCreate,
+    ProductionPlanNumberUpdate,
+    ProductionPlanRead,
+    ProductionPlanStatusUpdate,
+    TaquillaCreate,
+    TaquillaRead,
+    TaquillaStatusUpdate,
+)
+from mop.demand.service import (
+    DemandConflictError,
+    DemandNotFoundError,
+    DemandRuleError,
+    DemandService,
+)
+from mop.iam.dependencies import require_global_permission
+from mop.iam.models import User
+from mop.persistence.dependencies import get_session
+
+router = APIRouter(prefix="/demand", tags=["demand"])
+
+
+def service(session: Session = Depends(get_session)) -> DemandService:
+    return DemandService(session)
+
+
+def _translate(operation):
+    try:
+        return operation()
+    except DemandNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DemandConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except DemandRuleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+
+
+def _audit(
+    *,
+    session: Session,
+    request: Request,
+    actor: User,
+    action: str,
+    object_type: str,
+    object_id: UUID,
+    details: dict | None = None,
+) -> None:
+    AuditService(session).record(
+        action=action,
+        object_type=object_type,
+        object_id=str(object_id),
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details=details,
+        **request_audit_context(request),
+    )
+
+
+@router.post("/plans", response_model=ProductionPlanRead, status_code=status.HTTP_201_CREATED)
+def create_plan(
+    payload: ProductionPlanCreate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_plan(payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.plan.create",
+        object_type="production_plan",
+        object_id=created.id,
+        details={"plan_number": created.plan_number},
+    )
+    return created
+
+
+@router.get("/plans", response_model=list[ProductionPlanRead])
+def list_plans(
+    plan_status: str | None = None,
+    app: DemandService = Depends(service),
+    _: User = Depends(require_global_permission("demand.read")),
+):
+    return app.list_plans(plan_status)
+
+
+@router.patch("/plans/{plan_id}/number", response_model=ProductionPlanRead)
+def update_plan_number(
+    plan_id: UUID,
+    payload: ProductionPlanNumberUpdate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    previous = _translate(lambda: app.get_plan(plan_id)).plan_number
+    updated = _translate(lambda: app.update_plan_number(plan_id, payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.plan.number.update",
+        object_type="production_plan",
+        object_id=updated.id,
+        details={"previous_plan_number": previous, "plan_number": updated.plan_number},
+    )
+    return updated
+
+
+@router.post("/plans/{plan_id}/status", response_model=ProductionPlanRead)
+def transition_plan(
+    plan_id: UUID,
+    payload: ProductionPlanStatusUpdate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    previous = _translate(lambda: app.get_plan(plan_id)).status
+    updated = _translate(lambda: app.transition_plan(plan_id, payload))
+    if updated.status != previous:
+        _audit(
+            session=session,
+            request=request,
+            actor=actor,
+            action="demand.plan.status.transition",
+            object_type="production_plan",
+            object_id=updated.id,
+            details={"previous_status": previous, "status": updated.status},
+        )
+    return updated
+
+
+@router.post(
+    "/plans/{plan_id}/taquillas",
+    response_model=TaquillaRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_taquilla(
+    plan_id: UUID,
+    payload: TaquillaCreate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.create_taquilla(plan_id, payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla.create",
+        object_type="taquilla",
+        object_id=created.id,
+        details={
+            "plan_id": str(created.plan_id),
+            "taquilla_code": created.taquilla_code,
+            "sequence_no": created.sequence_no,
+        },
+    )
+    return created
+
+
+@router.get("/plans/{plan_id}/taquillas", response_model=list[TaquillaRead])
+def list_taquillas(
+    plan_id: UUID,
+    app: DemandService = Depends(service),
+    _: User = Depends(require_global_permission("demand.read")),
+):
+    return _translate(lambda: app.list_taquillas(plan_id))
+
+
+@router.post("/taquillas/{taquilla_id}/status", response_model=TaquillaRead)
+def transition_taquilla(
+    taquilla_id: UUID,
+    payload: TaquillaStatusUpdate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    previous = _translate(lambda: app.get_taquilla(taquilla_id)).status
+    updated = _translate(lambda: app.transition_taquilla(taquilla_id, payload))
+    if updated.status != previous:
+        _audit(
+            session=session,
+            request=request,
+            actor=actor,
+            action="demand.taquilla.status.transition",
+            object_type="taquilla",
+            object_id=updated.id,
+            details={"previous_status": previous, "status": updated.status},
+        )
+    return updated
