@@ -1684,7 +1684,7 @@ class MasterDataService:
     ) -> ManufacturingCalendar:
         candidates = self.session.scalars(
             select(ManufacturingCalendar).where(
-                ManufacturingCalendar.status == "ACTIVE"
+                ManufacturingCalendar.status.in_(("ACTIVE", "SUPERSEDED"))
             )
         ).all()
 
@@ -1707,7 +1707,7 @@ class MasterDataService:
 
             if len(matches) > 1:
                 raise MasterDataRuleError(
-                    "multiple effective active calendars found for target"
+                    "multiple effective published calendars found for target"
                 )
             if matches:
                 return matches[0]
