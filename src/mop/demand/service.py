@@ -17,6 +17,7 @@ from mop.demand.schemas import (
     TaquillaProductLineCreate,
     TaquillaProductLineUpdate,
     TaquillaStatusUpdate,
+    TaquillaTopologyUpdate,
 )
 
 
@@ -66,6 +67,7 @@ class DemandService:
             ProductionPlan(
                 plan_number=data.plan_number,
                 description=data.description,
+                vehicle_topology="SIMPLE",
                 status="DRAFT",
             )
         )
@@ -134,6 +136,24 @@ class DemandService:
             raise DemandNotFoundError("taquilla not found")
         return taquilla
 
+    def update_taquilla_topology(
+        self, taquilla_id: UUID, data: TaquillaTopologyUpdate
+    ) -> Taquilla:
+        taquilla = self._require_draft_taquilla(taquilla_id)
+        if taquilla.vehicle_topology == data.vehicle_topology:
+            return taquilla
+        has_lines = self.session.scalar(
+            select(TaquillaProductLine.id)
+            .where(TaquillaProductLine.taquilla_id == taquilla.id)
+            .limit(1)
+        )
+        if has_lines is not None:
+            raise DemandRuleError(
+                "vehicle topology must be declared before product composition"
+            )
+        taquilla.vehicle_topology = data.vehicle_topology
+        return self._commit(taquilla)
+
     def transition_taquilla(
         self, taquilla_id: UUID, data: TaquillaStatusUpdate
     ) -> Taquilla:
@@ -167,6 +187,7 @@ class DemandService:
             raise DemandRuleError(
                 "taquilla product line requires an active FINISHED_PRODUCT article"
             )
+        self._validate_deck_position(taquilla, data.deck_position)
 
         if data.source_line_key is not None:
             existing = self.session.scalar(
@@ -180,6 +201,8 @@ class DemandService:
                     existing.article_id == data.article_id
                     and existing.sequence_no == data.sequence_no
                     and existing.requested_quantity == data.requested_quantity
+                    and existing.deck_position == data.deck_position
+                    and existing.source_document_key == data.source_document_key
                 ):
                     return existing
                 raise DemandConflictError(
@@ -193,6 +216,8 @@ class DemandService:
                 sequence_no=data.sequence_no,
                 requested_quantity=data.requested_quantity,
                 source_line_key=data.source_line_key,
+                deck_position=data.deck_position,
+                source_document_key=data.source_document_key,
             )
         )
 
@@ -215,11 +240,31 @@ class DemandService:
             raise DemandNotFoundError("taquilla product line not found")
         return line
 
+    def _validate_deck_position(
+        self, taquilla: Taquilla, deck_position: str
+    ) -> None:
+        if taquilla.vehicle_topology == "SIMPLE" and deck_position != "SINGLE":
+            raise DemandRuleError(
+                "SIMPLE taquilla product lines must use SINGLE deck position"
+            )
+        if (
+            taquilla.vehicle_topology == "DOUBLE_DECK"
+            and deck_position not in {"UPPER", "LOWER"}
+        ):
+            raise DemandRuleError(
+                "DOUBLE_DECK taquilla product lines require UPPER or LOWER deck position"
+            )
+
     def update_product_line(
         self, line_id: UUID, data: TaquillaProductLineUpdate
     ) -> TaquillaProductLine:
         line = self.get_product_line(line_id)
-        self._require_draft_taquilla(line.taquilla_id)
+        taquilla = self._require_draft_taquilla(line.taquilla_id)
+        requested_deck = data.deck_position or line.deck_position
+        self._validate_deck_position(taquilla, requested_deck)
         line.sequence_no = data.sequence_no
         line.requested_quantity = data.requested_quantity
+        line.deck_position = requested_deck
+        if "source_document_key" in data.model_fields_set:
+            line.source_document_key = data.source_document_key
         return self._commit(line)

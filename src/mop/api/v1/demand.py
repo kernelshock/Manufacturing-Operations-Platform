@@ -18,6 +18,7 @@ from mop.demand.schemas import (
     TaquillaProductLineUpdate,
     TaquillaRead,
     TaquillaStatusUpdate,
+    TaquillaTopologyUpdate,
 )
 from mop.demand.service import (
     DemandConflictError,
@@ -187,6 +188,33 @@ def list_taquillas(
     return _translate(lambda: app.list_taquillas(plan_id))
 
 
+@router.patch("/taquillas/{taquilla_id}/topology", response_model=TaquillaRead)
+def update_taquilla_topology(
+    taquilla_id: UUID,
+    payload: TaquillaTopologyUpdate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    previous = _translate(lambda: app.get_taquilla(taquilla_id)).vehicle_topology
+    updated = _translate(lambda: app.update_taquilla_topology(taquilla_id, payload))
+    if updated.vehicle_topology != previous:
+        _audit(
+            session=session,
+            request=request,
+            actor=actor,
+            action="demand.taquilla.topology.update",
+            object_type="taquilla",
+            object_id=updated.id,
+            details={
+                "previous_vehicle_topology": previous,
+                "vehicle_topology": updated.vehicle_topology,
+            },
+        )
+    return updated
+
+
 @router.post("/taquillas/{taquilla_id}/status", response_model=TaquillaRead)
 def transition_taquilla(
     taquilla_id: UUID,
@@ -238,6 +266,8 @@ def add_product_line(
             "sequence_no": created.sequence_no,
             "requested_quantity": str(created.requested_quantity),
             "source_line_key": created.source_line_key,
+            "deck_position": created.deck_position,
+            "source_document_key": created.source_document_key,
         },
     )
     return created
@@ -270,6 +300,8 @@ def update_product_line(
     before = _translate(lambda: app.get_product_line(line_id))
     previous_sequence = before.sequence_no
     previous_quantity = str(before.requested_quantity)
+    previous_deck_position = before.deck_position
+    previous_source_document_key = before.source_document_key
     updated = _translate(lambda: app.update_product_line(line_id, payload))
     _audit(
         session=session,
@@ -285,6 +317,10 @@ def update_product_line(
             "sequence_no": updated.sequence_no,
             "previous_requested_quantity": previous_quantity,
             "requested_quantity": str(updated.requested_quantity),
+            "previous_deck_position": previous_deck_position,
+            "deck_position": updated.deck_position,
+            "previous_source_document_key": previous_source_document_key,
+            "source_document_key": updated.source_document_key,
         },
     )
     return updated

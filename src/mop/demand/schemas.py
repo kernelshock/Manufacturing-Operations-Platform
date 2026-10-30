@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PlanStatus = Literal["DRAFT", "OPEN", "COMPLETED", "CANCELLED"]
 TaquillaStatus = Literal["DRAFT", "READY", "COMPLETED", "CANCELLED"]
+VehicleTopology = Literal["SIMPLE", "DOUBLE_DECK"]
+DeckPosition = Literal["SINGLE", "UPPER", "LOWER"]
 
 
 def _trim(value: str) -> str:
@@ -78,6 +80,7 @@ class TaquillaRead(BaseModel):
     taquilla_code: str
     sequence_no: int
     description: str | None
+    vehicle_topology: VehicleTopology
     status: TaquillaStatus
     created_at: datetime
     updated_at: datetime
@@ -87,15 +90,21 @@ class TaquillaStatusUpdate(BaseModel):
     status: TaquillaStatus
 
 
+class TaquillaTopologyUpdate(BaseModel):
+    vehicle_topology: VehicleTopology
+
+
 class TaquillaProductLineCreate(BaseModel):
     article_id: UUID
     sequence_no: int = Field(gt=0)
     requested_quantity: Decimal = Field(gt=0)
     source_line_key: str | None = Field(default=None, max_length=200)
+    deck_position: DeckPosition = "SINGLE"
+    source_document_key: str | None = Field(default=None, max_length=200)
 
-    @field_validator("source_line_key")
+    @field_validator("source_line_key", "source_document_key")
     @classmethod
-    def normalize_source_line_key(cls, value: str | None) -> str | None:
+    def normalize_optional_key(cls, value: str | None) -> str | None:
         if value is None:
             return None
         value = value.strip()
@@ -105,6 +114,16 @@ class TaquillaProductLineCreate(BaseModel):
 class TaquillaProductLineUpdate(BaseModel):
     sequence_no: int = Field(gt=0)
     requested_quantity: Decimal = Field(gt=0)
+    deck_position: DeckPosition | None = None
+    source_document_key: str | None = Field(default=None, max_length=200)
+
+    @field_validator("source_document_key")
+    @classmethod
+    def normalize_source_document_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
 
 class TaquillaProductLineRead(BaseModel):
@@ -116,5 +135,7 @@ class TaquillaProductLineRead(BaseModel):
     sequence_no: int
     requested_quantity: Decimal
     source_line_key: str | None
+    deck_position: DeckPosition
+    source_document_key: str | None
     created_at: datetime
     updated_at: datetime

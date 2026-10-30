@@ -22,6 +22,9 @@ class ProductionPlan(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     plan_number: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vehicle_topology: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="SIMPLE"
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -48,6 +51,10 @@ class Taquilla(Base):
         CheckConstraint(
             "status IN ('DRAFT', 'READY', 'COMPLETED', 'CANCELLED')",
             name="ck_demand_taquilla_status",
+        ),
+        CheckConstraint(
+            "vehicle_topology IN ('SIMPLE', 'DOUBLE_DECK')",
+            name="ck_demand_taquilla_vehicle_topology",
         ),
     )
 
@@ -95,6 +102,10 @@ class TaquillaProductLine(Base):
             "requested_quantity > 0",
             name="ck_demand_taquilla_product_line_quantity_positive",
         ),
+        CheckConstraint(
+            "deck_position IN ('SINGLE', 'UPPER', 'LOWER')",
+            name="ck_demand_taquilla_product_line_deck_position",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -113,6 +124,12 @@ class TaquillaProductLine(Base):
         Numeric(24, 8), nullable=False
     )
     source_line_key: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )
+    deck_position: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="SINGLE"
+    )
+    source_document_key: Mapped[str | None] = mapped_column(
         String(200), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
