@@ -74,3 +74,17 @@ Implemented in G3.4:
 - Alembic migration `0016_g3_4`.
 
 G3.4 does not copy RoutingOperation/ResourceAssignment definitions and does not create APS sequence or timing state.
+
+
+Implemented in G3.5:
+- administrative historical completion for Production Plans;
+- historical completion classification: ON_TIME / DELAYED;
+- Plan-level historical completion cascades classification to non-cancelled Taquillas;
+- explicit audit evidence that historical closure creates no MES actuals;
+- reasoned Taquilla and Plan cancellation with actor/time provenance;
+- safe DRAFT Taquilla hard deletion only when no product composition exists;
+- dependent or non-draft Taquillas must be cancelled rather than deleted;
+- normal Plan completion requires all child Taquillas to be terminal;
+- Alembic migration `0017_g3_5`.
+
+Historical-completion timestamps are administrative recording timestamps, not inferred manufacturing start/finish timestamps. G3.5 does not create production actuals, scrap, operation execution or shop-floor evidence.
