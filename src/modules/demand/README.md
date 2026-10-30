@@ -60,3 +60,17 @@ Implemented in G3.3:
 - Alembic migration `0015_g3_3`.
 
 No deck position is inferred from product code, line order, source-document order or source-document identity. Source-document grouping is provenance only.
+
+
+Implemented in G3.4:
+- exact RoutingRevision reference on each TaquillaProductLine;
+- automatic routing resolution across G2 ArticleRevision identities for the same Article;
+- exact ACTIVE/effectivity validation;
+- ambiguity rejection when more than one effective route exists;
+- explicit OVERRIDE mode with mandatory reason;
+- persisted routing effective timestamp, binding timestamp and binding user;
+- DRAFT-only routing binding/rebinding;
+- audited RESOLVED and OVERRIDE mutations;
+- Alembic migration `0016_g3_4`.
+
+G3.4 does not copy RoutingOperation/ResourceAssignment definitions and does not create APS sequence or timing state.

@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G3.4 exact G2 RoutingRevision binding with deterministic resolution, ambiguity rejection and explicit audited override provenance.
 - G3.3 explicit SIMPLE/DOUBLE_DECK vehicle topology with SINGLE/UPPER/LOWER product allocation and source-document grouping independent from floor inference.
 - G3.2 Taquilla product composition with exact G2 finished-product references, Decimal demand quantities, ordering and idempotent source-line identity.
 - G3.1 Production Plan and Taquilla foundation with stable operational-demand identity, controlled lifecycle, RBAC, audit and API.
