@@ -52,7 +52,7 @@ G3 introduces the canonical transactional identities for:
 
 - **G3.1 — Production Plan & Taquilla Foundation — COMPLETED:** stable identities, editable business numbers, plan→taquilla membership, lifecycle, RBAC, audit and API.
 - **G3.2 — Taquilla Product Composition — COMPLETED:** multiple G2 Articles per Taquilla, Decimal requested quantities, ordering and idempotent line identity.
-- **G3.3 — Vehicle / Deck Topology:** SIMPLE / DOUBLE_DECK, explicit UPPER / LOWER allocation and source-document grouping without implicit inference.
+- **G3.3 — Vehicle / Deck Topology — COMPLETED:** SIMPLE / DOUBLE_DECK, explicit UPPER / LOWER allocation and source-document grouping without implicit inference.
 - **G3.4 — Routing Binding:** exact G2 RoutingRevision selection/resolution, effectivity checks and explicit override provenance.
 - **G3.5 — Lifecycle & Historical Completion:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
 - **G3.6 — Taquilla Assimilation:** controlled import, duplicate detection, source provenance and validation for one/two-document orders.
@@ -78,7 +78,26 @@ G3 is eligible for VALIDATED only when:
 
 ## Current slice
 
-**G3.3 — Vehicle / Deck Topology**
+**G3.4 — Routing Binding**
+
+### G3.3 — Vehicle / Deck Topology
+- implementation head: `1875a1d73d6d1f93959969584ebc61c718cb71c4`;
+- GitHub Actions: `G3 Demand Plan Taquilla Routing` push run #14 — **SUCCESS**;
+- Alembic head: `0015_g3_3`;
+- Taquilla owns explicit `SIMPLE` / `DOUBLE_DECK` vehicle topology;
+- SIMPLE product lines use only `SINGLE`;
+- DOUBLE_DECK product lines require explicit `UPPER` or `LOWER`;
+- product/document order never determines deck position;
+- optional `source_document_key` groups source lines independently from deck position;
+- one source document may contain lines for different deck positions and two documents may represent one Taquilla;
+- topology may be changed only while the Taquilla is DRAFT and before product composition exists;
+- product-line deck/document corrections remain DRAFT-only;
+- topology and line mutations are audited;
+- initial hardening detected an ORM ownership placement error before release; it was corrected with no physical data rewrite;
+- schema drift check and full migration downgrade/replay pass after remediation;
+- G0/G1/G2 regressions, G3 suite, frontend, dependency/security and runtime gates pass;
+- next slice: **G3.4 — Routing Binding**.
+
 
 ### G3.2 — Taquilla Product Composition
 - implementation head: `4f02181630303879b6fd3c8fc827ac09ce37a26c`;

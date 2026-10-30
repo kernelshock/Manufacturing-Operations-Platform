@@ -48,3 +48,15 @@ Implemented in G3.2:
 - Alembic migration `0014_g3_2`.
 
 G3.2 does not infer or copy ProductConfiguration, does not allocate products to vehicle decks, and does not create APS schedule state.
+
+
+Implemented in G3.3:
+- explicit Taquilla vehicle topology: SIMPLE or DOUBLE_DECK;
+- explicit product-line deck position: SINGLE / UPPER / LOWER;
+- SIMPLE ↔ SINGLE and DOUBLE_DECK ↔ UPPER/LOWER service validation;
+- optional source_document_key independent from deck allocation;
+- DRAFT-only topology changes, blocked after composition exists;
+- audited topology and line-deck/source-document mutations;
+- Alembic migration `0015_g3_3`.
+
+No deck position is inferred from product code, line order, source-document order or source-document identity. Source-document grouping is provenance only.
