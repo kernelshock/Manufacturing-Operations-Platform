@@ -67,7 +67,6 @@ class DemandService:
             ProductionPlan(
                 plan_number=data.plan_number,
                 description=data.description,
-                vehicle_topology="SIMPLE",
                 status="DRAFT",
             )
         )
@@ -118,6 +117,7 @@ class DemandService:
                 taquilla_code=data.taquilla_code,
                 sequence_no=data.sequence_no,
                 description=data.description,
+                vehicle_topology="SIMPLE",
                 status="DRAFT",
             )
         )

@@ -22,9 +22,6 @@ class ProductionPlan(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     plan_number: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    vehicle_topology: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="SIMPLE"
-    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -67,6 +64,9 @@ class Taquilla(Base):
     taquilla_code: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     sequence_no: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vehicle_topology: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="SIMPLE"
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
