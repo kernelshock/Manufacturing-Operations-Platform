@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
 from mop.master_data.models import Article, ArticleRevision, RoutingRevision
 from mop.demand.schemas import (
+    DemandCancellationRequest,
+    HistoricalCompletionRequest,
     ProductionPlanCreate,
     ProductionPlanNumberUpdate,
     ProductionPlanStatusUpdate,
@@ -37,15 +39,15 @@ class DemandNotFoundError(LookupError):
 
 
 _PLAN_TRANSITIONS = {
-    "DRAFT": {"OPEN", "CANCELLED"},
-    "OPEN": {"COMPLETED", "CANCELLED"},
+    "DRAFT": {"OPEN"},
+    "OPEN": {"COMPLETED"},
     "COMPLETED": set(),
     "CANCELLED": set(),
 }
 
 _TAQUILLA_TRANSITIONS = {
-    "DRAFT": {"READY", "CANCELLED"},
-    "READY": {"COMPLETED", "CANCELLED"},
+    "DRAFT": {"READY"},
+    "READY": {"COMPLETED"},
     "COMPLETED": set(),
     "CANCELLED": set(),
 }
@@ -107,6 +109,12 @@ class DemandService:
             raise DemandRuleError(
                 f"production plan transition {plan.status} -> {data.status} is not allowed"
             )
+        if data.status == "COMPLETED":
+            taquillas = list(self.list_taquillas(plan.id))
+            if not taquillas:
+                raise DemandRuleError("production plan cannot complete without taquillas")
+            if any(item.status not in {"COMPLETED", "CANCELLED"} for item in taquillas):
+                raise DemandRuleError("all taquillas must be completed or cancelled before plan completion")
         plan.status = data.status
         return self._commit(plan)
 
@@ -389,3 +397,138 @@ class DemandService:
             bound_by=bound_by,
             override_reason=data.reason,
         )
+
+
+    def historical_complete_plan(
+        self,
+        plan_id: UUID,
+        data: HistoricalCompletionRequest,
+        *,
+        actor_id: UUID,
+    ) -> ProductionPlan:
+        plan = self.get_plan(plan_id)
+        if plan.status in {"COMPLETED", "CANCELLED"}:
+            raise DemandRuleError(
+                "historical completion requires a non-terminal production plan"
+            )
+        taquillas = list(self.list_taquillas(plan_id))
+        if not taquillas:
+            raise DemandRuleError(
+                "historical completion requires at least one taquilla"
+            )
+        if any(item.status == "COMPLETED" for item in taquillas):
+            raise DemandRuleError(
+                "historical completion cannot overwrite an already completed taquilla"
+            )
+
+        at = datetime.now(timezone.utc)
+        for item in taquillas:
+            if item.status == "CANCELLED":
+                continue
+            item.status = "COMPLETED"
+            item.historical_completion_classification = data.classification
+            item.historical_completion_note = data.note
+            item.historical_completed_at = at
+            item.historical_completed_by = actor_id
+            self.session.add(item)
+
+        plan.status = "COMPLETED"
+        plan.historical_completion_classification = data.classification
+        plan.historical_completion_note = data.note
+        plan.historical_completed_at = at
+        plan.historical_completed_by = actor_id
+        self.session.add(plan)
+        try:
+            self.session.commit()
+            self.session.refresh(plan)
+            return plan
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise DemandConflictError(
+                "historical completion conflicts with demand state"
+            ) from exc
+
+    def cancel_taquilla(
+        self,
+        taquilla_id: UUID,
+        data: DemandCancellationRequest,
+        *,
+        actor_id: UUID,
+    ) -> Taquilla:
+        taquilla = self.get_taquilla(taquilla_id)
+        if taquilla.status in {"COMPLETED", "CANCELLED"}:
+            raise DemandRuleError(
+                "only a non-terminal taquilla can be cancelled"
+            )
+        taquilla.status = "CANCELLED"
+        taquilla.cancellation_reason = data.reason
+        taquilla.cancelled_at = datetime.now(timezone.utc)
+        taquilla.cancelled_by = actor_id
+        return self._commit(taquilla)
+
+    def cancel_plan(
+        self,
+        plan_id: UUID,
+        data: DemandCancellationRequest,
+        *,
+        actor_id: UUID,
+    ) -> ProductionPlan:
+        plan = self.get_plan(plan_id)
+        if plan.status in {"COMPLETED", "CANCELLED"}:
+            raise DemandRuleError(
+                "only a non-terminal production plan can be cancelled"
+            )
+        taquillas = list(self.list_taquillas(plan_id))
+        if any(item.status == "COMPLETED" for item in taquillas):
+            raise DemandRuleError(
+                "production plan with completed taquillas cannot be cancelled"
+            )
+
+        at = datetime.now(timezone.utc)
+        for item in taquillas:
+            if item.status == "CANCELLED":
+                continue
+            item.status = "CANCELLED"
+            item.cancellation_reason = data.reason
+            item.cancelled_at = at
+            item.cancelled_by = actor_id
+            self.session.add(item)
+
+        plan.status = "CANCELLED"
+        plan.cancellation_reason = data.reason
+        plan.cancelled_at = at
+        plan.cancelled_by = actor_id
+        self.session.add(plan)
+        try:
+            self.session.commit()
+            self.session.refresh(plan)
+            return plan
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise DemandConflictError(
+                "production plan cancellation conflicts with demand state"
+            ) from exc
+
+    def delete_draft_taquilla(self, taquilla_id: UUID) -> Taquilla:
+        taquilla = self.get_taquilla(taquilla_id)
+        plan = self.get_plan(taquilla.plan_id)
+        if plan.status in {"COMPLETED", "CANCELLED"}:
+            raise DemandRuleError(
+                "cannot delete taquilla from a terminal production plan"
+            )
+        if taquilla.status != "DRAFT":
+            raise DemandRuleError(
+                "only a DRAFT taquilla can be hard-deleted"
+            )
+        has_lines = self.session.scalar(
+            select(TaquillaProductLine.id)
+            .where(TaquillaProductLine.taquilla_id == taquilla.id)
+            .limit(1)
+        )
+        if has_lines is not None:
+            raise DemandRuleError(
+                "taquilla with dependent product composition must be cancelled, not deleted"
+            )
+        self.session.delete(taquilla)
+        self.session.commit()
+        return taquilla
