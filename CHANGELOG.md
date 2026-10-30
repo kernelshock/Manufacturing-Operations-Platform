@@ -5,6 +5,11 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G3.5 governed lifecycle and historical completion with ON_TIME/DELAYED administrative classification, reasoned cancellation and safe DRAFT correction without fabricated MES actuals.
+- G3.4 exact G2 RoutingRevision binding with deterministic resolution, ambiguity rejection and explicit audited override provenance.
+- G3.3 explicit SIMPLE/DOUBLE_DECK vehicle topology with SINGLE/UPPER/LOWER product allocation and source-document grouping independent from floor inference.
+- G3.2 Taquilla product composition with exact G2 finished-product references, Decimal demand quantities, ordering and idempotent source-line identity.
+- G3.1 Production Plan and Taquilla foundation with stable operational-demand identity, controlled lifecycle, RBAC, audit and API.
 - G2.1 canonical Article/ArticleRevision and Unit-of-Measure foundation with Master Data RBAC/audit/API baseline.
 - G2.2 product configuration projection for finished Articles with family/model/class/width metadata and Master Data frontend visibility.
 - G2.3 canonical Supplier master with source-system mappings and Article sourcing/lead-time/MOQ relationships.
