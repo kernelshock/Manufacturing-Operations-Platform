@@ -54,7 +54,7 @@ G3 introduces the canonical transactional identities for:
 - **G3.2 — Taquilla Product Composition — COMPLETED:** multiple G2 Articles per Taquilla, Decimal requested quantities, ordering and idempotent line identity.
 - **G3.3 — Vehicle / Deck Topology — COMPLETED:** SIMPLE / DOUBLE_DECK, explicit UPPER / LOWER allocation and source-document grouping without implicit inference.
 - **G3.4 — Routing Binding — COMPLETED:** exact G2 RoutingRevision selection/resolution, effectivity checks and explicit override provenance.
-- **G3.5 — Lifecycle & Historical Completion:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
+- **G3.5 — Lifecycle & Historical Completion — COMPLETED:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
 - **G3.6 — Taquilla Assimilation:** controlled import, duplicate detection, source provenance and validation for one/two-document orders.
 - **G3.7 — Operational Projection & Frontend:** plan/taquilla views and operator workflows needed before APS handoff.
 - **G3.8 — Gate Hardening:** migration integrity, regressions, RBAC/audit, idempotency, security, runtime and release evidence.
@@ -78,7 +78,28 @@ G3 is eligible for VALIDATED only when:
 
 ## Current slice
 
-**G3.5 — Lifecycle & Historical Completion**
+**G3.6 — Taquilla Assimilation**
+
+### G3.5 — Lifecycle & Historical Completion
+- implementation head: `1238fdc966a869b75d2d0e6696fdfe49fcd20b8c`;
+- canonical validation: `G3 Demand Plan Taquilla Routing` PR run #31 — **SUCCESS**;
+- Alembic head: `0017_g3_5`;
+- historical Production Plans may be administratively completed as `ON_TIME` or `DELAYED`;
+- historical completion bulk-classifies all non-cancelled Taquillas in the Plan;
+- historical completion explicitly records that no MES actuals are created;
+- administrative historical completion stores actor, classification, note and recording timestamp only;
+- no fabricated operation start/end, produced quantity, scrap or shop-floor trace is introduced;
+- generic CANCELLED status transitions are blocked in favour of reasoned cancellation endpoints;
+- Taquilla cancellation preserves UUID identity and requires an explicit reason;
+- Plan cancellation propagates a reasoned administrative cancellation only when no completed Taquilla exists;
+- safe hard deletion is limited to DRAFT Taquillas with no product composition and a non-terminal parent Plan;
+- Taquillas with dependent composition must be cancelled rather than silently deleted;
+- normal Plan completion now requires every Taquilla to be COMPLETED or CANCELLED;
+- lifecycle mutations are audited;
+- schema drift check and full migration downgrade/replay pass;
+- G0/G1/G2 regressions, G3 suite, frontend, dependency/security and runtime gates pass;
+- next slice: **G3.6 — Taquilla Assimilation**.
+
 
 ### G3.4 — Routing Binding
 - implementation head: `322f8b3b2d73fc72477bd55970acff90bb8ace1a`;
