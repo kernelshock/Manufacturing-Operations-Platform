@@ -32,3 +32,19 @@ Implemented in G3.1:
 - Alembic migration `0013_g3_1`.
 
 G3.1 deliberately does not store product lines, deck allocation, routing selection, APS timestamps or MES actuals.
+
+
+Implemented in G3.2:
+- TaquillaProductLine with stable UUID identity;
+- exact reference to G2 Article;
+- active FINISHED_PRODUCT validation;
+- Decimal(24,8) requested quantity;
+- explicit positive sequence number unique within the Taquilla;
+- optional source_line_key for idempotent import/replay;
+- DRAFT-only composition mutation;
+- composition freeze once the Taquilla leaves DRAFT;
+- REST create/list/update operations protected by demand RBAC;
+- append-only audit evidence for composition create/update;
+- Alembic migration `0014_g3_2`.
+
+G3.2 does not infer or copy ProductConfiguration, does not allocate products to vehicle decks, and does not create APS schedule state.

@@ -51,7 +51,7 @@ G3 introduces the canonical transactional identities for:
 ## Planned slices
 
 - **G3.1 — Production Plan & Taquilla Foundation — COMPLETED:** stable identities, editable business numbers, plan→taquilla membership, lifecycle, RBAC, audit and API.
-- **G3.2 — Taquilla Product Composition:** multiple G2 Articles per Taquilla, Decimal requested quantities, ordering and idempotent line identity.
+- **G3.2 — Taquilla Product Composition — COMPLETED:** multiple G2 Articles per Taquilla, Decimal requested quantities, ordering and idempotent line identity.
 - **G3.3 — Vehicle / Deck Topology:** SIMPLE / DOUBLE_DECK, explicit UPPER / LOWER allocation and source-document grouping without implicit inference.
 - **G3.4 — Routing Binding:** exact G2 RoutingRevision selection/resolution, effectivity checks and explicit override provenance.
 - **G3.5 — Lifecycle & Historical Completion:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
@@ -78,7 +78,27 @@ G3 is eligible for VALIDATED only when:
 
 ## Current slice
 
-**G3.2 — Taquilla Product Composition**
+**G3.3 — Vehicle / Deck Topology**
+
+### G3.2 — Taquilla Product Composition
+- implementation head: `4f02181630303879b6fd3c8fc827ac09ce37a26c`;
+- GitHub Actions: `G3 Demand Plan Taquilla Routing` push run #8 — **SUCCESS**;
+- Alembic head: `0014_g3_2`;
+- one Taquilla supports multiple ordered product lines;
+- each line has a stable UUID identity independent from its sequence;
+- each line references one exact G2 Article and accepts only active FINISHED_PRODUCT identities;
+- requested quantity uses Decimal(24,8) semantics and must be positive;
+- sequence is positive and unique inside each Taquilla;
+- optional source_line_key provides source-level idempotency without making product code the line identity;
+- identical replay by source_line_key returns the existing line; conflicting replay is rejected;
+- product quantity/sequence may be corrected only while the Taquilla is DRAFT;
+- READY / COMPLETED / CANCELLED Taquillas freeze product composition;
+- Article identity and ProductConfiguration are referenced from G2 and are never copied into G3;
+- create/update mutations are audited;
+- schema drift check and full migration downgrade/replay pass;
+- G0/G1/G2 regressions, G3 suite, frontend, dependency/security and runtime gates pass;
+- next slice: **G3.3 — Vehicle / Deck Topology**.
+
 
 ### G3.1 — Production Plan & Taquilla Foundation
 - implementation head: `50835bc3f349fb5d7e19991bc4106a237a548859`;

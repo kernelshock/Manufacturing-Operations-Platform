@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G3.2 Taquilla product composition with exact G2 finished-product references, Decimal demand quantities, ordering and idempotent source-line identity.
 - G3.1 Production Plan and Taquilla foundation with stable operational-demand identity, controlled lifecycle, RBAC, audit and API.
 - G2.1 canonical Article/ArticleRevision and Unit-of-Measure foundation with Master Data RBAC/audit/API baseline.
 - G2.2 product configuration projection for finished Articles with family/model/class/width metadata and Master Data frontend visibility.
