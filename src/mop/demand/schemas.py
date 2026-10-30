@@ -11,6 +11,7 @@ PlanStatus = Literal["DRAFT", "OPEN", "COMPLETED", "CANCELLED"]
 TaquillaStatus = Literal["DRAFT", "READY", "COMPLETED", "CANCELLED"]
 VehicleTopology = Literal["SIMPLE", "DOUBLE_DECK"]
 DeckPosition = Literal["SINGLE", "UPPER", "LOWER"]
+HistoricalCompletionClassification = Literal["ON_TIME", "DELAYED"]
 
 
 def _trim(value: str) -> str:
@@ -42,6 +43,13 @@ class ProductionPlanRead(BaseModel):
     plan_number: str
     description: str | None
     status: PlanStatus
+    historical_completion_classification: HistoricalCompletionClassification | None
+    historical_completion_note: str | None
+    historical_completed_at: datetime | None
+    historical_completed_by: UUID | None
+    cancellation_reason: str | None
+    cancelled_at: datetime | None
+    cancelled_by: UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -82,6 +90,13 @@ class TaquillaRead(BaseModel):
     description: str | None
     vehicle_topology: VehicleTopology
     status: TaquillaStatus
+    historical_completion_classification: HistoricalCompletionClassification | None
+    historical_completion_note: str | None
+    historical_completed_at: datetime | None
+    historical_completed_by: UUID | None
+    cancellation_reason: str | None
+    cancelled_at: datetime | None
+    cancelled_by: UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -157,6 +172,25 @@ class RoutingResolveRequest(BaseModel):
 class RoutingOverrideRequest(BaseModel):
     routing_revision_id: UUID
     effective_at: datetime | None = None
+    reason: str = Field(min_length=1, max_length=4000)
+
+    _reason = field_validator("reason")(_trim)
+
+
+class HistoricalCompletionRequest(BaseModel):
+    classification: HistoricalCompletionClassification
+    note: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("note")
+    @classmethod
+    def normalize_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+
+class DemandCancellationRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=4000)
 
     _reason = field_validator("reason")(_trim)
