@@ -17,12 +17,41 @@ class ProductionPlan(Base):
             "status IN ('DRAFT', 'OPEN', 'COMPLETED', 'CANCELLED')",
             name="ck_demand_production_plan_status",
         ),
+        CheckConstraint(
+            "historical_completion_classification IS NULL OR historical_completion_classification IN ('ON_TIME', 'DELAYED')",
+            name="ck_demand_production_plan_historical_classification",
+        ),
+        CheckConstraint(
+            "(historical_completion_classification IS NULL AND historical_completed_at IS NULL AND historical_completed_by IS NULL) OR "
+            "(historical_completion_classification IS NOT NULL AND historical_completed_at IS NOT NULL AND historical_completed_by IS NOT NULL)",
+            name="ck_demand_production_plan_historical_complete",
+        ),
+        CheckConstraint(
+            "historical_completion_classification IS NULL OR status = 'COMPLETED'",
+            name="ck_demand_production_plan_historical_status",
+        ),
+        CheckConstraint(
+            "(cancellation_reason IS NULL AND cancelled_at IS NULL AND cancelled_by IS NULL) OR "
+            "(cancellation_reason IS NOT NULL AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL)",
+            name="ck_demand_production_plan_cancellation_complete",
+        ),
+        CheckConstraint(
+            "cancellation_reason IS NULL OR status = 'CANCELLED'",
+            name="ck_demand_production_plan_cancellation_status",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     plan_number: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    historical_completion_classification: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    historical_completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    historical_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    historical_completed_by: Mapped[UUID | None] = mapped_column(ForeignKey("iam_user.id", ondelete="RESTRICT"), nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by: Mapped[UUID | None] = mapped_column(ForeignKey("iam_user.id", ondelete="RESTRICT"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -53,6 +82,28 @@ class Taquilla(Base):
             "vehicle_topology IN ('SIMPLE', 'DOUBLE_DECK')",
             name="ck_demand_taquilla_vehicle_topology",
         ),
+        CheckConstraint(
+            "historical_completion_classification IS NULL OR historical_completion_classification IN ('ON_TIME', 'DELAYED')",
+            name="ck_demand_taquilla_historical_classification",
+        ),
+        CheckConstraint(
+            "(historical_completion_classification IS NULL AND historical_completed_at IS NULL AND historical_completed_by IS NULL) OR "
+            "(historical_completion_classification IS NOT NULL AND historical_completed_at IS NOT NULL AND historical_completed_by IS NOT NULL)",
+            name="ck_demand_taquilla_historical_complete",
+        ),
+        CheckConstraint(
+            "historical_completion_classification IS NULL OR status = 'COMPLETED'",
+            name="ck_demand_taquilla_historical_status",
+        ),
+        CheckConstraint(
+            "(cancellation_reason IS NULL AND cancelled_at IS NULL AND cancelled_by IS NULL) OR "
+            "(cancellation_reason IS NOT NULL AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL)",
+            name="ck_demand_taquilla_cancellation_complete",
+        ),
+        CheckConstraint(
+            "cancellation_reason IS NULL OR status = 'CANCELLED'",
+            name="ck_demand_taquilla_cancellation_status",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -68,6 +119,13 @@ class Taquilla(Base):
         String(20), nullable=False, default="SIMPLE"
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    historical_completion_classification: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    historical_completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    historical_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    historical_completed_by: Mapped[UUID | None] = mapped_column(ForeignKey("iam_user.id", ondelete="RESTRICT"), nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by: Mapped[UUID | None] = mapped_column(ForeignKey("iam_user.id", ondelete="RESTRICT"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
