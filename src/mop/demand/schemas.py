@@ -1,6 +1,7 @@
 """Transport schemas for G3 operational demand."""
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -84,3 +85,36 @@ class TaquillaRead(BaseModel):
 
 class TaquillaStatusUpdate(BaseModel):
     status: TaquillaStatus
+
+
+class TaquillaProductLineCreate(BaseModel):
+    article_id: UUID
+    sequence_no: int = Field(gt=0)
+    requested_quantity: Decimal = Field(gt=0)
+    source_line_key: str | None = Field(default=None, max_length=200)
+
+    @field_validator("source_line_key")
+    @classmethod
+    def normalize_source_line_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+
+class TaquillaProductLineUpdate(BaseModel):
+    sequence_no: int = Field(gt=0)
+    requested_quantity: Decimal = Field(gt=0)
+
+
+class TaquillaProductLineRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    taquilla_id: UUID
+    article_id: UUID
+    sequence_no: int
+    requested_quantity: Decimal
+    source_line_key: str | None
+    created_at: datetime
+    updated_at: datetime

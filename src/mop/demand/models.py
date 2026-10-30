@@ -1,9 +1,10 @@
 """Operational demand persistence models for G3."""
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mop.persistence.base import Base
@@ -68,3 +69,60 @@ class Taquilla(Base):
     )
 
     plan: Mapped[ProductionPlan] = relationship(back_populates="taquillas")
+    product_lines: Mapped[list["TaquillaProductLine"]] = relationship(
+        back_populates="taquilla", cascade="all, delete-orphan"
+    )
+
+
+class TaquillaProductLine(Base):
+    __tablename__ = "demand_taquilla_product_line"
+    __table_args__ = (
+        UniqueConstraint(
+            "taquilla_id",
+            "sequence_no",
+            name="uq_demand_taquilla_product_line_sequence",
+        ),
+        UniqueConstraint(
+            "taquilla_id",
+            "source_line_key",
+            name="uq_demand_taquilla_product_line_source_key",
+        ),
+        CheckConstraint(
+            "sequence_no > 0",
+            name="ck_demand_taquilla_product_line_sequence_positive",
+        ),
+        CheckConstraint(
+            "requested_quantity > 0",
+            name="ck_demand_taquilla_product_line_quantity_positive",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    taquilla_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_taquilla.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    article_id: Mapped[UUID] = mapped_column(
+        ForeignKey("md_article.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    sequence_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    requested_quantity: Mapped[Decimal] = mapped_column(
+        Numeric(24, 8), nullable=False
+    )
+    source_line_key: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    taquilla: Mapped[Taquilla] = relationship(back_populates="product_lines")

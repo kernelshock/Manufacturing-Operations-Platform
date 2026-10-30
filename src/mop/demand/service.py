@@ -7,12 +7,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mop.demand.models import ProductionPlan, Taquilla
+from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
+from mop.master_data.models import Article
 from mop.demand.schemas import (
     ProductionPlanCreate,
     ProductionPlanNumberUpdate,
     ProductionPlanStatusUpdate,
     TaquillaCreate,
+    TaquillaProductLineCreate,
+    TaquillaProductLineUpdate,
     TaquillaStatusUpdate,
 )
 
@@ -143,3 +146,80 @@ class DemandService:
             )
         taquilla.status = data.status
         return self._commit(taquilla)
+
+
+    def _require_draft_taquilla(self, taquilla_id: UUID) -> Taquilla:
+        taquilla = self.get_taquilla(taquilla_id)
+        if taquilla.status != "DRAFT":
+            raise DemandRuleError(
+                "product composition can only be changed while taquilla is DRAFT"
+            )
+        return taquilla
+
+    def add_product_line(
+        self, taquilla_id: UUID, data: TaquillaProductLineCreate
+    ) -> TaquillaProductLine:
+        taquilla = self._require_draft_taquilla(taquilla_id)
+        article = self.session.get(Article, data.article_id)
+        if article is None:
+            raise DemandNotFoundError("article not found")
+        if article.article_kind != "FINISHED_PRODUCT" or not article.active:
+            raise DemandRuleError(
+                "taquilla product line requires an active FINISHED_PRODUCT article"
+            )
+
+        if data.source_line_key is not None:
+            existing = self.session.scalar(
+                select(TaquillaProductLine).where(
+                    TaquillaProductLine.taquilla_id == taquilla.id,
+                    TaquillaProductLine.source_line_key == data.source_line_key,
+                )
+            )
+            if existing is not None:
+                if (
+                    existing.article_id == data.article_id
+                    and existing.sequence_no == data.sequence_no
+                    and existing.requested_quantity == data.requested_quantity
+                ):
+                    return existing
+                raise DemandConflictError(
+                    "source_line_key already identifies a different product line"
+                )
+
+        return self._commit(
+            TaquillaProductLine(
+                taquilla_id=taquilla.id,
+                article_id=data.article_id,
+                sequence_no=data.sequence_no,
+                requested_quantity=data.requested_quantity,
+                source_line_key=data.source_line_key,
+            )
+        )
+
+    def list_product_lines(
+        self, taquilla_id: UUID
+    ) -> Sequence[TaquillaProductLine]:
+        self.get_taquilla(taquilla_id)
+        return self.session.scalars(
+            select(TaquillaProductLine)
+            .where(TaquillaProductLine.taquilla_id == taquilla_id)
+            .order_by(
+                TaquillaProductLine.sequence_no,
+                TaquillaProductLine.id,
+            )
+        ).all()
+
+    def get_product_line(self, line_id: UUID) -> TaquillaProductLine:
+        line = self.session.get(TaquillaProductLine, line_id)
+        if line is None:
+            raise DemandNotFoundError("taquilla product line not found")
+        return line
+
+    def update_product_line(
+        self, line_id: UUID, data: TaquillaProductLineUpdate
+    ) -> TaquillaProductLine:
+        line = self.get_product_line(line_id)
+        self._require_draft_taquilla(line.taquilla_id)
+        line.sequence_no = data.sequence_no
+        line.requested_quantity = data.requested_quantity
+        return self._commit(line)

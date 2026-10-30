@@ -13,6 +13,9 @@ from mop.demand.schemas import (
     ProductionPlanRead,
     ProductionPlanStatusUpdate,
     TaquillaCreate,
+    TaquillaProductLineCreate,
+    TaquillaProductLineRead,
+    TaquillaProductLineUpdate,
     TaquillaRead,
     TaquillaStatusUpdate,
 )
@@ -205,4 +208,83 @@ def transition_taquilla(
             object_id=updated.id,
             details={"previous_status": previous, "status": updated.status},
         )
+    return updated
+
+
+@router.post(
+    "/taquillas/{taquilla_id}/products",
+    response_model=TaquillaProductLineRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_product_line(
+    taquilla_id: UUID,
+    payload: TaquillaProductLineCreate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    created = _translate(lambda: app.add_product_line(taquilla_id, payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla_product.create",
+        object_type="taquilla_product_line",
+        object_id=created.id,
+        details={
+            "taquilla_id": str(created.taquilla_id),
+            "article_id": str(created.article_id),
+            "sequence_no": created.sequence_no,
+            "requested_quantity": str(created.requested_quantity),
+            "source_line_key": created.source_line_key,
+        },
+    )
+    return created
+
+
+@router.get(
+    "/taquillas/{taquilla_id}/products",
+    response_model=list[TaquillaProductLineRead],
+)
+def list_product_lines(
+    taquilla_id: UUID,
+    app: DemandService = Depends(service),
+    _: User = Depends(require_global_permission("demand.read")),
+):
+    return _translate(lambda: app.list_product_lines(taquilla_id))
+
+
+@router.patch(
+    "/taquilla-products/{line_id}",
+    response_model=TaquillaProductLineRead,
+)
+def update_product_line(
+    line_id: UUID,
+    payload: TaquillaProductLineUpdate,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    before = _translate(lambda: app.get_product_line(line_id))
+    previous_sequence = before.sequence_no
+    previous_quantity = str(before.requested_quantity)
+    updated = _translate(lambda: app.update_product_line(line_id, payload))
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla_product.update",
+        object_type="taquilla_product_line",
+        object_id=updated.id,
+        details={
+            "taquilla_id": str(updated.taquilla_id),
+            "article_id": str(updated.article_id),
+            "previous_sequence_no": previous_sequence,
+            "sequence_no": updated.sequence_no,
+            "previous_requested_quantity": previous_quantity,
+            "requested_quantity": str(updated.requested_quantity),
+        },
+    )
     return updated
