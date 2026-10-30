@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G3.5 governed lifecycle and historical completion with ON_TIME/DELAYED administrative classification, reasoned cancellation and safe DRAFT correction without fabricated MES actuals.
 - G3.4 exact G2 RoutingRevision binding with deterministic resolution, ambiguity rejection and explicit audited override provenance.
 - G3.3 explicit SIMPLE/DOUBLE_DECK vehicle topology with SINGLE/UPPER/LOWER product allocation and source-document grouping independent from floor inference.
 - G3.2 Taquilla product composition with exact G2 finished-product references, Decimal demand quantities, ordering and idempotent source-line identity.
