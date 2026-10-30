@@ -137,5 +137,26 @@ class TaquillaProductLineRead(BaseModel):
     source_line_key: str | None
     deck_position: DeckPosition
     source_document_key: str | None
+    routing_revision_id: UUID | None
+    routing_binding_mode: RoutingBindingMode | None
+    routing_effective_at: datetime | None
+    routing_override_reason: str | None
+    routing_bound_at: datetime | None
+    routing_bound_by: UUID | None
     created_at: datetime
     updated_at: datetime
+
+
+RoutingBindingMode = Literal["RESOLVED", "OVERRIDE"]
+
+
+class RoutingResolveRequest(BaseModel):
+    effective_at: datetime | None = None
+
+
+class RoutingOverrideRequest(BaseModel):
+    routing_revision_id: UUID
+    effective_at: datetime | None = None
+    reason: str = Field(min_length=1, max_length=4000)
+
+    _reason = field_validator("reason")(_trim)

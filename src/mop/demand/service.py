@@ -1,6 +1,7 @@
 """G3 operational demand application service."""
 
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -8,11 +9,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
-from mop.master_data.models import Article
+from mop.master_data.models import Article, ArticleRevision, RoutingRevision
 from mop.demand.schemas import (
     ProductionPlanCreate,
     ProductionPlanNumberUpdate,
     ProductionPlanStatusUpdate,
+    RoutingOverrideRequest,
+    RoutingResolveRequest,
     TaquillaCreate,
     TaquillaProductLineCreate,
     TaquillaProductLineUpdate,
@@ -268,3 +271,121 @@ class DemandService:
         if "source_document_key" in data.model_fields_set:
             line.source_document_key = data.source_document_key
         return self._commit(line)
+
+
+    @staticmethod
+    def _routing_window_contains(
+        routing: RoutingRevision, effective_at: datetime
+    ) -> bool:
+        return (
+            routing.valid_from <= effective_at
+            and (routing.valid_to is None or effective_at < routing.valid_to)
+        )
+
+    def _routing_for_product_line(
+        self,
+        line: TaquillaProductLine,
+        routing_revision_id: UUID,
+        effective_at: datetime,
+    ) -> RoutingRevision:
+        routing = self.session.get(RoutingRevision, routing_revision_id)
+        if routing is None:
+            raise DemandNotFoundError("routing revision not found")
+        revision = self.session.get(ArticleRevision, routing.article_revision_id)
+        if revision is None:
+            raise DemandNotFoundError("routing article revision not found")
+        if revision.article_id != line.article_id:
+            raise DemandRuleError(
+                "routing revision does not belong to the product line article"
+            )
+        if routing.status != "ACTIVE":
+            raise DemandRuleError("routing revision must be ACTIVE")
+        if not self._routing_window_contains(routing, effective_at):
+            raise DemandRuleError(
+                "routing revision is not effective at the requested time"
+            )
+        return routing
+
+    def _apply_routing_binding(
+        self,
+        line: TaquillaProductLine,
+        routing: RoutingRevision,
+        *,
+        mode: str,
+        effective_at: datetime,
+        bound_by: UUID,
+        override_reason: str | None,
+    ) -> TaquillaProductLine:
+        line.routing_revision_id = routing.id
+        line.routing_binding_mode = mode
+        line.routing_effective_at = effective_at
+        line.routing_override_reason = override_reason
+        line.routing_bound_at = datetime.now(timezone.utc)
+        line.routing_bound_by = bound_by
+        return self._commit(line)
+
+    def resolve_product_line_routing(
+        self,
+        line_id: UUID,
+        data: RoutingResolveRequest,
+        *,
+        bound_by: UUID,
+    ) -> TaquillaProductLine:
+        line = self.get_product_line(line_id)
+        self._require_draft_taquilla(line.taquilla_id)
+        at = data.effective_at or datetime.now(timezone.utc)
+
+        candidates = []
+        for routing, revision in self.session.execute(
+            select(RoutingRevision, ArticleRevision)
+            .join(
+                ArticleRevision,
+                RoutingRevision.article_revision_id == ArticleRevision.id,
+            )
+            .where(
+                ArticleRevision.article_id == line.article_id,
+                RoutingRevision.status == "ACTIVE",
+            )
+        ).all():
+            if self._routing_window_contains(routing, at):
+                candidates.append(routing)
+
+        if not candidates:
+            raise DemandNotFoundError(
+                "effective routing revision for product line not found"
+            )
+        if len(candidates) > 1:
+            raise DemandRuleError(
+                "multiple effective active routing revisions found for product line"
+            )
+
+        return self._apply_routing_binding(
+            line,
+            candidates[0],
+            mode="RESOLVED",
+            effective_at=at,
+            bound_by=bound_by,
+            override_reason=None,
+        )
+
+    def override_product_line_routing(
+        self,
+        line_id: UUID,
+        data: RoutingOverrideRequest,
+        *,
+        bound_by: UUID,
+    ) -> TaquillaProductLine:
+        line = self.get_product_line(line_id)
+        self._require_draft_taquilla(line.taquilla_id)
+        at = data.effective_at or datetime.now(timezone.utc)
+        routing = self._routing_for_product_line(
+            line, data.routing_revision_id, at
+        )
+        return self._apply_routing_binding(
+            line,
+            routing,
+            mode="OVERRIDE",
+            effective_at=at,
+            bound_by=bound_by,
+            override_reason=data.reason,
+        )

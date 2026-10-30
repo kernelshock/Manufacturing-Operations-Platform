@@ -106,6 +106,24 @@ class TaquillaProductLine(Base):
             "deck_position IN ('SINGLE', 'UPPER', 'LOWER')",
             name="ck_demand_taquilla_product_line_deck_position",
         ),
+        CheckConstraint(
+            "routing_binding_mode IS NULL OR routing_binding_mode IN ('RESOLVED', 'OVERRIDE')",
+            name="ck_demand_taquilla_product_line_routing_binding_mode",
+        ),
+        CheckConstraint(
+            "(routing_revision_id IS NULL AND routing_binding_mode IS NULL "
+            "AND routing_effective_at IS NULL AND routing_override_reason IS NULL "
+            "AND routing_bound_at IS NULL AND routing_bound_by IS NULL) OR "
+            "(routing_revision_id IS NOT NULL AND routing_binding_mode IS NOT NULL "
+            "AND routing_effective_at IS NOT NULL AND routing_bound_at IS NOT NULL "
+            "AND routing_bound_by IS NOT NULL)",
+            name="ck_demand_taquilla_product_line_routing_binding_complete",
+        ),
+        CheckConstraint(
+            "(routing_binding_mode = 'OVERRIDE' AND routing_override_reason IS NOT NULL) OR "
+            "(routing_binding_mode IS DISTINCT FROM 'OVERRIDE' AND routing_override_reason IS NULL)",
+            name="ck_demand_taquilla_product_line_routing_override_reason",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -131,6 +149,22 @@ class TaquillaProductLine(Base):
     )
     source_document_key: Mapped[str | None] = mapped_column(
         String(200), nullable=True
+    )
+    routing_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_routing_revision.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    routing_binding_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    routing_effective_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    routing_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    routing_bound_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    routing_bound_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

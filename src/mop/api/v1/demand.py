@@ -12,6 +12,8 @@ from mop.demand.schemas import (
     ProductionPlanNumberUpdate,
     ProductionPlanRead,
     ProductionPlanStatusUpdate,
+    RoutingOverrideRequest,
+    RoutingResolveRequest,
     TaquillaCreate,
     TaquillaProductLineCreate,
     TaquillaProductLineRead,
@@ -321,6 +323,85 @@ def update_product_line(
             "deck_position": updated.deck_position,
             "previous_source_document_key": previous_source_document_key,
             "source_document_key": updated.source_document_key,
+        },
+    )
+    return updated
+
+
+@router.post(
+    "/taquilla-products/{line_id}/routing/resolve",
+    response_model=TaquillaProductLineRead,
+)
+def resolve_product_line_routing(
+    line_id: UUID,
+    payload: RoutingResolveRequest,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    previous = _translate(lambda: app.get_product_line(line_id))
+    previous_routing_id = previous.routing_revision_id
+    updated = _translate(
+        lambda: app.resolve_product_line_routing(
+            line_id, payload, bound_by=actor.id
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla_product.routing.resolve",
+        object_type="taquilla_product_line",
+        object_id=updated.id,
+        details={
+            "article_id": str(updated.article_id),
+            "previous_routing_revision_id": (
+                str(previous_routing_id) if previous_routing_id else None
+            ),
+            "routing_revision_id": str(updated.routing_revision_id),
+            "routing_effective_at": updated.routing_effective_at.isoformat(),
+            "routing_binding_mode": updated.routing_binding_mode,
+        },
+    )
+    return updated
+
+
+@router.post(
+    "/taquilla-products/{line_id}/routing/override",
+    response_model=TaquillaProductLineRead,
+)
+def override_product_line_routing(
+    line_id: UUID,
+    payload: RoutingOverrideRequest,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    previous = _translate(lambda: app.get_product_line(line_id))
+    previous_routing_id = previous.routing_revision_id
+    updated = _translate(
+        lambda: app.override_product_line_routing(
+            line_id, payload, bound_by=actor.id
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla_product.routing.override",
+        object_type="taquilla_product_line",
+        object_id=updated.id,
+        details={
+            "article_id": str(updated.article_id),
+            "previous_routing_revision_id": (
+                str(previous_routing_id) if previous_routing_id else None
+            ),
+            "routing_revision_id": str(updated.routing_revision_id),
+            "routing_effective_at": updated.routing_effective_at.isoformat(),
+            "routing_binding_mode": updated.routing_binding_mode,
+            "routing_override_reason": updated.routing_override_reason,
         },
     )
     return updated
