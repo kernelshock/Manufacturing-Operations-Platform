@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from mop.audit.context import request_audit_context
 from mop.audit.service import AuditService
 from mop.demand.schemas import (
+    DemandCancellationRequest,
+    HistoricalCompletionRequest,
     ProductionPlanCreate,
     ProductionPlanNumberUpdate,
     ProductionPlanRead,
@@ -405,3 +407,126 @@ def override_product_line_routing(
         },
     )
     return updated
+
+
+@router.post(
+    "/plans/{plan_id}/historical-completion",
+    response_model=ProductionPlanRead,
+)
+def historical_complete_plan(
+    plan_id: UUID,
+    payload: HistoricalCompletionRequest,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    updated = _translate(
+        lambda: app.historical_complete_plan(
+            plan_id, payload, actor_id=actor.id
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.plan.historical_completion",
+        object_type="production_plan",
+        object_id=updated.id,
+        details={
+            "classification": updated.historical_completion_classification,
+            "note": updated.historical_completion_note,
+            "mes_actuals_created": False,
+        },
+    )
+    return updated
+
+
+@router.post(
+    "/taquillas/{taquilla_id}/cancel",
+    response_model=TaquillaRead,
+)
+def cancel_taquilla(
+    taquilla_id: UUID,
+    payload: DemandCancellationRequest,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    updated = _translate(
+        lambda: app.cancel_taquilla(
+            taquilla_id, payload, actor_id=actor.id
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla.cancel",
+        object_type="taquilla",
+        object_id=updated.id,
+        details={"reason": updated.cancellation_reason},
+    )
+    return updated
+
+
+@router.post(
+    "/plans/{plan_id}/cancel",
+    response_model=ProductionPlanRead,
+)
+def cancel_plan(
+    plan_id: UUID,
+    payload: DemandCancellationRequest,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    updated = _translate(
+        lambda: app.cancel_plan(
+            plan_id, payload, actor_id=actor.id
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.plan.cancel",
+        object_type="production_plan",
+        object_id=updated.id,
+        details={"reason": updated.cancellation_reason},
+    )
+    return updated
+
+
+@router.delete(
+    "/taquillas/{taquilla_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_draft_taquilla(
+    taquilla_id: UUID,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    taquilla = _translate(lambda: app.get_taquilla(taquilla_id))
+    details = {
+        "plan_id": str(taquilla.plan_id),
+        "taquilla_code": taquilla.taquilla_code,
+        "sequence_no": taquilla.sequence_no,
+        "reason": "safe draft correction",
+    }
+    deleted = _translate(
+        lambda: app.delete_draft_taquilla(taquilla_id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla.delete_draft",
+        object_type="taquilla",
+        object_id=deleted.id,
+        details=details,
+    )
