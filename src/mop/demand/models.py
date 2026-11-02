@@ -235,3 +235,161 @@ class TaquillaProductLine(Base):
     )
 
     taquilla: Mapped[Taquilla] = relationship(back_populates="product_lines")
+
+
+
+class TaquillaAssimilationBatch(Base):
+    __tablename__ = "demand_taquilla_assimilation_batch"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_system",
+            "payload_fingerprint",
+            "parser_version",
+            name="uq_demand_taquilla_assimilation_identity",
+        ),
+        CheckConstraint(
+            "status IN ('RECEIVED', 'VALIDATED', 'REVIEW_REQUIRED', 'REJECTED', 'APPLIED')",
+            name="ck_demand_taquilla_assimilation_status",
+        ),
+        CheckConstraint(
+            "vehicle_topology IN ('SIMPLE', 'DOUBLE_DECK')",
+            name="ck_demand_taquilla_assimilation_topology",
+        ),
+        CheckConstraint(
+            "accepted_lines >= 0 AND rejected_lines >= 0",
+            name="ck_demand_taquilla_assimilation_counts",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    plan_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_production_plan.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    target_taquilla_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("demand_taquilla.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    source_system: Mapped[str] = mapped_column(String(40), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    mapping_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    payload_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    taquilla_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    sequence_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    vehicle_topology: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="RECEIVED"
+    )
+    accepted_lines: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rejected_lines: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    imported_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TaquillaAssimilationDocument(Base):
+    __tablename__ = "demand_taquilla_assimilation_document"
+    __table_args__ = (
+        UniqueConstraint(
+            "batch_id",
+            "source_document_key",
+            name="uq_demand_taquilla_assimilation_document_key",
+        ),
+        UniqueConstraint(
+            "batch_id",
+            "source_sha256",
+            name="uq_demand_taquilla_assimilation_document_sha",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_taquilla_assimilation_batch.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    source_document_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    exported_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class TaquillaAssimilationLine(Base):
+    __tablename__ = "demand_taquilla_assimilation_line"
+    __table_args__ = (
+        UniqueConstraint(
+            "batch_id",
+            "source_line_key",
+            name="uq_demand_taquilla_assimilation_line_key",
+        ),
+        CheckConstraint(
+            "requested_quantity > 0",
+            name="ck_demand_taquilla_assimilation_line_quantity",
+        ),
+        CheckConstraint(
+            "deck_position IN ('SINGLE', 'UPPER', 'LOWER')",
+            name="ck_demand_taquilla_assimilation_line_deck",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_taquilla_assimilation_batch.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_taquilla_assimilation_document.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    source_line_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    source_article_system: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_article_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    resolved_article_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("md_article.id", ondelete="RESTRICT"), nullable=True
+    )
+    requested_quantity: Mapped[Decimal] = mapped_column(
+        Numeric(24, 8), nullable=False
+    )
+    deck_position: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_product_line_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("demand_taquilla_product_line.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+
+class TaquillaAssimilationIssue(Base):
+    __tablename__ = "demand_taquilla_assimilation_issue"
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('WARNING', 'ERROR', 'BLOCKER')",
+            name="ck_demand_taquilla_assimilation_issue_severity",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_taquilla_assimilation_batch.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    rule_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    source_document_key: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )
+    source_line_key: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
