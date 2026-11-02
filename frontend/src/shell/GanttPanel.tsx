@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiError, api } from "../api/client";
+import { WhatIfPanel } from "./WhatIfPanel";
 import type { GanttOperation, GanttProjection, ProductionPlan } from "../api/types";
 import {
   offsetHours,
@@ -23,13 +24,14 @@ function durationMinutes(operation: GanttOperation) {
   return Math.round(Number(operation.processing_seconds) / 60);
 }
 
-export function GanttPanel() {
+export function GanttPanel({ canEdit }: { canEdit: boolean }) {
   const [plans, setPlans] = useState<ProductionPlan[]>([]);
   const [planId, setPlanId] = useState("");
   const [projection, setProjection] = useState<GanttProjection | null>(null);
   const [scale, setScale] = useState<GanttScale>("shift");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -60,7 +62,7 @@ export function GanttPanel() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [planId]);
+  }, [planId, refreshKey]);
 
   const timelineWidth = useMemo(() => {
     if (!projection?.window_start || !projection.window_end) return 900;
@@ -148,6 +150,12 @@ export function GanttPanel() {
               </div>
             </div>
           </section>
+
+          <WhatIfPanel
+            projection={projection}
+            canEdit={canEdit}
+            onApplied={() => setRefreshKey((value) => value + 1)}
+          />
 
           <section className="content-section gantt-section">
             <div className="section-heading">
