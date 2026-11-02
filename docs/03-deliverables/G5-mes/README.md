@@ -68,7 +68,7 @@ G5 may reference maintenance/workforce/material context once those later gates e
 
 ## Planned slices
 
-- **G5.1 — Execution Domain & Dispatch Foundation:** canonical execution identities, dispatch from released demand/schedule provenance, lifecycle, RBAC, audit and API baseline.
+- **G5.1 — Execution Domain & Dispatch Foundation — COMPLETED:** canonical dispatch/execution-operation identities, CURRENT-publication materialization, lifecycle, RBAC, audit and API baseline.
 - **G5.2 — Operation Start / Finish & Quantity Capture:** actual start/finish, produced quantity and completion semantics with explicit operator action.
 - **G5.3 — Setup / Pause / Interruption / Deviation:** optional setup, pause/resume, interruption reasons, delay evidence and planned-vs-actual deviation.
 - **G5.4 — Transfer / Handoff & WIP Traceability:** predecessor/successor handoff, WIP movement and operation-to-operation traceability.
@@ -95,6 +95,19 @@ G5 becomes eligible for VALIDATED only when:
 
 **G5 IN PROGRESS**
 
+G5.1 is **COMPLETED**.
+
+- validated implementation head: `74d149ed41afe9df8822c9820ff8bfad1169bdec`;
+- Alembic head: `0025_g5_1`;
+- G5 MES push run #5: **SUCCESS**;
+- one canonical execution dispatch per CURRENT APS publication;
+- exact G2/G3/G4 provenance copied into MES execution-operation snapshots;
+- DRAFT → RELEASED / CANCELLED lifecycle;
+- dispatch materialization and release replay are idempotent;
+- release revalidates that the source APS publication remains CURRENT;
+- G5.1 stores planned evidence only and introduces no actual start/finish, produced quantity, scrap, pause/setup, operator or actual-resource state;
+- `mes.read` / `mes.edit` and audited dispatch mutations are active.
+
 The next slice is:
 
-**G5.1 — Execution Domain & Dispatch Foundation**
+**G5.2 — Operation Start / Finish & Quantity Capture**
