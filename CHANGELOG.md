@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G4.4 deterministic finite-capacity sequencing with planned timestamps, concrete resource assignment and break-aware productive segments.
 - G4.3 calendar/capacity projection with resource candidate snapshots and exact availability intervals.
 - G4.2 APS operation snapshot expansion.
 - G4.1 APS scheduling scenario/run foundation with explicit planning horizon, lifecycle, RBAC, audit, API and migration baseline.
