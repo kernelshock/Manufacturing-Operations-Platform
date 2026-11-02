@@ -14,6 +14,7 @@ from mop.aps.service import APSService
 from mop.config import Settings
 from mop.core.models import Area, Organization, Plant, Resource, WorkCenter
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
+from mop.iam.models import User  # noqa: F401 - registers IAM metadata for FK resolution
 from mop.master_data.models import (
     Article,
     ArticleRevision,
