@@ -55,7 +55,7 @@ G3 introduces the canonical transactional identities for:
 - **G3.3 — Vehicle / Deck Topology — COMPLETED:** SIMPLE / DOUBLE_DECK, explicit UPPER / LOWER allocation and source-document grouping without implicit inference.
 - **G3.4 — Routing Binding — COMPLETED:** exact G2 RoutingRevision selection/resolution, effectivity checks and explicit override provenance.
 - **G3.5 — Lifecycle & Historical Completion — COMPLETED:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
-- **G3.6 — Taquilla Assimilation:** controlled import, duplicate detection, source provenance and validation for one/two-document orders.
+- **G3.6 — Taquilla Assimilation — COMPLETED:** controlled import, duplicate detection, source provenance and validation for one/two-document orders.
 - **G3.7 — Operational Projection & Frontend:** plan/taquilla views and operator workflows needed before APS handoff.
 - **G3.8 — Gate Hardening:** migration integrity, regressions, RBAC/audit, idempotency, security, runtime and release evidence.
 
@@ -78,7 +78,31 @@ G3 is eligible for VALIDATED only when:
 
 ## Current slice
 
-**G3.6 — Taquilla Assimilation**
+**G3.7 — Operational Projection & Frontend**
+
+### G3.6 — Taquilla Assimilation
+- implementation head: `6e4f810e8de748fa0db8cd407dc7d0e8960cf427`;
+- canonical validation: `G3 Demand Plan Taquilla Routing` push run #52 — **SUCCESS**;
+- Alembic head: `0018_g3_6`;
+- import uses immutable staging batches before creating operational demand;
+- each batch retains source system, parser/mapping versions and deterministic payload fingerprint;
+- one or two source documents are supported per Taquilla;
+- each source document retains key, filename, SHA-256 and optional export timestamp;
+- each imported product line retains source document, source line key, source article identity, quantity and explicit deck position;
+- SIMPLE imports require only SINGLE lines;
+- DOUBLE_DECK imports require explicit UPPER and LOWER representation;
+- a unified document may contain both decks and two documents may map to decks in any order;
+- document identity/order never infers floor assignment;
+- exact active G2 FINISHED_PRODUCT Article resolution is mandatory;
+- unmapped/inactive/non-finished products remain staged with BLOCKER evidence and create no Taquilla;
+- source-document reuse, duplicate Taquilla codes, duplicate plan sequences and competing assimilation identities are blocked;
+- identical payload replay returns the same batch/target and is explicitly reported as idempotent;
+- only a fully validated batch is applied to operational Taquilla/ProductLine records;
+- staging provenance points to generated target Taquilla and product-line UUIDs after apply;
+- schema drift check and full migration downgrade/replay pass;
+- G0/G1/G2 regressions, G3 suite, frontend, dependency/security and runtime gates pass;
+- next slice: **G3.7 — Operational Projection & Frontend**.
+
 
 ### G3.5 — Lifecycle & Historical Completion
 - implementation head: `1238fdc966a869b75d2d0e6696fdfe49fcd20b8c`;
