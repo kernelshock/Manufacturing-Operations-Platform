@@ -24,6 +24,11 @@ def upgrade() -> None:
         ["id"],
         ondelete="RESTRICT",
     )
+    op.create_check_constraint(
+        "ck_aps_run_replan_provenance",
+        "aps_scheduling_run",
+        "(replan_from_run_id IS NULL AND replan_reason IS NULL) OR (replan_from_run_id IS NOT NULL AND replan_reason IS NOT NULL)",
+    )
 
     op.create_table(
         "aps_schedule_publication",
@@ -46,6 +51,13 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("scenario_id", "version_no", name="uq_aps_publication_scenario_version"),
         sa.UniqueConstraint("run_id", name="uq_aps_publication_run"),
+    )
+    op.create_index(
+        "uq_aps_publication_current_scenario",
+        "aps_schedule_publication",
+        ["scenario_id"],
+        unique=True,
+        postgresql_where=sa.text("status = 'CURRENT'"),
     )
 
     op.create_table(
@@ -100,7 +112,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("aps_published_scheduled_operation_segment")
     op.drop_table("aps_published_scheduled_operation")
+    op.drop_index("uq_aps_publication_current_scenario", table_name="aps_schedule_publication")
     op.drop_table("aps_schedule_publication")
+    op.drop_constraint("ck_aps_run_replan_provenance", "aps_scheduling_run", type_="check")
     op.drop_constraint("fk_aps_run_replan_from", "aps_scheduling_run", type_="foreignkey")
     op.drop_column("aps_scheduling_run", "replan_reason")
     op.drop_column("aps_scheduling_run", "replan_from_run_id")
