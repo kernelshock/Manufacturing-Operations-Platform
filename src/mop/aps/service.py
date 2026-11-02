@@ -1634,6 +1634,7 @@ class APSService:
 
         self.session.add_all(cloned_candidates)
         self.session.add_all(cloned_intervals)
+        self.session.flush()
         return len(cloned_candidates), len(cloned_intervals)
 
     def evaluate_whatif(self, whatif_id: UUID, actor_id: UUID | None) -> tuple[WhatIfScenario, dict]:
