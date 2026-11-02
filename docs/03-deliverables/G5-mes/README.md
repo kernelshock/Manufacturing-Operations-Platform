@@ -1,0 +1,100 @@
+# G5 — MES / Execution
+
+Status: **IN PROGRESS**  
+Started: 2026-11-02  
+Base: released G4 main `19725298c4e04a8d1e7d1b69a05f58bef3e2d2ed`
+
+## Objective
+
+Convert the released APS plan into governed shop-floor execution evidence without allowing execution facts to rewrite planning history.
+
+G5 owns the authoritative actual execution state for production operations:
+- dispatchable execution work derived from released APS / G3 provenance;
+- actual operation start, pause/resume and finish;
+- actual produced quantity and scrap;
+- setup / productive / interruption time evidence;
+- transfer / handoff and WIP traceability;
+- execution deviation and delay evidence;
+- rework / alternative execution-path evidence where explicitly governed;
+- shop-floor operator interaction and execution projection;
+- feedback from execution to planning without mutating published APS history.
+
+## Inputs owned by previous gates
+
+G5 consumes, but does not duplicate:
+- G1 Plant / Area / WorkCenter / Resource / identity / RBAC / audit;
+- G2 Article / RoutingRevision / RoutingOperation / ResourceAssignment;
+- G3 Plan / Taquilla / ProductLine / deck / routing binding;
+- G4 published schedule, planned operation sequence, planned resource and planned timestamps.
+
+## Ownership boundaries
+
+### G5 owns
+- actual shop-floor execution identity;
+- actual start / pause / resume / finish timestamps;
+- actual produced quantity;
+- actual scrap / rejected quantity;
+- optional setup evidence;
+- interruption / delay reason evidence;
+- execution resource actually used;
+- WIP transfer / handoff evidence;
+- execution traceability by Plan / Taquilla / ProductLine / RoutingOperation;
+- governed deviation from the planned operation/resource/sequence;
+- operator-facing rapid execution capture.
+
+### G5 does not own
+- G2 master definitions;
+- G3 requested demand;
+- G4 planned timestamps, published schedule or what-if state;
+- G6 inventory/material truth;
+- G7 purchasing;
+- G8 authoritative maintenance work orders/downtime;
+- G9 workforce master / skills / attendance.
+
+G5 may reference maintenance/workforce/material context once those later gates exist, but it must not fabricate their authoritative state.
+
+## Non-negotiable rules
+
+1. Planned timestamps remain G4-owned; G5 records separate actual timestamps.
+2. Execution evidence never rewrites a published G4 schedule.
+3. Every execution record retains provenance to Plan → Taquilla → ProductLine → RoutingRevision → RoutingOperation and, where applicable, published APS operation.
+4. Actual quantities use Decimal-safe semantics and cannot be silently inferred from planned quantities.
+5. Actual start/finish must come from explicit execution events or governed historical assimilation.
+6. Operator capture must remain fast and minimal while backend validation remains authoritative.
+7. Rework or alternative paths are explicit execution evidence; they are never inferred by changing the original routing history.
+8. Next-operation eligibility may depend on predecessor execution completion, but the dependency must remain explainable and auditable.
+9. Missing execution facts remain unknown; G5 must not fabricate produced quantity, scrap, timestamps, operator, resource or delay reason.
+10. Materials, maintenance and workforce constraints remain unavailable/not evaluated until their authoritative gates are released.
+
+## Planned slices
+
+- **G5.1 — Execution Domain & Dispatch Foundation:** canonical execution identities, dispatch from released demand/schedule provenance, lifecycle, RBAC, audit and API baseline.
+- **G5.2 — Operation Start / Finish & Quantity Capture:** actual start/finish, produced quantity and completion semantics with explicit operator action.
+- **G5.3 — Setup / Pause / Interruption / Deviation:** optional setup, pause/resume, interruption reasons, delay evidence and planned-vs-actual deviation.
+- **G5.4 — Transfer / Handoff & WIP Traceability:** predecessor/successor handoff, WIP movement and operation-to-operation traceability.
+- **G5.5 — Rework & Alternative Execution Path:** explicit repair/rework loops and governed deviation from nominal routing without rewriting G2/G3 history.
+- **G5.6 — APS Feedback & Completion Classification:** actual-vs-planned timing, delay classification and feedback to replanning without mutating published G4 schedules.
+- **G5.7 — Shop-floor Frontend & Rapid Tracking:** operator-first start/finish/quantity interaction plus leader/manager execution projection.
+- **G5.8 — Gate Hardening:** migration integrity, execution invariants, RBAC/audit, regressions, frontend, security and runtime evidence.
+
+## G5 exit criteria
+
+G5 becomes eligible for VALIDATED only when:
+- actual execution identities are stable and auditable;
+- planned vs actual ownership is unambiguous;
+- exact G2/G3/G4 provenance is preserved;
+- start/finish and quantity capture are explicit and validated;
+- predecessor/successor execution traceability is enforced;
+- rework/alternative execution does not rewrite canonical routing history;
+- operator workflows are permission-protected and auditable;
+- no G6/G8/G9 authoritative facts are fabricated;
+- G0–G4 regressions, G5 tests, schema drift, dependency/security audits, frontend and runtime validation are green;
+- explicit release approval is received before merge/release.
+
+## Current status
+
+**G5 IN PROGRESS**
+
+The next slice is:
+
+**G5.1 — Execution Domain & Dispatch Foundation**
