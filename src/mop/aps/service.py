@@ -1051,6 +1051,8 @@ class APSService:
                 .where(ScheduledOperationSegment.scheduled_operation_id == operation.id)
                 .order_by(ScheduledOperationSegment.segment_no, ScheduledOperationSegment.id)
             ).all()
+            if not segment_map[operation.id]:
+                raise APSRuleError("scheduled operation has no productive segments to publish")
 
         fingerprint = self._schedule_fingerprint(operations, segment_map)
         current = self.session.scalar(
