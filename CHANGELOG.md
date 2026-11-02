@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G4.1 APS scheduling scenario/run foundation with explicit planning horizon, lifecycle, RBAC, audit, API and migration baseline.
 - G4 APS gate bootstrap with explicit planning ownership, finite-capacity/Gantt/what-if slice roadmap and released G3 baseline.
 - G3.8 gate hardening with executable cross-slice ownership/RBAC/audit/idempotency invariants; G3 was validated and formally released.
 - G3.7 operational Plan/Taquilla/Product/Routing projection with demand frontend, blocker visibility, assimilation review queue and normalized import workflow.
