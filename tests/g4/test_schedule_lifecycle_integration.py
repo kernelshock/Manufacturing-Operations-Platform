@@ -246,6 +246,18 @@ def test_publish_replan_supersede_preserves_immutable_history() -> None:
         start2 = datetime(2026, 11, 2, 12, 0, tzinfo=timezone.utc)
         add_scheduled_run(replan, start2)
 
+        comparison = aps.compare_replan_to_published(replan.id)
+        assert comparison["source_publication_id"] == publication1.id
+        assert comparison["source_run_id"] == run1.id
+        assert comparison["candidate_run_id"] == replan.id
+        assert comparison["baseline_operation_count"] == 1
+        assert comparison["candidate_operation_count"] == 1
+        assert comparison["added_operation_count"] == 0
+        assert comparison["removed_operation_count"] == 0
+        assert comparison["timing_changed_count"] == 1
+        assert comparison["resource_changed_count"] == 0
+        assert comparison["makespan_delta_seconds"] == Decimal("0")
+
         publication2, superseded2, replay2 = aps.publish_schedule(replan.id, "Approved replan", None)
         assert publication2.version_no == 2
         assert publication2.status == "CURRENT"
