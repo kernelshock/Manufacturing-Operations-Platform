@@ -88,3 +88,20 @@ Implemented in G3.5:
 - Alembic migration `0017_g3_5`.
 
 Historical-completion timestamps are administrative recording timestamps, not inferred manufacturing start/finish timestamps. G3.5 does not create production actuals, scrap, operation execution or shop-floor evidence.
+
+
+Implemented in G3.6:
+- immutable Taquilla-assimilation staging batch/document/line/issue evidence;
+- deterministic source-payload fingerprint and idempotent replay;
+- one- or two-document Taquilla import;
+- unified double-deck document support;
+- explicit SINGLE / UPPER / LOWER validation without document-order inference;
+- exact G2 active FINISHED_PRODUCT resolution;
+- duplicate Taquilla code, Plan sequence, source-document reuse and competing assimilation detection;
+- REVIEW_REQUIRED quarantine when blockers exist;
+- transactional apply only after full validation;
+- source-to-target provenance for generated Taquilla and product-line UUIDs;
+- demand RBAC and append-only import audit;
+- Alembic migration `0018_g3_6`.
+
+G3.6 does not parse arbitrary PDFs inside the domain service. Parsers/adapters must submit the explicit normalized import contract. Ambiguous source content is rejected or quarantined rather than inferred.
