@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from mop.api.v1.audit import router as audit_router
 from mop.api.v1.aps import router as aps_router
+from mop.api.v1.aps_expansion import router as aps_expansion_router
 from mop.api.v1.demand import router as demand_router
 from mop.api.v1.auth import router as auth_router
 from mop.api.v1.iam import router as iam_router
@@ -17,6 +18,7 @@ router.include_router(auth_router)
 router.include_router(iam_router)
 router.include_router(audit_router)
 router.include_router(aps_router)
+router.include_router(aps_expansion_router)
 router.include_router(demand_router)
 router.include_router(meta_router)
 router.include_router(master_data_router)
