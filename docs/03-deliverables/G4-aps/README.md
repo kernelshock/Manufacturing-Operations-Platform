@@ -64,7 +64,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 
 ## Planned slices
 
-- **G4.1 — Scheduling Domain & Scenario Foundation:** planning identities, scenario lifecycle, horizon, RBAC, audit and API baseline.
+- **G4.1 — Scheduling Domain & Scenario Foundation — COMPLETED:** planning identities, scenario lifecycle, horizon, RBAC, audit and API baseline.
 - **G4.2 — Demand / Routing Operation Expansion:** convert G3 demand into immutable planning-operation snapshots with full provenance.
 - **G4.3 — Calendar & Capacity Projection:** derive schedulable resource availability from G1 resources and G2 calendars, including breaks and off-shift intervals.
 - **G4.4 — Finite-Capacity Sequencing Engine:** precedence, resource-capacity constraints, priorities, continuity and deterministic diagnostics.
@@ -92,6 +92,12 @@ G4 becomes eligible for VALIDATED only when:
 
 **G4 IN PROGRESS**
 
-The gate is opened from the released G3 baseline. No functional APS slice is claimed complete yet.
+G4.1 is **COMPLETED**.
 
-Next slice: **G4.1 — Scheduling Domain & Scenario Foundation**.
+- implementation head: `9deed02de420f5e365e12fdf1729ff4691c4580a`;
+- Alembic head: `0019_g4_1`;
+- G4 APS push run #1: **SUCCESS**;
+- scenario/run identity, horizon lifecycle, RBAC, audit and API foundation validated;
+- no operation expansion, finite-capacity sequencing, Gantt or MES-owned actuals introduced.
+
+Next slice: **G4.2 — Demand / Routing Operation Expansion**.
