@@ -119,7 +119,9 @@ export function AppShell({ user }: { user: CurrentUser }) {
             <StructurePanel context={context} />
           ) : null}
           {activeModule.id === "master-data" ? <MasterDataPanel /> : null}
-          {activeModule.id === "demand" ? <DemandPanel /> : null}
+          {activeModule.id === "demand" ? (
+            <DemandPanel canEdit={user.permissions.includes("demand.edit")} />
+          ) : null}
           {activeModule.id === "audit" ? <AuditPanel /> : null}
           {activeModule.id === "admin" ? (
             <AdminPanel permissions={user.permissions} />
