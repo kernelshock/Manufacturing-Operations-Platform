@@ -690,6 +690,37 @@ class DemandService:
                     )
                 )
 
+        prior_batch = self.session.scalar(
+            select(TaquillaAssimilationBatch)
+            .where(
+                TaquillaAssimilationBatch.id != batch.id,
+                TaquillaAssimilationBatch.status != "REJECTED",
+                (
+                    (TaquillaAssimilationBatch.taquilla_code == data.taquilla_code)
+                    | (
+                        (TaquillaAssimilationBatch.plan_id == plan.id)
+                        & (
+                            TaquillaAssimilationBatch.sequence_no
+                            == data.sequence_no
+                        )
+                    )
+                ),
+            )
+            .limit(1)
+        )
+        if prior_batch is not None:
+            issues.append(
+                TaquillaAssimilationIssue(
+                    batch_id=batch.id,
+                    rule_code="TAQ_DUPLICATE_ASSIMILATION_IDENTITY",
+                    severity="BLOCKER",
+                    message=(
+                        "another assimilation batch already claims this "
+                        "taquilla code or plan sequence"
+                    ),
+                )
+            )
+
         duplicate_code = self.session.scalar(
             select(Taquilla).where(
                 Taquilla.taquilla_code == data.taquilla_code
