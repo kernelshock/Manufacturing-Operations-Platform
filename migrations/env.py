@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, pool
 from mop.aps import models as aps_models  # noqa: F401
 from mop.aps import operation_models as aps_operation_models  # noqa: F401
 from mop.aps import capacity_models as aps_capacity_models  # noqa: F401
+from mop.aps import schedule_models as aps_schedule_models  # noqa: F401
 from mop.audit import models as audit_models  # noqa: F401
 from mop.config import get_settings
 from mop.core import models as core_models  # noqa: F401
