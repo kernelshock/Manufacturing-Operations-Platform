@@ -69,7 +69,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 - **G4.3 — Calendar & Capacity Projection — COMPLETED:** schedulable resource candidates and exact calendar availability intervals projected from G1/G2, including breaks and off-shift gaps.
 - **G4.4 — Finite-Capacity Sequencing Engine — COMPLETED:** deterministic precedence-aware scheduling, concrete resource assignment, finite-capacity occupancy and planned timestamps.
 - **G4.5 — Schedule Lifecycle / Replan / Publish — COMPLETED:** governed replan lineage, comparison, immutable publication snapshots and explicit supersession.
-- **G4.6 — Gantt Projection & Frontend:** master/per-plan Gantt, zoom/scale, blockers and explainable schedule state.
+- **G4.6 — Gantt Projection & Frontend — COMPLETED:** read-only master/per-plan Gantt, adjustable scale, productive-segment gaps and explainable published schedule state.
 - **G4.7 — What-if & Exception Evaluation:** isolated scenario changes, comparison metrics and explicit apply/discard workflow.
 - **G4.8 — Gate Hardening:** regression, migration, solver invariants, RBAC/audit, deterministic replay, security, frontend and runtime evidence.
 
@@ -139,4 +139,15 @@ G4.5 is **COMPLETED**.
 - PostgreSQL enforces exactly one CURRENT publication per scenario;
 - candidate replans can be compared to their published source before release.
 
-Next slice: **G4.6 — Gantt Projection & Frontend**.
+G4.6 is **COMPLETED**.
+
+- validated implementation head: `8d818af5c91b457cc265b02b5a8c8283b25209f0`;
+- Alembic head remains `0023_g4_5`;
+- G4 APS PR run #198: **SUCCESS**;
+- APS is now a real permission-driven frontend module;
+- master and per-plan Gantt views project only CURRENT published schedules;
+- Hour / Shift / Day zoom changes visual density only, never planning semantics;
+- productive segments preserve visible break/off-shift gaps inside operation envelopes;
+- material, maintenance and workforce constraints are explicitly shown as not yet evaluated.
+
+Next slice: **G4.7 — What-if & Exception Evaluation**.
