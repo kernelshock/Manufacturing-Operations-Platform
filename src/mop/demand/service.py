@@ -23,6 +23,10 @@ from mop.master_data.models import Article, ArticleRevision, RoutingRevision
 from mop.demand.schemas import (
     DemandCancellationRequest,
     HistoricalCompletionRequest,
+    OperationalPlanProjection,
+    OperationalProductProjection,
+    OperationalRoutingProjection,
+    OperationalTaquillaProjection,
     ProductionPlanCreate,
     ProductionPlanNumberUpdate,
     ProductionPlanStatusUpdate,
@@ -904,4 +908,119 @@ class DemandService:
         return self._assimilation_result(
             batch,
             idempotent_replay=False,
+        )
+
+
+    def get_operational_projection(
+        self,
+        plan_id: UUID,
+    ) -> OperationalPlanProjection:
+        plan = self.get_plan(plan_id)
+        taquillas = list(self.list_taquillas(plan_id))
+
+        taquilla_projections: list[OperationalTaquillaProjection] = []
+        total_product_lines = 0
+        total_missing_routes = 0
+        blocked_taquillas = 0
+
+        for taquilla in taquillas:
+            product_lines = list(self.list_product_lines(taquilla.id))
+            projected_products: list[OperationalProductProjection] = []
+            total_quantity = 0
+            bound_count = 0
+            missing_count = 0
+
+            for line in product_lines:
+                article = self.session.get(Article, line.article_id)
+                if article is None:
+                    raise DemandNotFoundError(
+                        "product line article not found"
+                    )
+
+                routing_revision_no: int | None = None
+                routing_status: str | None = None
+                if line.routing_revision_id is not None:
+                    routing = self.session.get(
+                        RoutingRevision,
+                        line.routing_revision_id,
+                    )
+                    if routing is None:
+                        raise DemandNotFoundError(
+                            "bound routing revision not found"
+                        )
+                    routing_revision_no = routing.revision_no
+                    routing_status = routing.status
+                    bound_count += 1
+                else:
+                    missing_count += 1
+
+                total_quantity += line.requested_quantity
+                projected_products.append(
+                    OperationalProductProjection(
+                        id=line.id,
+                        sequence_no=line.sequence_no,
+                        article_id=article.id,
+                        article_code=article.external_code,
+                        article_description=article.canonical_description,
+                        requested_quantity=line.requested_quantity,
+                        deck_position=line.deck_position,
+                        source_document_key=line.source_document_key,
+                        source_line_key=line.source_line_key,
+                        routing=OperationalRoutingProjection(
+                            routing_revision_id=line.routing_revision_id,
+                            binding_mode=line.routing_binding_mode,
+                            revision_no=routing_revision_no,
+                            status=routing_status,
+                            effective_at=line.routing_effective_at,
+                            override_reason=line.routing_override_reason,
+                        ),
+                    )
+                )
+
+            total_product_lines += len(projected_products)
+            total_missing_routes += missing_count
+
+            is_blocked = (
+                taquilla.status == "DRAFT"
+                and (
+                    len(projected_products) == 0
+                    or missing_count > 0
+                )
+            )
+            if is_blocked:
+                blocked_taquillas += 1
+
+            taquilla_projections.append(
+                OperationalTaquillaProjection(
+                    id=taquilla.id,
+                    taquilla_code=taquilla.taquilla_code,
+                    sequence_no=taquilla.sequence_no,
+                    status=taquilla.status,
+                    vehicle_topology=taquilla.vehicle_topology,
+                    historical_completion_classification=(
+                        taquilla.historical_completion_classification
+                    ),
+                    cancellation_reason=taquilla.cancellation_reason,
+                    products=projected_products,
+                    product_count=len(projected_products),
+                    total_requested_quantity=total_quantity,
+                    routing_bound_count=bound_count,
+                    routing_missing_count=missing_count,
+                )
+            )
+
+        return OperationalPlanProjection(
+            id=plan.id,
+            plan_number=plan.plan_number,
+            description=plan.description,
+            status=plan.status,
+            historical_completion_classification=(
+                plan.historical_completion_classification
+            ),
+            cancellation_reason=plan.cancellation_reason,
+            taquillas=taquilla_projections,
+            taquilla_count=len(taquilla_projections),
+            product_line_count=total_product_lines,
+            routing_missing_count=total_missing_routes,
+            blocked_taquilla_count=blocked_taquillas,
         )
