@@ -1,6 +1,6 @@
 # G4 — APS
 
-Status: **VALIDATED**  
+Status: **RELEASED**  
 Started: 2026-11-02  
 Base: released G3 main `73b42138d5af14c9f7a6830d0a70ea60eba65200`
 
@@ -90,7 +90,7 @@ G4 becomes eligible for VALIDATED only when:
 
 ## Current status
 
-**G4 VALIDATED**
+**G4 RELEASED**
 
 G4.1 is **COMPLETED**.
 
@@ -177,5 +177,8 @@ G4.8 is **COMPLETED**.
 - released-runtime regression passes;
 - aggregate G4 gate passes;
 - all recorded G4 exit criteria are satisfied;
-- G4 is **VALIDATED**, not RELEASED;
-- explicit release approval is required before PR #10 may leave draft/merge into main.
+- explicit release approval received on 2026-11-02;
+- PR #10 marked ready and merged to `main`;
+- release merge commit: `0500c3fb89c105f9e5c36cb6bae58ce54ab59ed1`;
+- final PR validation on release head `9dee38a0745f1412e99c709d2c5342937a464a03`: G4 #260, G0 #295, G1 #303, G2 #236 and G3 #248 — **SUCCESS**;
+- G4 status: **RELEASED**.
