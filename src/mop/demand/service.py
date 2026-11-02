@@ -2,13 +2,23 @@
 
 from collections.abc import Sequence
 from datetime import datetime, timezone
+import hashlib
+import json
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
+from mop.demand.models import (
+    ProductionPlan,
+    Taquilla,
+    TaquillaAssimilationBatch,
+    TaquillaAssimilationDocument,
+    TaquillaAssimilationIssue,
+    TaquillaAssimilationLine,
+    TaquillaProductLine,
+)
 from mop.master_data.models import Article, ArticleRevision, RoutingRevision
 from mop.demand.schemas import (
     DemandCancellationRequest,
@@ -18,6 +28,8 @@ from mop.demand.schemas import (
     ProductionPlanStatusUpdate,
     RoutingOverrideRequest,
     RoutingResolveRequest,
+    TaquillaAssimilationRequest,
+    TaquillaAssimilationResult,
     TaquillaCreate,
     TaquillaProductLineCreate,
     TaquillaProductLineUpdate,
@@ -532,3 +544,333 @@ class DemandService:
         self.session.delete(taquilla)
         self.session.commit()
         return taquilla
+
+
+    @staticmethod
+    def _assimilation_fingerprint(
+        data: TaquillaAssimilationRequest,
+    ) -> str:
+        canonical = json.dumps(
+            data.model_dump(mode="json"),
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def list_assimilation_batches(
+        self,
+        status: str | None = None,
+    ) -> Sequence[TaquillaAssimilationBatch]:
+        query = select(TaquillaAssimilationBatch)
+        if status is not None:
+            query = query.where(TaquillaAssimilationBatch.status == status)
+        return self.session.scalars(
+            query.order_by(
+                TaquillaAssimilationBatch.imported_at.desc(),
+                TaquillaAssimilationBatch.id,
+            )
+        ).all()
+
+    def list_assimilation_issues(
+        self,
+        batch_id: UUID,
+    ) -> Sequence[TaquillaAssimilationIssue]:
+        if self.session.get(TaquillaAssimilationBatch, batch_id) is None:
+            raise DemandNotFoundError("assimilation batch not found")
+        return self.session.scalars(
+            select(TaquillaAssimilationIssue)
+            .where(TaquillaAssimilationIssue.batch_id == batch_id)
+            .order_by(
+                TaquillaAssimilationIssue.created_at,
+                TaquillaAssimilationIssue.id,
+            )
+        ).all()
+
+    def _assimilation_result(
+        self,
+        batch: TaquillaAssimilationBatch,
+        *,
+        idempotent_replay: bool,
+    ) -> TaquillaAssimilationResult:
+        issues = list(self.list_assimilation_issues(batch.id))
+        return TaquillaAssimilationResult(
+            batch=batch,
+            issues=issues,
+            target_taquilla_id=batch.target_taquilla_id,
+            idempotent_replay=idempotent_replay,
+        )
+
+    def import_taquilla(
+        self,
+        data: TaquillaAssimilationRequest,
+        *,
+        imported_by: UUID,
+    ) -> TaquillaAssimilationResult:
+        fingerprint = self._assimilation_fingerprint(data)
+        source_system = data.source_system.strip().upper()
+
+        existing = self.session.scalar(
+            select(TaquillaAssimilationBatch).where(
+                TaquillaAssimilationBatch.source_system == source_system,
+                TaquillaAssimilationBatch.payload_fingerprint == fingerprint,
+                TaquillaAssimilationBatch.parser_version
+                == data.parser_version,
+            )
+        )
+        if existing is not None:
+            return self._assimilation_result(
+                existing,
+                idempotent_replay=True,
+            )
+
+        plan = self.get_plan(data.plan_id)
+        if plan.status in {"COMPLETED", "CANCELLED"}:
+            raise DemandRuleError(
+                "cannot assimilate a taquilla into a terminal production plan"
+            )
+
+        batch = TaquillaAssimilationBatch(
+            plan_id=plan.id,
+            source_system=source_system,
+            parser_version=data.parser_version,
+            mapping_version=data.mapping_version,
+            payload_fingerprint=fingerprint,
+            taquilla_code=data.taquilla_code,
+            sequence_no=data.sequence_no,
+            vehicle_topology=data.vehicle_topology,
+            status="RECEIVED",
+            accepted_lines=0,
+            rejected_lines=0,
+            imported_by=imported_by,
+        )
+        self.session.add(batch)
+        self.session.flush()
+
+        document_by_key: dict[str, TaquillaAssimilationDocument] = {}
+        issues: list[TaquillaAssimilationIssue] = []
+
+        for source_document in data.documents:
+            document = TaquillaAssimilationDocument(
+                batch_id=batch.id,
+                source_document_key=source_document.source_document_key,
+                source_filename=source_document.filename,
+                source_sha256=source_document.sha256,
+                exported_at=source_document.exported_at,
+            )
+            self.session.add(document)
+            self.session.flush()
+            document_by_key[source_document.source_document_key] = document
+
+            prior_document = self.session.scalar(
+                select(TaquillaAssimilationDocument)
+                .join(
+                    TaquillaAssimilationBatch,
+                    TaquillaAssimilationDocument.batch_id
+                    == TaquillaAssimilationBatch.id,
+                )
+                .where(
+                    TaquillaAssimilationDocument.source_sha256
+                    == source_document.sha256,
+                    TaquillaAssimilationBatch.source_system == source_system,
+                    TaquillaAssimilationBatch.id != batch.id,
+                )
+                .limit(1)
+            )
+            if prior_document is not None:
+                issues.append(
+                    TaquillaAssimilationIssue(
+                        batch_id=batch.id,
+                        rule_code="TAQ_SOURCE_DOCUMENT_REUSED",
+                        severity="BLOCKER",
+                        message=(
+                            "source document already belongs to another "
+                            "assimilation batch"
+                        ),
+                        source_document_key=source_document.source_document_key,
+                    )
+                )
+
+        duplicate_code = self.session.scalar(
+            select(Taquilla).where(
+                Taquilla.taquilla_code == data.taquilla_code
+            )
+        )
+        if duplicate_code is not None:
+            issues.append(
+                TaquillaAssimilationIssue(
+                    batch_id=batch.id,
+                    rule_code="TAQ_DUPLICATE_CODE",
+                    severity="BLOCKER",
+                    message="taquilla code already exists",
+                )
+            )
+
+        duplicate_sequence = self.session.scalar(
+            select(Taquilla).where(
+                Taquilla.plan_id == plan.id,
+                Taquilla.sequence_no == data.sequence_no,
+            )
+        )
+        if duplicate_sequence is not None:
+            issues.append(
+                TaquillaAssimilationIssue(
+                    batch_id=batch.id,
+                    rule_code="TAQ_DUPLICATE_PLAN_SEQUENCE",
+                    severity="BLOCKER",
+                    message="taquilla sequence already exists in production plan",
+                )
+            )
+
+        staged_lines: list[TaquillaAssimilationLine] = []
+        accepted_lines = 0
+        rejected_lines = 0
+
+        for source_line in data.lines:
+            article_system = (
+                source_line.article_source_system or source_system
+            ).strip().upper()
+            article = self.session.scalar(
+                select(Article).where(
+                    Article.external_system == article_system,
+                    Article.external_code == source_line.article_code,
+                )
+            )
+
+            line_issue: TaquillaAssimilationIssue | None = None
+            if article is None:
+                line_issue = TaquillaAssimilationIssue(
+                    batch_id=batch.id,
+                    rule_code="TAQ_PRODUCT_UNMAPPED",
+                    severity="BLOCKER",
+                    message=(
+                        "source product does not resolve to an exact G2 Article"
+                    ),
+                    source_document_key=source_line.source_document_key,
+                    source_line_key=source_line.source_line_key,
+                )
+            elif article.article_kind != "FINISHED_PRODUCT" or not article.active:
+                line_issue = TaquillaAssimilationIssue(
+                    batch_id=batch.id,
+                    rule_code="TAQ_PRODUCT_NOT_ACTIVE_FINISHED",
+                    severity="BLOCKER",
+                    message=(
+                        "resolved Article must be active FINISHED_PRODUCT"
+                    ),
+                    source_document_key=source_line.source_document_key,
+                    source_line_key=source_line.source_line_key,
+                )
+
+            staged = TaquillaAssimilationLine(
+                batch_id=batch.id,
+                document_id=document_by_key[
+                    source_line.source_document_key
+                ].id,
+                source_line_key=source_line.source_line_key,
+                source_article_system=article_system,
+                source_article_code=source_line.article_code,
+                resolved_article_id=article.id if article is not None else None,
+                requested_quantity=source_line.requested_quantity,
+                deck_position=source_line.deck_position,
+            )
+            self.session.add(staged)
+            staged_lines.append(staged)
+
+            if line_issue is None:
+                accepted_lines += 1
+            else:
+                rejected_lines += 1
+                issues.append(line_issue)
+
+        batch.accepted_lines = accepted_lines
+        batch.rejected_lines = rejected_lines
+        batch.status = (
+            "REVIEW_REQUIRED"
+            if any(issue.severity == "BLOCKER" for issue in issues)
+            else "VALIDATED"
+        )
+        self.session.add_all(issues)
+        self.session.add(batch)
+        try:
+            self.session.commit()
+            self.session.refresh(batch)
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise DemandConflictError(
+                "assimilation staging conflicts with existing source evidence"
+            ) from exc
+
+        if batch.status != "VALIDATED":
+            return self._assimilation_result(
+                batch,
+                idempotent_replay=False,
+            )
+
+        try:
+            target = Taquilla(
+                plan_id=plan.id,
+                taquilla_code=data.taquilla_code,
+                sequence_no=data.sequence_no,
+                description=None,
+                vehicle_topology=data.vehicle_topology,
+                status="DRAFT",
+            )
+            self.session.add(target)
+            self.session.flush()
+
+            reloaded_lines = self.session.scalars(
+                select(TaquillaAssimilationLine)
+                .where(TaquillaAssimilationLine.batch_id == batch.id)
+                .order_by(TaquillaAssimilationLine.id)
+            ).all()
+            line_by_source_key = {
+                line.source_line_key: line for line in reloaded_lines
+            }
+
+            for sequence_no, source_line in enumerate(data.lines, start=1):
+                staged = line_by_source_key[source_line.source_line_key]
+                product_line = TaquillaProductLine(
+                    taquilla_id=target.id,
+                    article_id=staged.resolved_article_id,
+                    sequence_no=sequence_no,
+                    requested_quantity=staged.requested_quantity,
+                    source_line_key=staged.source_line_key,
+                    deck_position=staged.deck_position,
+                    source_document_key=source_line.source_document_key,
+                )
+                self.session.add(product_line)
+                self.session.flush()
+                staged.target_product_line_id = product_line.id
+                self.session.add(staged)
+
+            batch.target_taquilla_id = target.id
+            batch.status = "APPLIED"
+            self.session.add(batch)
+            self.session.commit()
+            self.session.refresh(batch)
+        except IntegrityError:
+            self.session.rollback()
+            batch = self.session.get(TaquillaAssimilationBatch, batch.id)
+            if batch is None:
+                raise DemandConflictError(
+                    "assimilation batch disappeared during apply"
+                )
+            batch.status = "REVIEW_REQUIRED"
+            self.session.add(
+                TaquillaAssimilationIssue(
+                    batch_id=batch.id,
+                    rule_code="TAQ_APPLY_CONFLICT",
+                    severity="BLOCKER",
+                    message=(
+                        "validated source could not be applied because target "
+                        "demand now conflicts with another record"
+                    ),
+                )
+            )
+            self.session.add(batch)
+            self.session.commit()
+            self.session.refresh(batch)
+
+        return self._assimilation_result(
+            batch,
+            idempotent_replay=False,
+        )
