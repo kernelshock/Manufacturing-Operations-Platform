@@ -15,7 +15,9 @@ from mop.aps.models import SchedulingRun, SchedulingScenario
 from mop.aps.operation_models import PlanningOperation
 from mop.aps.capacity_models import CapacityCandidate, ResourceAvailabilityInterval
 from mop.aps.schedule_models import ScheduledOperation, ScheduledOperationSegment
+from mop.aps.lifecycle_models import SchedulePublication, PublishedScheduledOperation, PublishedScheduledOperationSegment
 from mop.aps.schemas import SchedulingRunCreate, SchedulingScenarioCreate, SchedulingScenarioHorizonUpdate, SchedulingScenarioStatusUpdate
+from mop.aps.lifecycle_schemas import ReplanCreate
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
 from mop.core.models import Area, Resource, WorkCenter
 from mop.master_data.models import CalendarException, CalendarWeeklyWindow, ManufacturingCalendar, ResourceAssignment, RoutingOperation, RoutingRevision
@@ -144,6 +146,11 @@ class APSService:
             raise APSNotFoundError("scheduling run not found")
         if run.status == "CANCELLED":
             return run
+        published = self.session.scalar(
+            select(SchedulePublication.id).where(SchedulePublication.run_id == run.id).limit(1)
+        )
+        if published is not None:
+            raise APSRuleError("published scheduling run cannot be cancelled")
         run.status = "CANCELLED"
         return self._commit(run)
 
@@ -925,3 +932,220 @@ class APSService:
             .where(ScheduledOperationSegment.scheduled_operation_id == scheduled_operation_id)
             .order_by(ScheduledOperationSegment.segment_no)
         ).all()
+
+
+    def create_replan(self, source_run_id: UUID, data: ReplanCreate, actor_id: UUID | None) -> SchedulingRun:
+        source = self.session.get(SchedulingRun, source_run_id)
+        if source is None:
+            raise APSNotFoundError("source scheduling run not found")
+        if source.status != "SCHEDULED":
+            raise APSRuleError("replan requires a SCHEDULED source run")
+        reason = data.reason.strip()
+        if not reason:
+            raise APSRuleError("replan reason is required")
+
+        current_publication = self.session.scalar(
+            select(SchedulePublication).where(
+                SchedulePublication.scenario_id == source.scenario_id,
+                SchedulePublication.status == "CURRENT",
+            )
+        )
+        if current_publication is None or current_publication.run_id != source.id:
+            raise APSRuleError("replan must start from the currently published schedule")
+
+        run_number = (
+            self.session.scalar(
+                select(func.max(SchedulingRun.run_number)).where(
+                    SchedulingRun.scenario_id == source.scenario_id
+                )
+            )
+            or 0
+        ) + 1
+
+        replanned = SchedulingRun(
+            scenario_id=source.scenario_id,
+            run_number=run_number,
+            algorithm_key=(data.algorithm_key or source.algorithm_key).strip(),
+            algorithm_version=(data.algorithm_version or source.algorithm_version).strip(),
+            status="CREATED",
+            replan_from_run_id=source.id,
+            replan_reason=reason,
+            created_by=actor_id,
+        )
+        return self._commit(replanned)
+
+    def _schedule_fingerprint(
+        self,
+        operations: Sequence[ScheduledOperation],
+        segments: dict[UUID, Sequence[ScheduledOperationSegment]],
+    ) -> str:
+        parts: list[str] = []
+        for operation in sorted(operations, key=lambda item: (item.sequence_no, str(item.id))):
+            parts.append(
+                "|".join(
+                    [
+                        str(operation.id),
+                        str(operation.planning_operation_id),
+                        str(operation.resource_id),
+                        str(operation.sequence_no),
+                        operation.planned_start.isoformat(),
+                        operation.planned_finish.isoformat(),
+                        str(operation.processing_seconds),
+                        str(operation.requested_quantity),
+                        str(operation.nominal_rate),
+                        operation.normalized_rate_uom,
+                        operation.algorithm_key,
+                        operation.algorithm_version,
+                    ]
+                )
+            )
+            for segment in sorted(
+                segments.get(operation.id, []),
+                key=lambda item: (item.segment_no, str(item.id)),
+            ):
+                parts.append(
+                    "|".join(
+                        [
+                            str(segment.id),
+                            str(segment.resource_id),
+                            str(segment.segment_no),
+                            segment.start_at.isoformat(),
+                            segment.end_at.isoformat(),
+                            str(segment.effective_rate_per_hour),
+                            str(segment.produced_quantity),
+                        ]
+                    )
+                )
+        return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+    def publish_schedule(
+        self,
+        run_id: UUID,
+        publish_reason: str | None,
+        actor_id: UUID | None,
+    ) -> tuple[SchedulePublication, UUID | None, bool]:
+        run = self.session.get(SchedulingRun, run_id)
+        if run is None:
+            raise APSNotFoundError("scheduling run not found")
+        if run.status != "SCHEDULED":
+            raise APSRuleError("only SCHEDULED runs can be published")
+
+        existing = self.session.scalar(
+            select(SchedulePublication).where(SchedulePublication.run_id == run.id)
+        )
+        if existing is not None:
+            return existing, existing.supersedes_publication_id, True
+
+        operations = self.session.scalars(
+            select(ScheduledOperation)
+            .where(ScheduledOperation.run_id == run.id)
+            .order_by(ScheduledOperation.sequence_no, ScheduledOperation.id)
+        ).all()
+        if not operations:
+            raise APSRuleError("scheduled run has no operations to publish")
+
+        segment_map: dict[UUID, Sequence[ScheduledOperationSegment]] = {}
+        for operation in operations:
+            segment_map[operation.id] = self.session.scalars(
+                select(ScheduledOperationSegment)
+                .where(ScheduledOperationSegment.scheduled_operation_id == operation.id)
+                .order_by(ScheduledOperationSegment.segment_no, ScheduledOperationSegment.id)
+            ).all()
+
+        fingerprint = self._schedule_fingerprint(operations, segment_map)
+        current = self.session.scalar(
+            select(SchedulePublication).where(
+                SchedulePublication.scenario_id == run.scenario_id,
+                SchedulePublication.status == "CURRENT",
+            )
+        )
+
+        if current is not None:
+            if run.replan_from_run_id is None:
+                raise APSRuleError("publishing over an existing schedule requires a controlled replan")
+            if current.run_id != run.replan_from_run_id:
+                raise APSRuleError("replan source is not the currently published schedule")
+        elif run.replan_from_run_id is not None:
+            raise APSRuleError("replan source publication is missing")
+
+        version_no = (
+            self.session.scalar(
+                select(func.max(SchedulePublication.version_no)).where(
+                    SchedulePublication.scenario_id == run.scenario_id
+                )
+            )
+            or 0
+        ) + 1
+
+        publication = SchedulePublication(
+            scenario_id=run.scenario_id,
+            run_id=run.id,
+            version_no=version_no,
+            status="CURRENT",
+            supersedes_publication_id=current.id if current else None,
+            publish_reason=publish_reason.strip() if publish_reason and publish_reason.strip() else None,
+            schedule_fingerprint=fingerprint,
+            published_by=actor_id,
+        )
+
+        try:
+            self.session.add(publication)
+            self.session.flush()
+
+            for operation in operations:
+                published_operation = PublishedScheduledOperation(
+                    publication_id=publication.id,
+                    source_scheduled_operation_id=operation.id,
+                    planning_operation_id=operation.planning_operation_id,
+                    resource_id=operation.resource_id,
+                    sequence_no=operation.sequence_no,
+                    planned_start=operation.planned_start,
+                    planned_finish=operation.planned_finish,
+                    processing_seconds=operation.processing_seconds,
+                    requested_quantity=operation.requested_quantity,
+                    nominal_rate=operation.nominal_rate,
+                    normalized_rate_uom=operation.normalized_rate_uom,
+                    algorithm_key=operation.algorithm_key,
+                    algorithm_version=operation.algorithm_version,
+                )
+                self.session.add(published_operation)
+                self.session.flush()
+                for segment in segment_map.get(operation.id, []):
+                    self.session.add(
+                        PublishedScheduledOperationSegment(
+                            published_operation_id=published_operation.id,
+                            source_segment_id=segment.id,
+                            resource_id=segment.resource_id,
+                            segment_no=segment.segment_no,
+                            start_at=segment.start_at,
+                            end_at=segment.end_at,
+                            effective_rate_per_hour=segment.effective_rate_per_hour,
+                            produced_quantity=segment.produced_quantity,
+                        )
+                    )
+
+            if current is not None:
+                current.status = "SUPERSEDED"
+                self.session.add(current)
+
+            self.session.commit()
+            self.session.refresh(publication)
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise APSConflictError("schedule publication conflicts with existing lifecycle state") from exc
+
+        return publication, current.id if current else None, False
+
+    def list_publications(self, scenario_id: UUID) -> Sequence[SchedulePublication]:
+        self.get_scenario(scenario_id)
+        return self.session.scalars(
+            select(SchedulePublication)
+            .where(SchedulePublication.scenario_id == scenario_id)
+            .order_by(SchedulePublication.version_no)
+        ).all()
+
+    def get_publication(self, publication_id: UUID) -> SchedulePublication:
+        publication = self.session.get(SchedulePublication, publication_id)
+        if publication is None:
+            raise APSNotFoundError("schedule publication not found")
+        return publication
