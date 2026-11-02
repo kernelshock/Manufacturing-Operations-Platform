@@ -1,6 +1,6 @@
 # G3 — Demand / Plan / Taquilla / Routing
 
-Status: **VALIDATED — awaiting explicit release approval**  
+Status: **RELEASED**  
 Started: 2026-10-29  
 Base: released G2 main `115b8dfe11a94d1d2587f5c6937b0383f0f05e65`
 
@@ -78,7 +78,7 @@ G3 is eligible for VALIDATED only when:
 
 ## Current status
 
-**G3 VALIDATED — awaiting explicit release approval**
+**G3 RELEASED**
 
 ### G3.8 — Gate Hardening
 - hardening implementation head: `627fc2341c5bcd050ab43e0cbf0b58f7e2762b7f`;
@@ -93,9 +93,13 @@ G3 is eligible for VALIDATED only when:
 - secret scan, supply-chain pin checks and Python dependency audit pass;
 - released-runtime regression passes;
 - aggregate G3 gate passes;
-- G3 meets all recorded exit criteria and is now **VALIDATED**;
-- PR #9 remains DRAFT;
-- no merge or RELEASED status is authorized until explicit release approval is received.
+- G3 met all recorded exit criteria and was **VALIDATED** before release;
+- explicit release approval received on 2026-11-02;
+- PR #9 marked ready and merged to `main`;
+- final validated branch head: `00f50cf499d04c209b292a8700c4bfae21991b35`;
+- release merge commit: `8bae480b40474a4ac14fa892dec12ea02c51bb08`;
+- final PR validation: G3 #111, G0 #153, G1 #166 and G2 #99 — **SUCCESS**;
+- G3 status: **RELEASED**.
 
 
 ### G3.7 — Operational Projection & Frontend
