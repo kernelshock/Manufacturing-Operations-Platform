@@ -19,6 +19,7 @@ from mop.aps.lifecycle_models import SchedulePublication, PublishedScheduledOper
 from mop.aps.schemas import SchedulingRunCreate, SchedulingScenarioCreate, SchedulingScenarioHorizonUpdate, SchedulingScenarioStatusUpdate
 from mop.aps.lifecycle_schemas import ReplanCreate
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
+from mop.master_data.models import Article
 from mop.core.models import Area, Resource, WorkCenter
 from mop.master_data.models import CalendarException, CalendarWeeklyWindow, ManufacturingCalendar, ResourceAssignment, RoutingOperation, RoutingRevision
 from mop.master_data.service import MasterDataNotFoundError, MasterDataRuleError, MasterDataService
@@ -1246,4 +1247,180 @@ class APSService:
             "candidate_start": candidate_start,
             "candidate_finish": candidate_finish,
             "makespan_delta_seconds": candidate_makespan - baseline_makespan,
+        }
+
+
+    def gantt_projection(self, plan_id: UUID | None = None) -> dict:
+        publication_query = (
+            select(SchedulePublication)
+            .join(SchedulingScenario, SchedulingScenario.id == SchedulePublication.scenario_id)
+            .where(SchedulePublication.status == "CURRENT")
+        )
+        if plan_id is not None:
+            self._get_plan(plan_id)
+            publication_query = publication_query.where(SchedulingScenario.plan_id == plan_id)
+
+        publications = self.session.scalars(
+            publication_query.order_by(SchedulePublication.published_at, SchedulePublication.id)
+        ).all()
+
+        publication_rows = []
+        operation_rows = []
+        taquilla_ids: set[UUID] = set()
+        resource_ids: set[UUID] = set()
+
+        for publication in publications:
+            scenario = self.get_scenario(publication.scenario_id)
+            plan = self._get_plan(scenario.plan_id)
+            published_ops = self.session.scalars(
+                select(PublishedScheduledOperation)
+                .where(PublishedScheduledOperation.publication_id == publication.id)
+                .order_by(PublishedScheduledOperation.sequence_no)
+            ).all()
+
+            publication_rows.append(
+                {
+                    "publication_id": publication.id,
+                    "scenario_id": scenario.id,
+                    "run_id": publication.run_id,
+                    "plan_id": plan.id,
+                    "plan_number": plan.plan_number,
+                    "version_no": publication.version_no,
+                    "status": publication.status,
+                    "published_at": publication.published_at,
+                    "schedule_fingerprint": publication.schedule_fingerprint,
+                    "operation_count": len(published_ops),
+                }
+            )
+
+            for published in published_ops:
+                planning = self.session.get(PlanningOperation, published.planning_operation_id)
+                if planning is None:
+                    raise APSNotFoundError("published planning operation provenance not found")
+                taquilla = self.session.get(Taquilla, planning.taquilla_id)
+                if taquilla is None:
+                    raise APSNotFoundError("published taquilla provenance not found")
+                product_line = self.session.get(TaquillaProductLine, planning.product_line_id)
+                if product_line is None:
+                    raise APSNotFoundError("published product-line provenance not found")
+                article = self.session.get(Article, planning.article_id)
+                if article is None:
+                    raise APSNotFoundError("published article provenance not found")
+                resource = self.session.get(Resource, published.resource_id)
+                if resource is None:
+                    raise APSNotFoundError("published resource provenance not found")
+                work_center = self.session.get(WorkCenter, resource.work_center_id)
+                if work_center is None:
+                    raise APSNotFoundError("published work-center provenance not found")
+                area = self.session.get(Area, work_center.area_id)
+                if area is None:
+                    raise APSNotFoundError("published area provenance not found")
+
+                segments = self.session.scalars(
+                    select(PublishedScheduledOperationSegment)
+                    .where(
+                        PublishedScheduledOperationSegment.published_operation_id == published.id
+                    )
+                    .order_by(PublishedScheduledOperationSegment.segment_no)
+                ).all()
+                if not segments:
+                    raise APSRuleError("published operation has no productive segments")
+
+                taquilla_ids.add(taquilla.id)
+                resource_ids.add(resource.id)
+                operation_rows.append(
+                    {
+                        "publication_id": publication.id,
+                        "publication_version": publication.version_no,
+                        "publication_status": publication.status,
+                        "run_id": publication.run_id,
+                        "scenario_id": scenario.id,
+                        "plan_id": plan.id,
+                        "plan_number": plan.plan_number,
+                        "taquilla_id": taquilla.id,
+                        "taquilla_code": taquilla.taquilla_code,
+                        "taquilla_sequence_no": taquilla.sequence_no,
+                        "product_line_id": product_line.id,
+                        "product_sequence_no": product_line.sequence_no,
+                        "article_id": article.id,
+                        "article_code": article.external_code,
+                        "article_description": article.canonical_description,
+                        "deck_position": product_line.deck_position,
+                        "routing_revision_id": planning.routing_revision_id,
+                        "routing_operation_id": planning.routing_operation_id,
+                        "routing_sequence_no": planning.routing_sequence_no,
+                        "operation_code": planning.source_operation_code,
+                        "operation_description": planning.source_description,
+                        "resource_id": resource.id,
+                        "resource_code": resource.code,
+                        "resource_name": resource.name,
+                        "work_center_id": work_center.id,
+                        "work_center_code": work_center.code,
+                        "work_center_name": work_center.name,
+                        "area_id": area.id,
+                        "area_code": area.code,
+                        "area_name": area.name,
+                        "sequence_no": published.sequence_no,
+                        "planned_start": published.planned_start,
+                        "planned_finish": published.planned_finish,
+                        "processing_seconds": published.processing_seconds,
+                        "requested_quantity": published.requested_quantity,
+                        "segments": [
+                            {
+                                "segment_no": segment.segment_no,
+                                "start_at": segment.start_at,
+                                "end_at": segment.end_at,
+                                "effective_rate_per_hour": segment.effective_rate_per_hour,
+                                "produced_quantity": segment.produced_quantity,
+                            }
+                            for segment in segments
+                        ],
+                    }
+                )
+
+        operation_rows.sort(
+            key=lambda item: (
+                item["planned_start"],
+                item["plan_number"],
+                item["taquilla_sequence_no"],
+                item["product_sequence_no"],
+                item["routing_sequence_no"],
+                item["resource_code"],
+            )
+        )
+
+        if operation_rows:
+            window_start = min(item["planned_start"] for item in operation_rows)
+            window_end = max(item["planned_finish"] for item in operation_rows)
+        else:
+            window_start = None
+            window_end = None
+
+        plan_number = None
+        if plan_id is not None:
+            plan_number = self._get_plan(plan_id).plan_number
+
+        return {
+            "scope": "PLAN" if plan_id is not None else "MASTER",
+            "plan_id": plan_id,
+            "plan_number": plan_number,
+            "window_start": window_start,
+            "window_end": window_end,
+            "publications": publication_rows,
+            "operations": operation_rows,
+            "operation_count": len(operation_rows),
+            "taquilla_count": len(taquilla_ids),
+            "resource_count": len(resource_ids),
+            "constraints_evaluated": [
+                "routing_precedence",
+                "resource_finite_capacity",
+                "manufacturing_calendar",
+                "configured_breaks",
+                "off_shift_time",
+            ],
+            "constraints_not_evaluated": [
+                "materials",
+                "maintenance",
+                "workforce",
+            ],
         }
