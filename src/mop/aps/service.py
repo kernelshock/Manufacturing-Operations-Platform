@@ -944,6 +944,10 @@ class APSService:
         if not reason:
             raise APSRuleError("replan reason is required")
 
+        scenario = self.get_scenario(source.scenario_id)
+        if scenario.status != "READY":
+            raise APSRuleError("replan requires a READY scheduling scenario")
+
         current_publication = self.session.scalar(
             select(SchedulePublication).where(
                 SchedulePublication.scenario_id == source.scenario_id,
@@ -1035,6 +1039,10 @@ class APSService:
         )
         if existing is not None:
             return existing, existing.supersedes_publication_id, True
+
+        scenario = self.get_scenario(run.scenario_id)
+        if scenario.status != "READY":
+            raise APSRuleError("publishing requires a READY scheduling scenario")
 
         operations = self.session.scalars(
             select(ScheduledOperation)
@@ -1160,3 +1168,81 @@ class APSService:
             .where(PublishedScheduledOperation.publication_id == publication_id)
             .order_by(PublishedScheduledOperation.sequence_no)
         ).all()
+
+
+    def compare_replan_to_published(self, run_id: UUID) -> dict:
+        run = self.session.get(SchedulingRun, run_id)
+        if run is None:
+            raise APSNotFoundError("candidate scheduling run not found")
+        if run.status != "SCHEDULED":
+            raise APSRuleError("schedule comparison requires a SCHEDULED candidate run")
+        if run.replan_from_run_id is None:
+            raise APSRuleError("schedule comparison requires a controlled replan")
+
+        source_publication = self.session.scalar(
+            select(SchedulePublication).where(
+                SchedulePublication.run_id == run.replan_from_run_id
+            )
+        )
+        if source_publication is None:
+            raise APSRuleError("source run has no published schedule")
+
+        baseline_rows = self.session.scalars(
+            select(PublishedScheduledOperation)
+            .where(PublishedScheduledOperation.publication_id == source_publication.id)
+            .order_by(PublishedScheduledOperation.sequence_no)
+        ).all()
+        candidate_rows = self.session.scalars(
+            select(ScheduledOperation)
+            .where(ScheduledOperation.run_id == run.id)
+            .order_by(ScheduledOperation.sequence_no)
+        ).all()
+        if not baseline_rows or not candidate_rows:
+            raise APSRuleError("schedule comparison requires non-empty baseline and candidate schedules")
+
+        def provenance_key(planning_operation_id: UUID) -> tuple[UUID, UUID]:
+            planning = self.session.get(PlanningOperation, planning_operation_id)
+            if planning is None:
+                raise APSNotFoundError("planning operation provenance not found")
+            return planning.product_line_id, planning.routing_operation_id
+
+        baseline = {provenance_key(item.planning_operation_id): item for item in baseline_rows}
+        candidate = {provenance_key(item.planning_operation_id): item for item in candidate_rows}
+        baseline_keys = set(baseline)
+        candidate_keys = set(candidate)
+        common = baseline_keys & candidate_keys
+
+        timing_changed = 0
+        resource_changed = 0
+        for key in common:
+            before = baseline[key]
+            after = candidate[key]
+            if before.planned_start != after.planned_start or before.planned_finish != after.planned_finish:
+                timing_changed += 1
+            if before.resource_id != after.resource_id:
+                resource_changed += 1
+
+        baseline_start = min(item.planned_start for item in baseline_rows)
+        baseline_finish = max(item.planned_finish for item in baseline_rows)
+        candidate_start = min(item.planned_start for item in candidate_rows)
+        candidate_finish = max(item.planned_finish for item in candidate_rows)
+
+        baseline_makespan = Decimal(str((baseline_finish - baseline_start).total_seconds()))
+        candidate_makespan = Decimal(str((candidate_finish - candidate_start).total_seconds()))
+
+        return {
+            "source_publication_id": source_publication.id,
+            "source_run_id": run.replan_from_run_id,
+            "candidate_run_id": run.id,
+            "baseline_operation_count": len(baseline_rows),
+            "candidate_operation_count": len(candidate_rows),
+            "added_operation_count": len(candidate_keys - baseline_keys),
+            "removed_operation_count": len(baseline_keys - candidate_keys),
+            "timing_changed_count": timing_changed,
+            "resource_changed_count": resource_changed,
+            "baseline_start": baseline_start,
+            "baseline_finish": baseline_finish,
+            "candidate_start": candidate_start,
+            "candidate_finish": candidate_finish,
+            "makespan_delta_seconds": candidate_makespan - baseline_makespan,
+        }
