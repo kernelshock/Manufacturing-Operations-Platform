@@ -38,6 +38,7 @@ class SchedulingRun(Base):
     __table_args__ = (
         UniqueConstraint("scenario_id", "run_number", name="uq_aps_run_scenario_number"),
         CheckConstraint("run_number > 0", name="ck_aps_run_number_positive"),
+        CheckConstraint("(replan_from_run_id IS NULL AND replan_reason IS NULL) OR (replan_from_run_id IS NOT NULL AND replan_reason IS NOT NULL)", name="ck_aps_run_replan_provenance"),
         CheckConstraint("status IN ('CREATED', 'EXPANDED', 'CAPACITY_PROJECTED', 'SCHEDULED', 'CANCELLED')", name="ck_aps_run_status"),
     )
 
