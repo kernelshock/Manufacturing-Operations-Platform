@@ -363,3 +363,55 @@ class TaquillaAssimilationResult(BaseModel):
     issues: list[TaquillaAssimilationIssueRead]
     target_taquilla_id: UUID | None
     idempotent_replay: bool
+
+
+
+class OperationalRoutingProjection(BaseModel):
+    routing_revision_id: UUID | None
+    binding_mode: RoutingBindingMode | None
+    revision_no: int | None
+    status: str | None
+    effective_at: datetime | None
+    override_reason: str | None
+
+
+class OperationalProductProjection(BaseModel):
+    id: UUID
+    sequence_no: int
+    article_id: UUID
+    article_code: str
+    article_description: str
+    requested_quantity: Decimal
+    deck_position: DeckPosition
+    source_document_key: str | None
+    source_line_key: str | None
+    routing: OperationalRoutingProjection
+
+
+class OperationalTaquillaProjection(BaseModel):
+    id: UUID
+    taquilla_code: str
+    sequence_no: int
+    status: TaquillaStatus
+    vehicle_topology: VehicleTopology
+    historical_completion_classification: HistoricalCompletionClassification | None
+    cancellation_reason: str | None
+    products: list[OperationalProductProjection]
+    product_count: int
+    total_requested_quantity: Decimal
+    routing_bound_count: int
+    routing_missing_count: int
+
+
+class OperationalPlanProjection(BaseModel):
+    id: UUID
+    plan_number: str
+    description: str | None
+    status: PlanStatus
+    historical_completion_classification: HistoricalCompletionClassification | None
+    cancellation_reason: str | None
+    taquillas: list[OperationalTaquillaProjection]
+    taquilla_count: int
+    product_line_count: int
+    routing_missing_count: int
+    blocked_taquilla_count: int
