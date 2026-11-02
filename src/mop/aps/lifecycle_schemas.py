@@ -1,6 +1,7 @@
 """Schemas for G4.5 schedule lifecycle, replan and publication."""
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,3 +42,21 @@ class PublishResult(BaseModel):
     publication: SchedulePublicationRead
     superseded_publication_id: UUID | None
     idempotent_replay: bool
+
+
+class PublishedScheduledOperationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    publication_id: UUID
+    source_scheduled_operation_id: UUID
+    planning_operation_id: UUID
+    resource_id: UUID
+    sequence_no: int
+    planned_start: datetime
+    planned_finish: datetime
+    processing_seconds: Decimal
+    requested_quantity: Decimal
+    nominal_rate: Decimal
+    normalized_rate_uom: str
+    algorithm_key: str
+    algorithm_version: str
