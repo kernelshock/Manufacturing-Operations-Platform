@@ -261,3 +261,63 @@ export type GanttProjection = {
   constraints_evaluated: string[];
   constraints_not_evaluated: string[];
 };
+
+
+export type WhatIfScenario = {
+  id: string;
+  scenario_code: string;
+  name: string;
+  description: string | null;
+  baseline_publication_id: string;
+  baseline_run_id: string;
+  candidate_run_id: string | null;
+  status: "DRAFT" | "EVALUATED" | "APPLIED" | "DISCARDED";
+  created_by: string | null;
+  created_at: string;
+  evaluated_at: string | null;
+  applied_publication_id: string | null;
+  applied_at: string | null;
+  discarded_at: string | null;
+};
+
+export type WhatIfException = {
+  id: string;
+  whatif_scenario_id: string;
+  exception_type: "RESOURCE_BLACKOUT" | "RESOURCE_CAPACITY_FACTOR";
+  resource_id: string;
+  start_at: string;
+  end_at: string;
+  capacity_factor: string | null;
+  reason: string;
+  created_at: string;
+};
+
+export type WhatIfComparison = {
+  whatif_scenario_id: string;
+  baseline_publication_id: string;
+  baseline_run_id: string;
+  candidate_run_id: string;
+  baseline_operation_count: number;
+  candidate_operation_count: number;
+  added_operation_count: number;
+  removed_operation_count: number;
+  timing_changed_count: number;
+  resource_changed_count: number;
+  baseline_start: string;
+  baseline_finish: string;
+  candidate_start: string;
+  candidate_finish: string;
+  makespan_delta_seconds: string;
+  exception_count: number;
+};
+
+export type WhatIfEvaluationResult = {
+  scenario: WhatIfScenario;
+  comparison: WhatIfComparison;
+};
+
+export type WhatIfApplyResult = {
+  scenario: WhatIfScenario;
+  publication_id: string;
+  superseded_publication_id: string | null;
+};
