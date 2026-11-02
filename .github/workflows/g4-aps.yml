@@ -94,6 +94,8 @@ jobs:
         run: python -m pytest tests/g3 -q
       - name: Run G4 tests
         run: python -m pytest tests/g4 -q
+      - name: Verify G4 gate hardening invariants
+        run: python -m pytest tests/g4/test_gate_hardening.py -q
 
   frontend-regression:
     runs-on: ubuntu-latest
@@ -167,5 +169,6 @@ jobs:
       - runtime-regression
     steps:
       - run: |
-          echo "G4 APS validation passed."
-          echo "Current completed scope is limited to implemented G4 slices."
+          echo "G4 APS technical validation passed."
+          echo "G4.1 through G4.8 are technically validated."
+          echo "Technical validation does not authorize merge or release; explicit release approval is still required."
