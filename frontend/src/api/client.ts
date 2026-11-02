@@ -11,6 +11,7 @@ import type {
   ServiceMeta,
   Supplier,
   TaquillaAssimilationBatch,
+  TaquillaAssimilationResult,
   UnitOfMeasure
 } from "./types";
 
@@ -97,5 +98,13 @@ export const api = {
   assimilationBatches: () =>
     apiFetch<TaquillaAssimilationBatch[]>(
       "/api/v1/demand/assimilation/batches"
+    ),
+  importTaquilla: (payload: unknown) =>
+    apiFetch<TaquillaAssimilationResult>(
+      "/api/v1/demand/assimilation/taquillas/import",
+      {
+        method: "POST",
+        body: JSON.stringify(payload)
+      }
     )
 };
