@@ -38,7 +38,7 @@ class SchedulingRun(Base):
     __table_args__ = (
         UniqueConstraint("scenario_id", "run_number", name="uq_aps_run_scenario_number"),
         CheckConstraint("run_number > 0", name="ck_aps_run_number_positive"),
-        CheckConstraint("status IN ('CREATED', 'EXPANDED', 'CAPACITY_PROJECTED', 'CANCELLED')", name="ck_aps_run_status"),
+        CheckConstraint("status IN ('CREATED', 'EXPANDED', 'CAPACITY_PROJECTED', 'SCHEDULED', 'CANCELLED')", name="ck_aps_run_status"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
