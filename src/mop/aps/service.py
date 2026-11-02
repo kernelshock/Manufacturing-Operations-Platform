@@ -1099,6 +1099,11 @@ class APSService:
         )
 
         try:
+            if current is not None:
+                current.status = "SUPERSEDED"
+                self.session.add(current)
+                self.session.flush()
+
             self.session.add(publication)
             self.session.flush()
 
@@ -1133,10 +1138,6 @@ class APSService:
                             produced_quantity=segment.produced_quantity,
                         )
                     )
-
-            if current is not None:
-                current.status = "SUPERSEDED"
-                self.session.add(current)
 
             self.session.commit()
             self.session.refresh(publication)
