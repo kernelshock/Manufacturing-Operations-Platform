@@ -32,3 +32,10 @@ def translate(operation):
 @router.get("/runs/{run_id}/operations", response_model=list[PlanningOperationRead])
 def list_operations(run_id: UUID, app: APSService = Depends(service), _: User = Depends(require_global_permission("aps.read"))):
     return translate(lambda: app.list_planning_operations(run_id))
+
+
+@router.post("/runs/{run_id}/materialize", response_model=ExpansionResult)
+def materialize_run(run_id: UUID, app: APSService = Depends(service), _: User = Depends(require_global_permission("aps.edit"))):
+    result = translate(lambda: app.expand_run(run_id))
+    run, operations, lines, routings, replay = result
+    return ExpansionResult(run=run, operation_count=operations, product_line_count=lines, routing_revision_count=routings, idempotent_replay=replay)
