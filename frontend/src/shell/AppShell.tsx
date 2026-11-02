@@ -122,7 +122,7 @@ export function AppShell({ user }: { user: CurrentUser }) {
           {activeModule.id === "demand" ? (
             <DemandPanel canEdit={user.permissions.includes("demand.edit")} />
           ) : null}
-          {activeModule.id === "aps" ? <GanttPanel /> : null}
+          {activeModule.id === "aps" ? <GanttPanel canEdit={user.permissions.includes("aps.edit")} /> : null}
           {activeModule.id === "audit" ? <AuditPanel /> : null}
           {activeModule.id === "admin" ? (
             <AdminPanel permissions={user.permissions} />
