@@ -34,8 +34,7 @@ def test_g3_exit_criteria_and_slice_completion_are_recorded() -> None:
 
 
 def test_g3_domain_has_no_aps_or_mes_owned_state() -> None:
-    domain = "
-".join(
+    domain = "\n".join(
         _read(path)
         for path in (
             "src/mop/demand/models.py",
