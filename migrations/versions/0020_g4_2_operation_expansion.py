@@ -54,6 +54,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["article_id"], ["md_article.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["routing_revision_id"], ["md_routing_revision.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["routing_operation_id"], ["md_routing_operation.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["area_id"], ["core_area.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["work_center_id"], ["core_work_center.id"], ondelete="RESTRICT"),
     )
 
 
