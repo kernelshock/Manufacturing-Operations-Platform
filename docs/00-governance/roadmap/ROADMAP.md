@@ -15,7 +15,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | RELEASED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | RELEASED |
-| G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
+| G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | IN PROGRESS |
 | G6 | Materials | ABM/BOM, theoretical demand, actual consumption, inventory and reconciliation | PLANNED |
 | G7 | Kanban + Purchasing | PP/PR, replenishment signals, supplier lead time, purchasing and receipts | PLANNED |
 | G8 | Maintenance | Assets, work orders, downtime and production-capacity impact | PLANNED |
@@ -216,3 +216,13 @@ Resolved/deferred for G0:
 - release documentation PR #11 merged as `17d852d6922889858ec2e078cf9bcdb63615aba0`;
 - Alembic head remains `0024_g4_7`;
 - G4 status: **RELEASED**.
+
+
+## G5 start record — 2026-11-02
+- branch: `feat/G5-mes`;
+- base: released G4/main commit `19725298c4e04a8d1e7d1b69a05f58bef3e2d2ed`;
+- G5 consumes released G4 planning evidence but never rewrites planned timestamps or published schedules;
+- G5 owns actual execution start/finish, quantities, scrap, interruption/deviation and WIP handoff evidence;
+- materials, maintenance and workforce authority remain deferred to G6/G8/G9;
+- G5.1 starts with execution-domain identity and dispatch foundation;
+- G5 status: **IN PROGRESS**.
