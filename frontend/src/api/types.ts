@@ -166,3 +166,22 @@ export type TaquillaAssimilationBatch = {
   imported_by: string | null;
   imported_at: string;
 };
+
+
+export type TaquillaAssimilationIssue = {
+  id: string;
+  batch_id: string;
+  rule_code: string;
+  severity: "WARNING" | "ERROR" | "BLOCKER";
+  message: string;
+  source_document_key: string | null;
+  source_line_key: string | null;
+  created_at: string;
+};
+
+export type TaquillaAssimilationResult = {
+  batch: TaquillaAssimilationBatch;
+  issues: TaquillaAssimilationIssue[];
+  target_taquilla_id: string | null;
+  idempotent_replay: boolean;
+};
