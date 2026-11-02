@@ -66,7 +66,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 
 - **G4.1 — Scheduling Domain & Scenario Foundation — COMPLETED:** planning identities, scenario lifecycle, horizon, RBAC, audit and API baseline.
 - **G4.2 — Demand / Routing Operation Expansion — COMPLETED:** exact G3 demand and G2 routing bindings materialized into immutable planning-operation snapshots with full provenance.
-- **G4.3 — Calendar & Capacity Projection:** derive schedulable resource availability from G1 resources and G2 calendars, including breaks and off-shift intervals.
+- **G4.3 — Calendar & Capacity Projection — COMPLETED:** schedulable resource candidates and exact calendar availability intervals projected from G1/G2, including breaks and off-shift gaps.
 - **G4.4 — Finite-Capacity Sequencing Engine:** precedence, resource-capacity constraints, priorities, continuity and deterministic diagnostics.
 - **G4.5 — Schedule Lifecycle / Replan / Publish:** draft solve, compare, publish, supersede and controlled replanning.
 - **G4.6 — Gantt Projection & Frontend:** master/per-plan Gantt, zoom/scale, blockers and explainable schedule state.
@@ -109,4 +109,13 @@ G4.2 is **COMPLETED**.
 - deterministic input fingerprint and idempotent replay implemented;
 - no planned timestamps, finite-capacity sequencing or MES actuals introduced.
 
-Next slice: **G4.3 — Calendar & Capacity Projection**.
+G4.3 is **COMPLETED**.
+
+- validated implementation head: `cf24d30aa5f1f20fc90bf9b01425e88b7b377cd8`;
+- Alembic head: `0021_g4_3`;
+- G4 APS PR run #82: **SUCCESS**;
+- explicit assignment and work-center-pool resource semantics preserved;
+- calendar hierarchy/effectivity, weekly windows, exceptions and lunch/off-shift gaps projected exactly;
+- no planned operation timestamps or finite-capacity sequencing introduced.
+
+Next slice: **G4.4 — Finite-Capacity Sequencing Engine**.
