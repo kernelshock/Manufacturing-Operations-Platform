@@ -67,7 +67,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 - **G4.1 — Scheduling Domain & Scenario Foundation — COMPLETED:** planning identities, scenario lifecycle, horizon, RBAC, audit and API baseline.
 - **G4.2 — Demand / Routing Operation Expansion — COMPLETED:** exact G3 demand and G2 routing bindings materialized into immutable planning-operation snapshots with full provenance.
 - **G4.3 — Calendar & Capacity Projection — COMPLETED:** schedulable resource candidates and exact calendar availability intervals projected from G1/G2, including breaks and off-shift gaps.
-- **G4.4 — Finite-Capacity Sequencing Engine:** precedence, resource-capacity constraints, priorities, continuity and deterministic diagnostics.
+- **G4.4 — Finite-Capacity Sequencing Engine — COMPLETED:** deterministic precedence-aware scheduling, concrete resource assignment, finite-capacity occupancy and planned timestamps.
 - **G4.5 — Schedule Lifecycle / Replan / Publish:** draft solve, compare, publish, supersede and controlled replanning.
 - **G4.6 — Gantt Projection & Frontend:** master/per-plan Gantt, zoom/scale, blockers and explainable schedule state.
 - **G4.7 — What-if & Exception Evaluation:** isolated scenario changes, comparison metrics and explicit apply/discard workflow.
@@ -118,4 +118,14 @@ G4.3 is **COMPLETED**.
 - calendar hierarchy/effectivity, weekly windows, exceptions and lunch/off-shift gaps projected exactly;
 - no planned operation timestamps or finite-capacity sequencing introduced.
 
-Next slice: **G4.4 — Finite-Capacity Sequencing Engine**.
+G4.4 is **COMPLETED**.
+
+- validated implementation head: `869e13c0b9d4aa70046aa21643ec375e46d92165`;
+- Alembic head: `0022_g4_4`;
+- G4 APS PR run #111: **SUCCESS**;
+- planned start/finish and concrete resource assignment now belong to APS;
+- operations may span multiple productive segments across breaks/off-shift gaps without consuming capacity there;
+- routing precedence, finite resource occupancy and deterministic earliest-finish selection are enforced;
+- MES-owned actuals and schedule publication remain outside G4.4.
+
+Next slice: **G4.5 — Schedule Lifecycle / Replan / Publish**.
