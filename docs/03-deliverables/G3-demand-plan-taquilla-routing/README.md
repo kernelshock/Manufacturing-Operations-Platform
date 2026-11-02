@@ -56,7 +56,7 @@ G3 introduces the canonical transactional identities for:
 - **G3.4 — Routing Binding — COMPLETED:** exact G2 RoutingRevision selection/resolution, effectivity checks and explicit override provenance.
 - **G3.5 — Lifecycle & Historical Completion — COMPLETED:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
 - **G3.6 — Taquilla Assimilation — COMPLETED:** controlled import, duplicate detection, source provenance and validation for one/two-document orders.
-- **G3.7 — Operational Projection & Frontend:** plan/taquilla views and operator workflows needed before APS handoff.
+- **G3.7 — Operational Projection & Frontend — COMPLETED:** plan/taquilla views and operator workflows needed before APS handoff.
 - **G3.8 — Gate Hardening:** migration integrity, regressions, RBAC/audit, idempotency, security, runtime and release evidence.
 
 ## G3 exit criteria
@@ -78,7 +78,26 @@ G3 is eligible for VALIDATED only when:
 
 ## Current slice
 
-**G3.7 — Operational Projection & Frontend**
+**G3.8 — Gate Hardening**
+
+### G3.7 — Operational Projection & Frontend
+- implementation head: `865e07cef52f2534f3c9c6d4567891a94f76adc6`;
+- canonical validation: `G3 Demand Plan Taquilla Routing` push run #87 — **SUCCESS**;
+- PR validation: G3 #88, G0 #144, G1 #157 and G2 #90 — **SUCCESS**;
+- no new migration was required; Alembic head remains `0018_g3_6`;
+- added backend operational projection endpoint for Plan → Taquillas → Products → Routing;
+- projection resolves Article code/description from G2 and exposes requested quantity, explicit deck, source provenance and exact route-binding state;
+- projection publishes aggregate counts for Taquillas, product lines, missing routing and DRAFT blockers;
+- introduced permission-driven frontend module `Planificación / Taquillas` for `demand.read` / `demand.edit`;
+- frontend shows Plan status, historical classification, ordered Taquillas, topology, products, deck position, routing revision/mode/status and source keys;
+- REVIEW_REQUIRED assimilation batches are surfaced as an operator intervention queue;
+- `demand.edit` users can submit the normalized G3.6 JSON import contract from the frontend;
+- browser import does not parse PDFs or infer product/floor semantics;
+- backend remains authoritative for validation and authorization;
+- APS scheduling, finite capacity, Gantt and MES actuals remain outside G3.7;
+- G0/G1/G2 regressions, G3 suite, frontend typecheck/tests/build, security/dependency and runtime gates pass;
+- next slice: **G3.8 — Gate Hardening**.
+
 
 ### G3.6 — Taquilla Assimilation
 - implementation head: `6e4f810e8de748fa0db8cd407dc7d0e8960cf427`;
