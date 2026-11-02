@@ -39,6 +39,12 @@ describe("permission-driven navigation", () => {
     expect(visibleModules([]).map((item) => item.id)).not.toContain("demand");
   });
 
+  it("exposes APS only with APS capabilities", () => {
+    expect(visibleModules(["aps.read"]).map((item) => item.id)).toContain("aps");
+    expect(visibleModules(["aps.edit"]).map((item) => item.id)).toContain("aps");
+    expect(visibleModules([]).map((item) => item.id)).not.toContain("aps");
+  });
+
   it("exposes administration with either administrative capability", () => {
     expect(
       visibleModules(["admin.users"]).map((item) => item.id)
