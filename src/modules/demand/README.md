@@ -105,3 +105,16 @@ Implemented in G3.6:
 - Alembic migration `0018_g3_6`.
 
 G3.6 does not parse arbitrary PDFs inside the domain service. Parsers/adapters must submit the explicit normalized import contract. Ambiguous source content is rejected or quarantined rather than inferred.
+
+
+Implemented in G3.7:
+- backend OperationalPlanProjection for Plan → Taquilla → Product → Routing;
+- aggregate blocker/missing-routing metrics without APS scheduling semantics;
+- permission-driven frontend Demand module;
+- Plan selector and ordered Taquilla operational cards;
+- explicit product/deck/routing/source provenance visibility;
+- REVIEW_REQUIRED assimilation intervention queue;
+- normalized Taquilla JSON import surface for demand.edit users;
+- frontend documentation updated for G3.7.
+
+G3.7 does not calculate capacity, schedule operations, render Gantt timestamps or record MES execution. The browser does not parse arbitrary source documents; it consumes/versioned APIs and submits the explicit G3.6 normalized contract.
