@@ -121,5 +121,7 @@ class SchedulingRunRead(BaseModel):
     input_fingerprint: str | None
     expanded_at: datetime | None
     operation_count: int
+    replan_from_run_id: UUID | None
+    replan_reason: str | None
     created_by: UUID | None
     created_at: datetime
