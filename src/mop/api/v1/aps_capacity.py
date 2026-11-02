@@ -2,11 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from mop.aps.capacity_schemas import CapacityCandidateRead, CapacityProjectionResult, ResourceAvailabilityIntervalRead
 from mop.aps.service import APSConflictError, APSNotFoundError, APSRuleError, APSService
+from mop.audit.context import request_audit_context
+from mop.audit.service import AuditService
 from mop.iam.dependencies import require_global_permission
 from mop.iam.models import User
 from mop.persistence.dependencies import get_session
@@ -32,11 +34,27 @@ def translate(operation):
 @router.post("/runs/{run_id}/project-capacity", response_model=CapacityProjectionResult)
 def project_capacity(
     run_id: UUID,
+    request: Request,
     app: APSService = Depends(service),
-    _: User = Depends(require_global_permission("aps.edit")),
+    actor: User = Depends(require_global_permission("aps.edit")),
+    session: Session = Depends(get_session),
 ):
     run, candidate_count, interval_count, replay = translate(
         lambda: app.project_capacity(run_id)
+    )
+    AuditService(session).record(
+        action="aps.run.capacity.project",
+        object_type="scheduling_run",
+        object_id=str(run.id),
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details={
+            "candidate_count": candidate_count,
+            "interval_count": interval_count,
+            "idempotent_replay": replay,
+        },
+        **request_audit_context(request),
     )
     return CapacityProjectionResult(
         run=run,
