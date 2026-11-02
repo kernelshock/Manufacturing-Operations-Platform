@@ -920,3 +920,90 @@ th {
     grid-template-columns: 240px minmax(0, 1fr);
   }
 }
+
+
+.whatif-create-grid,
+.whatif-exception-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.whatif-create-grid input,
+.whatif-create-grid select,
+.whatif-exception-form input,
+.whatif-exception-form select,
+.whatif-workspace > div > select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0.72rem 0.78rem;
+  background: white;
+  color: var(--ink);
+}
+
+.whatif-workspace {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.whatif-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.7rem;
+}
+
+.whatif-summary small {
+  color: var(--muted);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.whatif-comparison {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.whatif-comparison article {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.whatif-comparison span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.whatif-comparison strong {
+  font-size: 1.1rem;
+}
+
+@media (max-width: 1050px) {
+  .whatif-create-grid,
+  .whatif-exception-form,
+  .whatif-comparison {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .whatif-create-grid,
+  .whatif-exception-form,
+  .whatif-comparison {
+    grid-template-columns: 1fr;
+  }
+}
