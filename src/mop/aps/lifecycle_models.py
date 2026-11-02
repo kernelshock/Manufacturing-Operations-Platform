@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from mop.persistence.base import Base
@@ -17,6 +17,7 @@ class SchedulePublication(Base):
         UniqueConstraint("run_id", name="uq_aps_publication_run"),
         CheckConstraint("version_no > 0", name="ck_aps_publication_version_positive"),
         CheckConstraint("status IN ('CURRENT', 'SUPERSEDED')", name="ck_aps_publication_status"),
+        Index("uq_aps_publication_current_scenario", "scenario_id", unique=True, postgresql_where=text("status = 'CURRENT'")),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
