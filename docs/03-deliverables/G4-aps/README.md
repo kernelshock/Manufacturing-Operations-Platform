@@ -70,7 +70,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 - **G4.4 — Finite-Capacity Sequencing Engine — COMPLETED:** deterministic precedence-aware scheduling, concrete resource assignment, finite-capacity occupancy and planned timestamps.
 - **G4.5 — Schedule Lifecycle / Replan / Publish — COMPLETED:** governed replan lineage, comparison, immutable publication snapshots and explicit supersession.
 - **G4.6 — Gantt Projection & Frontend — COMPLETED:** read-only master/per-plan Gantt, adjustable scale, productive-segment gaps and explainable published schedule state.
-- **G4.7 — What-if & Exception Evaluation:** isolated scenario changes, comparison metrics and explicit apply/discard workflow.
+- **G4.7 — What-if & Exception Evaluation — COMPLETED:** isolated capacity hypotheses, baseline/candidate comparison and explicit apply/discard workflow.
 - **G4.8 — Gate Hardening:** regression, migration, solver invariants, RBAC/audit, deterministic replay, security, frontend and runtime evidence.
 
 ## G4 exit criteria
@@ -150,4 +150,16 @@ G4.6 is **COMPLETED**.
 - productive segments preserve visible break/off-shift gaps inside operation envelopes;
 - material, maintenance and workforce constraints are explicitly shown as not yet evaluated.
 
-Next slice: **G4.7 — What-if & Exception Evaluation**.
+G4.7 is **COMPLETED**.
+
+- validated implementation head: `c4fcf5047c8060ea6c68c72b75865589bc96fe80`;
+- Alembic head: `0024_g4_7`;
+- G4 APS push run #236: **SUCCESS**;
+- what-if evaluation clones APS baseline snapshots rather than mutating or re-reading live G2/G3 inputs;
+- RESOURCE_BLACKOUT and RESOURCE_CAPACITY_FACTOR hypotheses are isolated planning assumptions;
+- Evaluate preserves the CURRENT publication;
+- Apply explicitly publishes/supersedes through G4.5 governance;
+- Discard leaves the published schedule untouched;
+- frontend supports create, exception definition, evaluate, compare, apply and discard.
+
+Next slice: **G4.8 — Gate Hardening**.
