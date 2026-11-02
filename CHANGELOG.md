@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G3.8 gate hardening with executable cross-slice ownership/RBAC/audit/idempotency invariants; G3 is VALIDATED pending explicit release approval.
 - G3.7 operational Plan/Taquilla/Product/Routing projection with demand frontend, blocker visibility, assimilation review queue and normalized import workflow.
 - G3.6 governed Taquilla assimilation with idempotent staging, one/two-document provenance, explicit deck validation, exact G2 product resolution, duplicate quarantine and transactional apply.
 - G3.5 governed lifecycle and historical completion with ON_TIME/DELAYED administrative classification, reasoned cancellation and safe DRAFT correction without fabricated MES actuals.
