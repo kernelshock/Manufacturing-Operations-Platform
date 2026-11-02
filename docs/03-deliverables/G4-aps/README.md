@@ -1,6 +1,6 @@
 # G4 — APS
 
-Status: **IN PROGRESS**  
+Status: **VALIDATED**  
 Started: 2026-11-02  
 Base: released G3 main `73b42138d5af14c9f7a6830d0a70ea60eba65200`
 
@@ -71,7 +71,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 - **G4.5 — Schedule Lifecycle / Replan / Publish — COMPLETED:** governed replan lineage, comparison, immutable publication snapshots and explicit supersession.
 - **G4.6 — Gantt Projection & Frontend — COMPLETED:** read-only master/per-plan Gantt, adjustable scale, productive-segment gaps and explainable published schedule state.
 - **G4.7 — What-if & Exception Evaluation — COMPLETED:** isolated capacity hypotheses, baseline/candidate comparison and explicit apply/discard workflow.
-- **G4.8 — Gate Hardening:** regression, migration, solver invariants, RBAC/audit, deterministic replay, security, frontend and runtime evidence.
+- **G4.8 — Gate Hardening — COMPLETED:** regression, migration, solver invariants, RBAC/audit, deterministic replay, security, frontend and runtime evidence.
 
 ## G4 exit criteria
 
@@ -90,7 +90,7 @@ G4 becomes eligible for VALIDATED only when:
 
 ## Current status
 
-**G4 IN PROGRESS**
+**G4 VALIDATED**
 
 G4.1 is **COMPLETED**.
 
@@ -162,4 +162,20 @@ G4.7 is **COMPLETED**.
 - Discard leaves the published schedule untouched;
 - frontend supports create, exception definition, evaluate, compare, apply and discard.
 
-Next slice: **G4.8 — Gate Hardening**.
+G4.8 is **COMPLETED**.
+
+- hardening implementation head: `13605bfe4d14d51af106eeb27b5a8717556e5d6f`;
+- canonical validation: `G4 APS` PR run #252 — **SUCCESS**;
+- Alembic head remains `0024_g4_7`;
+- added explicit final gate-hardening invariants for ownership boundaries, RBAC, mutation audit, determinism, replay, publication/what-if governance and frontend authority;
+- hardening review detected and corrected the missing G4.2 materialization audit event;
+- single Alembic head, clean upgrade, schema sync, full downgrade/replay pass;
+- G0/G1/G2/G3 regressions and complete G4 suite pass;
+- dedicated G4 hardening invariant suite passes;
+- frontend audit/typecheck/tests/build pass;
+- secret scan, supply-chain pin checks and Python dependency audit pass;
+- released-runtime regression passes;
+- aggregate G4 gate passes;
+- all recorded G4 exit criteria are satisfied;
+- G4 is **VALIDATED**, not RELEASED;
+- explicit release approval is required before PR #10 may leave draft/merge into main.
