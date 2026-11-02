@@ -10,6 +10,7 @@ from mop.audit.service import AuditService
 from mop.demand.schemas import (
     DemandCancellationRequest,
     HistoricalCompletionRequest,
+    OperationalPlanProjection,
     TaquillaAssimilationBatchRead,
     TaquillaAssimilationIssueRead,
     TaquillaAssimilationRequest,
@@ -601,4 +602,19 @@ def list_assimilation_issues(
 ):
     return _translate(
         lambda: app.list_assimilation_issues(batch_id)
+    )
+
+
+
+@router.get(
+    "/plans/{plan_id}/projection",
+    response_model=OperationalPlanProjection,
+)
+def get_operational_projection(
+    plan_id: UUID,
+    app: DemandService = Depends(service),
+    _: User = Depends(require_global_permission("demand.read")),
+):
+    return _translate(
+        lambda: app.get_operational_projection(plan_id)
     )
