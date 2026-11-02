@@ -118,5 +118,8 @@ class SchedulingRunRead(BaseModel):
     algorithm_key: str
     algorithm_version: str
     status: RunStatus
+    input_fingerprint: str | None
+    expanded_at: datetime | None
+    operation_count: int
     created_by: UUID | None
     created_at: datetime
