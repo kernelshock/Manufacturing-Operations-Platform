@@ -2,12 +2,16 @@ import type {
   AuditEntry,
   CurrentUser,
   LoginPayload,
+  OperationalPlanProjection,
   Organization,
   Plant,
+  ProductionPlan,
   ProductConfiguration,
   ReadyStatus,
   ServiceMeta,
   Supplier,
+  TaquillaAssimilationBatch,
+  TaquillaAssimilationResult,
   UnitOfMeasure
 } from "./types";
 
@@ -84,5 +88,23 @@ export const api = {
       "/api/v1/master-data/product-configurations?active=true"
     ),
   suppliers: () =>
-    apiFetch<Supplier[]>("/api/v1/master-data/suppliers?active=true")
+    apiFetch<Supplier[]>("/api/v1/master-data/suppliers?active=true"),
+  productionPlans: () =>
+    apiFetch<ProductionPlan[]>("/api/v1/demand/plans"),
+  operationalProjection: (planId: string) =>
+    apiFetch<OperationalPlanProjection>(
+      `/api/v1/demand/plans/${encodeURIComponent(planId)}/projection`
+    ),
+  assimilationBatches: () =>
+    apiFetch<TaquillaAssimilationBatch[]>(
+      "/api/v1/demand/assimilation/batches"
+    ),
+  importTaquilla: (payload: unknown) =>
+    apiFetch<TaquillaAssimilationResult>(
+      "/api/v1/demand/assimilation/taquillas/import",
+      {
+        method: "POST",
+        body: JSON.stringify(payload)
+      }
+    )
 };

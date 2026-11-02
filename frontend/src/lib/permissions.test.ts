@@ -29,6 +29,16 @@ describe("permission-driven navigation", () => {
     ).toContain("master-data");
   });
 
+  it("exposes Demand only with demand capabilities", () => {
+    expect(
+      visibleModules(["demand.read"]).map((item) => item.id)
+    ).toContain("demand");
+    expect(
+      visibleModules(["demand.edit"]).map((item) => item.id)
+    ).toContain("demand");
+    expect(visibleModules([]).map((item) => item.id)).not.toContain("demand");
+  });
+
   it("exposes administration with either administrative capability", () => {
     expect(
       visibleModules(["admin.users"]).map((item) => item.id)

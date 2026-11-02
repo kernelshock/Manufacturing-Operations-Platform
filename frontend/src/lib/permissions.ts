@@ -2,6 +2,7 @@ export type ModuleId =
   | "home"
   | "structure"
   | "master-data"
+  | "demand"
   | "audit"
   | "admin";
 
@@ -35,6 +36,12 @@ export const navigationModules: NavigationModule[] = [
     label: "Datos maestros",
     description: "Artículos y configuraciones",
     requiredAny: ["masterdata.read", "masterdata.edit"]
+  },
+  {
+    id: "demand",
+    label: "Planificación / Taquillas",
+    description: "Planes, Taquillas, productos y routing",
+    requiredAny: ["demand.read", "demand.edit"]
   },
   {
     id: "audit",
