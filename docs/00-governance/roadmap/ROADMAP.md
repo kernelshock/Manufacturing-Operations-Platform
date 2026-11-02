@@ -14,7 +14,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | RELEASED |
-| G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
+| G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | IN PROGRESS |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
 | G6 | Materials | ABM/BOM, theoretical demand, actual consumption, inventory and reconciliation | PLANNED |
 | G7 | Kanban + Purchasing | PP/PR, replenishment signals, supplier lead time, purchasing and receipts | PLANNED |
@@ -186,3 +186,13 @@ Resolved/deferred for G0:
 - release merge commit: `8bae480b40474a4ac14fa892dec12ea02c51bb08`;
 - Alembic head: `0018_g3_6`;
 - G3 status: **RELEASED**.
+
+
+## G4 start record — 2026-11-02
+- branch: `feat/G4-aps`;
+- base: released G3/main commit `73b42138d5af14c9f7a6830d0a70ea60eba65200`;
+- G4 consumes released G1 resource identities, G2 routing/calendars and G3 demand/routing bindings;
+- G4 owns planned operation timing, finite-capacity sequencing, schedule publication, Gantt and what-if scenarios;
+- MES actuals remain deferred to G5; materials, purchasing, maintenance and workforce authoritative constraints remain owned by G6/G7/G8/G9;
+- G4.1 starts with scheduling-domain identity, scenario lifecycle, horizon, RBAC, audit and API foundation;
+- G4 status: **IN PROGRESS**.
