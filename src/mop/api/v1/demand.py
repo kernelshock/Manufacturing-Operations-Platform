@@ -10,6 +10,10 @@ from mop.audit.service import AuditService
 from mop.demand.schemas import (
     DemandCancellationRequest,
     HistoricalCompletionRequest,
+    TaquillaAssimilationBatchRead,
+    TaquillaAssimilationIssueRead,
+    TaquillaAssimilationRequest,
+    TaquillaAssimilationResult,
     ProductionPlanCreate,
     ProductionPlanNumberUpdate,
     ProductionPlanRead,
@@ -529,4 +533,72 @@ def delete_draft_taquilla(
         object_type="taquilla",
         object_id=deleted.id,
         details=details,
+    )
+
+
+
+@router.post(
+    "/assimilation/taquillas/import",
+    response_model=TaquillaAssimilationResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def import_taquilla(
+    payload: TaquillaAssimilationRequest,
+    request: Request,
+    app: DemandService = Depends(service),
+    actor: User = Depends(require_global_permission("demand.edit")),
+    session: Session = Depends(get_session),
+):
+    result = _translate(
+        lambda: app.import_taquilla(
+            payload,
+            imported_by=actor.id,
+        )
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="demand.taquilla.assimilation.import",
+        object_type="taquilla_assimilation_batch",
+        object_id=result.batch.id,
+        details={
+            "status": result.batch.status,
+            "target_taquilla_id": (
+                str(result.target_taquilla_id)
+                if result.target_taquilla_id
+                else None
+            ),
+            "accepted_lines": result.batch.accepted_lines,
+            "rejected_lines": result.batch.rejected_lines,
+            "issue_count": len(result.issues),
+            "idempotent_replay": result.idempotent_replay,
+        },
+    )
+    return result
+
+
+@router.get(
+    "/assimilation/batches",
+    response_model=list[TaquillaAssimilationBatchRead],
+)
+def list_assimilation_batches(
+    status_filter: str | None = None,
+    app: DemandService = Depends(service),
+    _: User = Depends(require_global_permission("demand.read")),
+):
+    return app.list_assimilation_batches(status_filter)
+
+
+@router.get(
+    "/assimilation/batches/{batch_id}/issues",
+    response_model=list[TaquillaAssimilationIssueRead],
+)
+def list_assimilation_issues(
+    batch_id: UUID,
+    app: DemandService = Depends(service),
+    _: User = Depends(require_global_permission("demand.read")),
+):
+    return _translate(
+        lambda: app.list_assimilation_issues(batch_id)
     )
