@@ -60,3 +60,20 @@ class PublishedScheduledOperationRead(BaseModel):
     normalized_rate_uom: str
     algorithm_key: str
     algorithm_version: str
+
+
+class ScheduleComparisonRead(BaseModel):
+    source_publication_id: UUID
+    source_run_id: UUID
+    candidate_run_id: UUID
+    baseline_operation_count: int
+    candidate_operation_count: int
+    added_operation_count: int
+    removed_operation_count: int
+    timing_changed_count: int
+    resource_changed_count: int
+    baseline_start: datetime
+    baseline_finish: datetime
+    candidate_start: datetime
+    candidate_finish: datetime
+    makespan_delta_seconds: Decimal
