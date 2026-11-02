@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G4 APS gate bootstrap with explicit planning ownership, finite-capacity/Gantt/what-if slice roadmap and released G3 baseline.
 - G3.8 gate hardening with executable cross-slice ownership/RBAC/audit/idempotency invariants; G3 was validated and formally released.
 - G3.7 operational Plan/Taquilla/Product/Routing projection with demand frontend, blocker visibility, assimilation review queue and normalized import workflow.
 - G3.6 governed Taquilla assimilation with idempotent staging, one/two-document provenance, explicit deck validation, exact G2 product resolution, duplicate quarantine and transactional apply.
