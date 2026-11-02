@@ -27,3 +27,8 @@ def translate(operation):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except APSRuleError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@router.get("/runs/{run_id}/operations", response_model=list[PlanningOperationRead])
+def list_operations(run_id: UUID, app: APSService = Depends(service), _: User = Depends(require_global_permission("aps.read"))):
+    return translate(lambda: app.list_planning_operations(run_id))
