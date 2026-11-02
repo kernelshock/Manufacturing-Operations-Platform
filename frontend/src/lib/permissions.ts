@@ -3,6 +3,7 @@ export type ModuleId =
   | "structure"
   | "master-data"
   | "demand"
+  | "aps"
   | "audit"
   | "admin";
 
@@ -42,6 +43,12 @@ export const navigationModules: NavigationModule[] = [
     label: "Planificación / Taquillas",
     description: "Planes, Taquillas, productos y routing",
     requiredAny: ["demand.read", "demand.edit"]
+  },
+  {
+    id: "aps",
+    label: "APS / Gantt",
+    description: "Capacidad finita y schedule publicado",
+    requiredAny: ["aps.read", "aps.edit"]
   },
   {
     id: "audit",

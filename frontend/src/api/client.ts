@@ -1,6 +1,7 @@
 import type {
   AuditEntry,
   CurrentUser,
+  GanttProjection,
   LoginPayload,
   OperationalPlanProjection,
   Organization,
@@ -12,6 +13,11 @@ import type {
   Supplier,
   TaquillaAssimilationBatch,
   TaquillaAssimilationResult,
+  WhatIfApplyResult,
+  WhatIfComparison,
+  WhatIfEvaluationResult,
+  WhatIfException,
+  WhatIfScenario,
   UnitOfMeasure
 } from "./types";
 
@@ -106,5 +112,60 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload)
       }
+    ),
+  ganttProjection: (planId?: string) =>
+    apiFetch<GanttProjection>(
+      planId
+        ? `/api/v1/aps/gantt?plan_id=${encodeURIComponent(planId)}`
+        : "/api/v1/aps/gantt"
+    ),
+  whatIfScenarios: () =>
+    apiFetch<WhatIfScenario[]>("/api/v1/aps/what-if"),
+  createWhatIf: (payload: {
+    scenario_code: string;
+    name: string;
+    description?: string;
+    baseline_publication_id: string;
+  }) =>
+    apiFetch<WhatIfScenario>("/api/v1/aps/what-if", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  addWhatIfException: (
+    whatIfId: string,
+    payload: {
+      exception_type: "RESOURCE_BLACKOUT" | "RESOURCE_CAPACITY_FACTOR";
+      resource_id: string;
+      start_at: string;
+      end_at: string;
+      capacity_factor?: string;
+      reason: string;
+    }
+  ) =>
+    apiFetch<WhatIfException>(
+      `/api/v1/aps/what-if/${encodeURIComponent(whatIfId)}/exceptions`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload)
+      }
+    ),
+  evaluateWhatIf: (whatIfId: string) =>
+    apiFetch<WhatIfEvaluationResult>(
+      `/api/v1/aps/what-if/${encodeURIComponent(whatIfId)}/evaluate`,
+      { method: "POST" }
+    ),
+  compareWhatIf: (whatIfId: string) =>
+    apiFetch<WhatIfComparison>(
+      `/api/v1/aps/what-if/${encodeURIComponent(whatIfId)}/compare`
+    ),
+  applyWhatIf: (whatIfId: string) =>
+    apiFetch<WhatIfApplyResult>(
+      `/api/v1/aps/what-if/${encodeURIComponent(whatIfId)}/apply`,
+      { method: "POST" }
+    ),
+  discardWhatIf: (whatIfId: string) =>
+    apiFetch<WhatIfScenario>(
+      `/api/v1/aps/what-if/${encodeURIComponent(whatIfId)}/discard`,
+      { method: "POST" }
     )
 };

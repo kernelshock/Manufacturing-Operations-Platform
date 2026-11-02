@@ -5,6 +5,15 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G4.8 final APS gate hardening with explicit ownership/RBAC/audit/determinism invariants; G4 technically VALIDATED pending release approval.
+- G4.7 isolated what-if evaluation with resource blackout/capacity-factor exceptions, comparison metrics and explicit apply/discard workflow.
+- G4.6 read-only published-schedule Gantt projection with master/per-plan frontend, adjustable scale and productive-segment gap rendering.
+- G4.5 governed schedule lifecycle with controlled replan, comparison, immutable publication snapshots and atomic supersession.
+- G4.4 deterministic finite-capacity sequencing with planned timestamps, concrete resource assignment and break-aware productive segments.
+- G4.3 calendar/capacity projection with resource candidate snapshots and exact availability intervals.
+- G4.2 APS operation snapshot expansion.
+- G4.1 APS scheduling scenario/run foundation with explicit planning horizon, lifecycle, RBAC, audit, API and migration baseline.
+- G4 APS gate bootstrap with explicit planning ownership, finite-capacity/Gantt/what-if slice roadmap and released G3 baseline.
 - G3.8 gate hardening with executable cross-slice ownership/RBAC/audit/idempotency invariants; G3 was validated and formally released.
 - G3.7 operational Plan/Taquilla/Product/Routing projection with demand frontend, blocker visibility, assimilation review queue and normalized import workflow.
 - G3.6 governed Taquilla assimilation with idempotent staging, one/two-document provenance, explicit deck validation, exact G2 product resolution, duplicate quarantine and transactional apply.
