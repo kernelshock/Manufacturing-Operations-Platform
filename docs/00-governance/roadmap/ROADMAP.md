@@ -13,7 +13,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
-| G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | VALIDATED |
+| G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | RELEASED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
 | G6 | Materials | ABM/BOM, theoretical demand, actual consumption, inventory and reconciliation | PLANNED |
@@ -176,6 +176,13 @@ Resolved/deferred for G0:
 - `G3 Demand Plan Taquilla Routing` push run #100: **SUCCESS**;
 - security baseline, dependency audits, migration integrity, G0/G1/G2 regressions, full G3 tests, frontend validation and released-runtime regression: **PASS**;
 - explicit hardening invariants verify G3 ownership boundaries, RBAC/audit expectations, assimilation idempotency/explicit source semantics and absence of APS/MES-owned state;
-- G3 status: **VALIDATED — awaiting explicit release approval**;
-- PR #9 remains **DRAFT**;
-- no merge/release is authorized by validation alone.
+- G3 status at validation: **VALIDATED — awaiting explicit release approval**;
+
+## G3 release record — 2026-11-02
+- explicit release approval received: **"liberar formalmente G3 en GitHub y abrir G4 — APS"**;
+- final validated branch head: `00f50cf499d04c209b292a8700c4bfae21991b35`;
+- final PR validation: G3 #111, G0 #153, G1 #166 and G2 #99 — **SUCCESS**;
+- PR #9 marked ready and merged into `main`;
+- release merge commit: `8bae480b40474a4ac14fa892dec12ea02c51bb08`;
+- Alembic head: `0018_g3_6`;
+- G3 status: **RELEASED**.
