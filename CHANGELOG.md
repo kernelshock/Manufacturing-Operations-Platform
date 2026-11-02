@@ -5,7 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
-- G4.8 final APS gate hardening with explicit ownership/RBAC/audit/determinism invariants; G4 technically VALIDATED pending release approval.
+- G4.8 final APS gate hardening with explicit ownership/RBAC/audit/determinism invariants; G4 formally released.
 - G4.7 isolated what-if evaluation with resource blackout/capacity-factor exceptions, comparison metrics and explicit apply/discard workflow.
 - G4.6 read-only published-schedule Gantt projection with master/per-plan frontend, adjustable scale and productive-segment gap rendering.
 - G4.5 governed schedule lifecycle with controlled replan, comparison, immutable publication snapshots and atomic supersession.
@@ -50,6 +50,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - Automated G0 repository structure check.
 
 ### Changed
+- G4 APS released on 2026-11-02 after explicit approval; PR #10 merged to `main` as `0500c3fb89c105f9e5c36cb6bae58ce54ab59ed1`.
 - G3 Demand / Plan / Taquilla / Routing released on 2026-11-02 after explicit approval; PR #9 merged to `main` as `8bae480b40474a4ac14fa892dec12ea02c51bb08`.
 - G2 Master Data released on 2026-10-29 after explicit approval; PR #8 merged to `main` as `e476edb8f1862613ff90f2a22a514d3f53a05ec5`.
 - G1 Platform Core released on 2026-10-29 after explicit approval; PR #6 merged to `main` as `3412a9b3f78303166f81e22e32a7b167ad2dc19e`.
