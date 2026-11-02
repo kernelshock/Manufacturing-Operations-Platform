@@ -1,6 +1,7 @@
 import type {
   AuditEntry,
   CurrentUser,
+  GanttProjection,
   LoginPayload,
   OperationalPlanProjection,
   Organization,
@@ -106,5 +107,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload)
       }
+    ),
+  ganttProjection: (planId?: string) =>
+    apiFetch<GanttProjection>(
+      planId
+        ? `/api/v1/aps/gantt?plan_id=${encodeURIComponent(planId)}`
+        : "/api/v1/aps/gantt"
     )
 };
