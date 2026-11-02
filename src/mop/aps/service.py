@@ -1,6 +1,8 @@
 """Application service for G4.1 APS scenario/run foundation."""
 
 from collections.abc import Sequence
+from datetime import datetime, timezone
+import hashlib
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -8,8 +10,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mop.aps.models import SchedulingRun, SchedulingScenario
+from mop.aps.operation_models import PlanningOperation
 from mop.aps.schemas import SchedulingRunCreate, SchedulingScenarioCreate, SchedulingScenarioHorizonUpdate, SchedulingScenarioStatusUpdate
-from mop.demand.models import ProductionPlan
+from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
+from mop.master_data.models import RoutingOperation, RoutingRevision
 
 
 class APSConflictError(ValueError):
@@ -136,3 +140,131 @@ class APSService:
             return run
         run.status = "CANCELLED"
         return self._commit(run)
+
+
+    def expand_run(self, run_id: UUID) -> tuple[SchedulingRun, int, int, int, bool]:
+        run = self.session.get(SchedulingRun, run_id)
+        if run is None:
+            raise APSNotFoundError("scheduling run not found")
+        if run.status == "CANCELLED":
+            raise APSRuleError("cancelled scheduling run cannot be expanded")
+        existing = self.session.scalars(
+            select(PlanningOperation).where(PlanningOperation.run_id == run.id)
+        ).all()
+        if run.status == "EXPANDED":
+            return (
+                run,
+                len(existing),
+                len({item.product_line_id for item in existing}),
+                len({item.routing_revision_id for item in existing}),
+                True,
+            )
+
+        scenario = self.get_scenario(run.scenario_id)
+        lines = self.session.scalars(
+            select(TaquillaProductLine)
+            .join(Taquilla, Taquilla.id == TaquillaProductLine.taquilla_id)
+            .where(
+                Taquilla.plan_id == scenario.plan_id,
+                Taquilla.status != "CANCELLED",
+            )
+            .order_by(Taquilla.sequence_no, TaquillaProductLine.sequence_no, TaquillaProductLine.id)
+        ).all()
+        if not lines:
+            raise APSRuleError("scheduling run cannot expand without active demand lines")
+
+        snapshots = []
+        fingerprint_parts = []
+        routing_ids = set()
+        for line in lines:
+            if line.routing_revision_id is None:
+                raise APSRuleError("every active demand line requires a routing binding before APS expansion")
+            routing = self.session.get(RoutingRevision, line.routing_revision_id)
+            if routing is None:
+                raise APSNotFoundError("bound routing revision not found")
+            if routing.status not in {"ACTIVE", "SUPERSEDED"}:
+                raise APSRuleError("bound routing revision is not eligible for APS expansion")
+            operations = self.session.scalars(
+                select(RoutingOperation)
+                .where(
+                    RoutingOperation.routing_revision_id == routing.id,
+                    RoutingOperation.active.is_(True),
+                )
+                .order_by(RoutingOperation.sequence_no, RoutingOperation.id)
+            ).all()
+            if not operations:
+                raise APSRuleError("bound routing revision has no active operations")
+            routing_ids.add(routing.id)
+            taquilla = self.session.get(Taquilla, line.taquilla_id)
+            if taquilla is None:
+                raise APSNotFoundError("taquilla not found during APS expansion")
+            for operation in operations:
+                fingerprint_parts.append(
+                    "|".join(
+                        [
+                            str(line.id),
+                            str(line.requested_quantity),
+                            str(routing.id),
+                            routing.source_fingerprint,
+                            str(operation.id),
+                            str(operation.sequence_no),
+                            str(operation.active),
+                        ]
+                    )
+                )
+                snapshots.append(
+                    PlanningOperation(
+                        run_id=run.id,
+                        plan_id=scenario.plan_id,
+                        taquilla_id=taquilla.id,
+                        product_line_id=line.id,
+                        article_id=line.article_id,
+                        routing_revision_id=routing.id,
+                        routing_operation_id=operation.id,
+                        requested_quantity=line.requested_quantity,
+                        deck_position=line.deck_position,
+                        product_sequence_no=line.sequence_no,
+                        routing_sequence_no=operation.sequence_no,
+                        source_operation_code=operation.source_operation_code,
+                        source_description=operation.source_description,
+                        operation_kind=operation.operation_kind,
+                        schedulable=operation.schedulable,
+                        completion_marker=operation.completion_marker,
+                        area_id=operation.area_id,
+                        work_center_id=operation.work_center_id,
+                        nominal_rate=operation.nominal_rate,
+                        rate_uom=operation.rate_uom,
+                        routing_source_fingerprint=routing.source_fingerprint,
+                    )
+                )
+
+        fingerprint = hashlib.sha256("\n".join(fingerprint_parts).encode("utf-8")).hexdigest()
+        try:
+            self.session.add_all(snapshots)
+            run.input_fingerprint = fingerprint
+            run.expanded_at = datetime.now(timezone.utc)
+            run.operation_count = len(snapshots)
+            run.status = "EXPANDED"
+            self.session.add(run)
+            self.session.commit()
+            self.session.refresh(run)
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise APSConflictError("planning operation expansion conflicts with existing snapshot") from exc
+
+        return run, len(snapshots), len(lines), len(routing_ids), False
+
+    def list_planning_operations(self, run_id: UUID) -> Sequence[PlanningOperation]:
+        run = self.session.get(SchedulingRun, run_id)
+        if run is None:
+            raise APSNotFoundError("scheduling run not found")
+        return self.session.scalars(
+            select(PlanningOperation)
+            .where(PlanningOperation.run_id == run_id)
+            .order_by(
+                PlanningOperation.taquilla_id,
+                PlanningOperation.product_sequence_no,
+                PlanningOperation.routing_sequence_no,
+                PlanningOperation.id,
+            )
+        ).all()
