@@ -158,10 +158,6 @@ def test_capacity_projection_preserves_lunch_gap() -> None:
             sequence_no=1,
             requested_quantity=Decimal("10"),
             deck_position="SINGLE",
-            routing_revision_id=routing.id,
-            routing_binding_mode="RESOLVED",
-            routing_effective_at=datetime(2026, 11, 2, tzinfo=timezone.utc),
-            routing_bound_at=datetime(2026, 11, 2, tzinfo=timezone.utc),
         )
         session.add(line)
         session.flush()
@@ -224,13 +220,6 @@ def test_capacity_projection_preserves_lunch_gap() -> None:
 
         intervals = list(APSService(session).list_resource_availability(run.id))
         assert len(intervals) == 2
-        local_ranges = [
-            (
-                item.start_at.astimezone().isoformat(),
-                item.end_at.astimezone().isoformat(),
-            )
-            for item in intervals
-        ]
         assert intervals[0].end_at < intervals[1].start_at
 
         replayed, _, _, replay_flag = APSService(session).project_capacity(run.id)
