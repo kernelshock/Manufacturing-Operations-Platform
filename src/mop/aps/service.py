@@ -16,8 +16,10 @@ from mop.aps.operation_models import PlanningOperation
 from mop.aps.capacity_models import CapacityCandidate, ResourceAvailabilityInterval
 from mop.aps.schedule_models import ScheduledOperation, ScheduledOperationSegment
 from mop.aps.lifecycle_models import SchedulePublication, PublishedScheduledOperation, PublishedScheduledOperationSegment
+from mop.aps.whatif_models import WhatIfException, WhatIfScenario
 from mop.aps.schemas import SchedulingRunCreate, SchedulingScenarioCreate, SchedulingScenarioHorizonUpdate, SchedulingScenarioStatusUpdate
 from mop.aps.lifecycle_schemas import ReplanCreate
+from mop.aps.whatif_schemas import WhatIfCreate, WhatIfExceptionCreate
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
 from mop.master_data.models import Article
 from mop.core.models import Area, Resource, WorkCenter
@@ -1424,3 +1426,354 @@ class APSService:
                 "workforce",
             ],
         }
+
+
+    def create_whatif(self, data: WhatIfCreate, actor_id: UUID | None) -> WhatIfScenario:
+        publication = self.get_publication(data.baseline_publication_id)
+        if publication.status != "CURRENT":
+            raise APSRuleError("what-if baseline must be the CURRENT publication")
+        return self._commit(
+            WhatIfScenario(
+                scenario_code=data.scenario_code.strip(),
+                name=data.name.strip(),
+                description=data.description,
+                baseline_publication_id=publication.id,
+                baseline_run_id=publication.run_id,
+                status="DRAFT",
+                created_by=actor_id,
+            )
+        )
+
+    def list_whatifs(self) -> Sequence[WhatIfScenario]:
+        return self.session.scalars(
+            select(WhatIfScenario).order_by(WhatIfScenario.created_at.desc(), WhatIfScenario.scenario_code)
+        ).all()
+
+    def get_whatif(self, whatif_id: UUID) -> WhatIfScenario:
+        scenario = self.session.get(WhatIfScenario, whatif_id)
+        if scenario is None:
+            raise APSNotFoundError("what-if scenario not found")
+        return scenario
+
+    def add_whatif_exception(
+        self,
+        whatif_id: UUID,
+        data: WhatIfExceptionCreate,
+    ) -> WhatIfException:
+        scenario = self.get_whatif(whatif_id)
+        if scenario.status != "DRAFT":
+            raise APSRuleError("exceptions can only be changed while what-if scenario is DRAFT")
+
+        baseline_run = self.session.get(SchedulingRun, scenario.baseline_run_id)
+        if baseline_run is None:
+            raise APSNotFoundError("what-if baseline run not found")
+        scheduling_scenario = self.get_scenario(baseline_run.scenario_id)
+        if data.start_at < scheduling_scenario.horizon_start or data.end_at > scheduling_scenario.horizon_end:
+            raise APSRuleError("what-if exception must stay inside the planning horizon")
+
+        baseline_resource = self.session.scalar(
+            select(ResourceAvailabilityInterval.id).where(
+                ResourceAvailabilityInterval.run_id == scenario.baseline_run_id,
+                ResourceAvailabilityInterval.resource_id == data.resource_id,
+            ).limit(1)
+        )
+        if baseline_resource is None:
+            raise APSRuleError("what-if exception resource is not part of baseline projected capacity")
+
+        return self._commit(
+            WhatIfException(
+                whatif_scenario_id=scenario.id,
+                exception_type=data.exception_type,
+                resource_id=data.resource_id,
+                start_at=data.start_at,
+                end_at=data.end_at,
+                capacity_factor=data.capacity_factor,
+                reason=data.reason.strip(),
+            )
+        )
+
+    def list_whatif_exceptions(self, whatif_id: UUID) -> Sequence[WhatIfException]:
+        self.get_whatif(whatif_id)
+        return self.session.scalars(
+            select(WhatIfException)
+            .where(WhatIfException.whatif_scenario_id == whatif_id)
+            .order_by(WhatIfException.start_at, WhatIfException.id)
+        ).all()
+
+    @staticmethod
+    def _apply_whatif_exception_to_interval(
+        interval: ResourceAvailabilityInterval,
+        exception: WhatIfException,
+    ) -> list[dict]:
+        if exception.end_at <= interval.start_at or exception.start_at >= interval.end_at:
+            return [
+                {
+                    "start_at": interval.start_at,
+                    "end_at": interval.end_at,
+                    "capacity_factor": interval.calendar_capacity_factor,
+                    "source": interval.source,
+                }
+            ]
+
+        overlap_start = max(interval.start_at, exception.start_at)
+        overlap_end = min(interval.end_at, exception.end_at)
+        pieces: list[dict] = []
+
+        if interval.start_at < overlap_start:
+            pieces.append(
+                {
+                    "start_at": interval.start_at,
+                    "end_at": overlap_start,
+                    "capacity_factor": interval.calendar_capacity_factor,
+                    "source": interval.source,
+                }
+            )
+
+        if exception.exception_type == "RESOURCE_CAPACITY_FACTOR":
+            pieces.append(
+                {
+                    "start_at": overlap_start,
+                    "end_at": overlap_end,
+                    "capacity_factor": interval.calendar_capacity_factor * exception.capacity_factor,
+                    "source": "WHATIF_FACTOR",
+                }
+            )
+
+        if overlap_end < interval.end_at:
+            pieces.append(
+                {
+                    "start_at": overlap_end,
+                    "end_at": interval.end_at,
+                    "capacity_factor": interval.calendar_capacity_factor,
+                    "source": interval.source,
+                }
+            )
+        return pieces
+
+    def _clone_whatif_capacity(
+        self,
+        *,
+        scenario: WhatIfScenario,
+        candidate_run: SchedulingRun,
+        operation_map: dict[UUID, UUID],
+    ) -> tuple[int, int]:
+        baseline_candidates = self.session.scalars(
+            select(CapacityCandidate).where(CapacityCandidate.run_id == scenario.baseline_run_id)
+        ).all()
+        cloned_candidates = [
+            CapacityCandidate(
+                run_id=candidate_run.id,
+                planning_operation_id=operation_map[item.planning_operation_id],
+                routing_operation_id=item.routing_operation_id,
+                resource_id=item.resource_id,
+                source_mode=item.source_mode,
+                resource_assignment_id=item.resource_assignment_id,
+                assignment_capacity_factor=item.assignment_capacity_factor,
+            )
+            for item in baseline_candidates
+        ]
+
+        exceptions = self.list_whatif_exceptions(scenario.id)
+        exceptions_by_resource: dict[UUID, list[WhatIfException]] = {}
+        for item in exceptions:
+            exceptions_by_resource.setdefault(item.resource_id, []).append(item)
+
+        cloned_intervals: list[ResourceAvailabilityInterval] = []
+        baseline_intervals = self.session.scalars(
+            select(ResourceAvailabilityInterval)
+            .where(ResourceAvailabilityInterval.run_id == scenario.baseline_run_id)
+            .order_by(ResourceAvailabilityInterval.resource_id, ResourceAvailabilityInterval.start_at)
+        ).all()
+
+        for interval in baseline_intervals:
+            pieces = [
+                {
+                    "start_at": interval.start_at,
+                    "end_at": interval.end_at,
+                    "capacity_factor": interval.calendar_capacity_factor,
+                    "source": interval.source,
+                }
+            ]
+            for exception in exceptions_by_resource.get(interval.resource_id, []):
+                next_pieces: list[dict] = []
+                for piece in pieces:
+                    virtual = ResourceAvailabilityInterval(
+                        run_id=candidate_run.id,
+                        resource_id=interval.resource_id,
+                        calendar_id=interval.calendar_id,
+                        calendar_code=interval.calendar_code,
+                        calendar_revision_no=interval.calendar_revision_no,
+                        target_scope=interval.target_scope,
+                        timezone=interval.timezone,
+                        start_at=piece["start_at"],
+                        end_at=piece["end_at"],
+                        calendar_capacity_factor=piece["capacity_factor"],
+                        source=piece["source"],
+                    )
+                    next_pieces.extend(self._apply_whatif_exception_to_interval(virtual, exception))
+                pieces = next_pieces
+
+            for piece in pieces:
+                if piece["end_at"] <= piece["start_at"]:
+                    continue
+                cloned_intervals.append(
+                    ResourceAvailabilityInterval(
+                        run_id=candidate_run.id,
+                        resource_id=interval.resource_id,
+                        calendar_id=interval.calendar_id,
+                        calendar_code=interval.calendar_code,
+                        calendar_revision_no=interval.calendar_revision_no,
+                        target_scope=interval.target_scope,
+                        timezone=interval.timezone,
+                        start_at=piece["start_at"],
+                        end_at=piece["end_at"],
+                        calendar_capacity_factor=piece["capacity_factor"],
+                        source=piece["source"],
+                    )
+                )
+
+        self.session.add_all(cloned_candidates)
+        self.session.add_all(cloned_intervals)
+        return len(cloned_candidates), len(cloned_intervals)
+
+    def evaluate_whatif(self, whatif_id: UUID, actor_id: UUID | None) -> tuple[WhatIfScenario, dict]:
+        scenario = self.get_whatif(whatif_id)
+        if scenario.status != "DRAFT":
+            raise APSRuleError("only DRAFT what-if scenarios can be evaluated")
+
+        baseline_publication = self.get_publication(scenario.baseline_publication_id)
+        if baseline_publication.status != "CURRENT":
+            raise APSRuleError("what-if baseline is no longer CURRENT")
+
+        baseline_run = self.session.get(SchedulingRun, scenario.baseline_run_id)
+        if baseline_run is None or baseline_run.status != "SCHEDULED":
+            raise APSRuleError("what-if baseline run is not SCHEDULED")
+
+        run_number = (
+            self.session.scalar(
+                select(func.max(SchedulingRun.run_number)).where(
+                    SchedulingRun.scenario_id == baseline_run.scenario_id
+                )
+            )
+            or 0
+        ) + 1
+        candidate_run = SchedulingRun(
+            scenario_id=baseline_run.scenario_id,
+            run_number=run_number,
+            algorithm_key=baseline_run.algorithm_key,
+            algorithm_version=baseline_run.algorithm_version,
+            status="CAPACITY_PROJECTED",
+            input_fingerprint=baseline_run.input_fingerprint,
+            expanded_at=baseline_run.expanded_at,
+            operation_count=baseline_run.operation_count,
+            replan_from_run_id=baseline_run.id,
+            replan_reason=f"WHATIF:{scenario.scenario_code}",
+            created_by=actor_id,
+        )
+        self.session.add(candidate_run)
+        self.session.flush()
+
+        baseline_operations = self.session.scalars(
+            select(PlanningOperation)
+            .where(PlanningOperation.run_id == baseline_run.id)
+            .order_by(PlanningOperation.product_sequence_no, PlanningOperation.routing_sequence_no, PlanningOperation.id)
+        ).all()
+        operation_map: dict[UUID, UUID] = {}
+        for source in baseline_operations:
+            clone = PlanningOperation(
+                run_id=candidate_run.id,
+                plan_id=source.plan_id,
+                taquilla_id=source.taquilla_id,
+                product_line_id=source.product_line_id,
+                article_id=source.article_id,
+                routing_revision_id=source.routing_revision_id,
+                routing_operation_id=source.routing_operation_id,
+                requested_quantity=source.requested_quantity,
+                deck_position=source.deck_position,
+                product_sequence_no=source.product_sequence_no,
+                routing_sequence_no=source.routing_sequence_no,
+                source_operation_code=source.source_operation_code,
+                source_description=source.source_description,
+                operation_kind=source.operation_kind,
+                schedulable=source.schedulable,
+                completion_marker=source.completion_marker,
+                area_id=source.area_id,
+                work_center_id=source.work_center_id,
+                nominal_rate=source.nominal_rate,
+                rate_uom=source.rate_uom,
+                routing_source_fingerprint=source.routing_source_fingerprint,
+            )
+            self.session.add(clone)
+            self.session.flush()
+            operation_map[source.id] = clone.id
+
+        self._clone_whatif_capacity(
+            scenario=scenario,
+            candidate_run=candidate_run,
+            operation_map=operation_map,
+        )
+
+        try:
+            solved, *_ = self.solve_finite_capacity(candidate_run.id)
+        except Exception:
+            self.session.rollback()
+            raise
+
+        scenario = self.get_whatif(whatif_id)
+        scenario.candidate_run_id = solved.id
+        scenario.status = "EVALUATED"
+        scenario.evaluated_at = datetime.now(timezone.utc)
+        self._commit(scenario)
+
+        comparison = self.compare_replan_to_published(solved.id)
+        comparison["whatif_scenario_id"] = scenario.id
+        comparison["baseline_publication_id"] = scenario.baseline_publication_id
+        comparison["baseline_run_id"] = scenario.baseline_run_id
+        comparison["exception_count"] = len(self.list_whatif_exceptions(scenario.id))
+        return scenario, comparison
+
+    def compare_whatif(self, whatif_id: UUID) -> dict:
+        scenario = self.get_whatif(whatif_id)
+        if scenario.status not in {"EVALUATED", "APPLIED"} or scenario.candidate_run_id is None:
+            raise APSRuleError("what-if comparison requires an evaluated scenario")
+        comparison = self.compare_replan_to_published(scenario.candidate_run_id)
+        comparison["whatif_scenario_id"] = scenario.id
+        comparison["baseline_publication_id"] = scenario.baseline_publication_id
+        comparison["baseline_run_id"] = scenario.baseline_run_id
+        comparison["exception_count"] = len(self.list_whatif_exceptions(scenario.id))
+        return comparison
+
+    def apply_whatif(
+        self,
+        whatif_id: UUID,
+        actor_id: UUID | None,
+    ) -> tuple[WhatIfScenario, SchedulePublication, UUID | None]:
+        scenario = self.get_whatif(whatif_id)
+        if scenario.status != "EVALUATED" or scenario.candidate_run_id is None:
+            raise APSRuleError("only EVALUATED what-if scenarios can be applied")
+        baseline = self.get_publication(scenario.baseline_publication_id)
+        if baseline.status != "CURRENT":
+            raise APSRuleError("what-if baseline is no longer CURRENT")
+
+        publication, superseded_id, _ = self.publish_schedule(
+            scenario.candidate_run_id,
+            f"Applied what-if {scenario.scenario_code}",
+            actor_id,
+        )
+        scenario = self.get_whatif(whatif_id)
+        scenario.status = "APPLIED"
+        scenario.applied_publication_id = publication.id
+        scenario.applied_at = datetime.now(timezone.utc)
+        self._commit(scenario)
+        return scenario, publication, superseded_id
+
+    def discard_whatif(self, whatif_id: UUID) -> WhatIfScenario:
+        scenario = self.get_whatif(whatif_id)
+        if scenario.status in {"APPLIED", "DISCARDED"}:
+            raise APSRuleError("applied or discarded what-if scenario cannot be discarded again")
+        if scenario.candidate_run_id is not None:
+            self.cancel_run(scenario.candidate_run_id)
+            scenario = self.get_whatif(whatif_id)
+        scenario.status = "DISCARDED"
+        scenario.discarded_at = datetime.now(timezone.utc)
+        return self._commit(scenario)
