@@ -2,11 +2,13 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from mop.aps.operation_schemas import ExpansionResult, PlanningOperationRead
 from mop.aps.service import APSConflictError, APSNotFoundError, APSRuleError, APSService
+from mop.audit.context import request_audit_context
+from mop.audit.service import AuditService
 from mop.iam.dependencies import require_global_permission
 from mop.iam.models import User
 from mop.persistence.dependencies import get_session
