@@ -1,9 +1,10 @@
 """Persistence models for G4 APS."""
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mop.persistence.base import Base
@@ -37,7 +38,7 @@ class SchedulingRun(Base):
     __table_args__ = (
         UniqueConstraint("scenario_id", "run_number", name="uq_aps_run_scenario_number"),
         CheckConstraint("run_number > 0", name="ck_aps_run_number_positive"),
-        CheckConstraint("status IN ('CREATED', 'CANCELLED')", name="ck_aps_run_status"),
+        CheckConstraint("status IN ('CREATED', 'EXPANDED', 'CANCELLED')", name="ck_aps_run_status"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -46,6 +47,9 @@ class SchedulingRun(Base):
     algorithm_key: Mapped[str] = mapped_column(String(80), nullable=False)
     algorithm_version: Mapped[str] = mapped_column(String(80), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="CREATED")
+    input_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expanded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    operation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
