@@ -1149,3 +1149,12 @@ class APSService:
         if publication is None:
             raise APSNotFoundError("schedule publication not found")
         return publication
+
+
+    def list_published_operations(self, publication_id: UUID) -> Sequence[PublishedScheduledOperation]:
+        self.get_publication(publication_id)
+        return self.session.scalars(
+            select(PublishedScheduledOperation)
+            .where(PublishedScheduledOperation.publication_id == publication_id)
+            .order_by(PublishedScheduledOperation.sequence_no)
+        ).all()
