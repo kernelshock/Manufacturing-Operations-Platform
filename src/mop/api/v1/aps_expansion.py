@@ -37,7 +37,34 @@ def list_operations(run_id: UUID, app: APSService = Depends(service), _: User = 
 
 
 @router.post("/runs/{run_id}/materialize", response_model=ExpansionResult)
-def materialize_run(run_id: UUID, app: APSService = Depends(service), _: User = Depends(require_global_permission("aps.edit"))):
+def materialize_run(
+    run_id: UUID,
+    request: Request,
+    app: APSService = Depends(service),
+    actor: User = Depends(require_global_permission("aps.edit")),
+    session: Session = Depends(get_session),
+):
     result = translate(lambda: app.expand_run(run_id))
     run, operations, lines, routings, replay = result
-    return ExpansionResult(run=run, operation_count=operations, product_line_count=lines, routing_revision_count=routings, idempotent_replay=replay)
+    AuditService(session).record(
+        action="aps.run.materialize",
+        object_type="scheduling_run",
+        object_id=str(run.id),
+        outcome="success",
+        actor_user_id=actor.id,
+        actor_username=actor.username,
+        details={
+            "operation_count": operations,
+            "product_line_count": lines,
+            "routing_revision_count": routings,
+            "idempotent_replay": replay,
+        },
+        **request_audit_context(request),
+    )
+    return ExpansionResult(
+        run=run,
+        operation_count=operations,
+        product_line_count=lines,
+        routing_revision_count=routings,
+        idempotent_replay=replay,
+    )
