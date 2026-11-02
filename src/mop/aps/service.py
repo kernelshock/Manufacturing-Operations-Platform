@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from mop.aps.models import SchedulingRun, SchedulingScenario
 from mop.aps.operation_models import PlanningOperation
 from mop.aps.capacity_models import CapacityCandidate, ResourceAvailabilityInterval
+from mop.aps.schedule_models import ScheduledOperation, ScheduledOperationSegment
 from mop.aps.schemas import SchedulingRunCreate, SchedulingScenarioCreate, SchedulingScenarioHorizonUpdate, SchedulingScenarioStatusUpdate
 from mop.demand.models import ProductionPlan, Taquilla, TaquillaProductLine
 from mop.core.models import Area, Resource, WorkCenter
@@ -549,4 +550,378 @@ class APSService:
             select(ResourceAvailabilityInterval)
             .where(ResourceAvailabilityInterval.run_id == run_id)
             .order_by(ResourceAvailabilityInterval.resource_id, ResourceAvailabilityInterval.start_at)
+        ).all()
+
+
+    @staticmethod
+    def _normalize_rate_per_hour(nominal_rate: Decimal | None, rate_uom: str | None) -> tuple[Decimal, str]:
+        if nominal_rate is None or rate_uom is None:
+            raise APSRuleError("schedulable operation requires nominal_rate and rate_uom")
+        token = (
+            rate_uom.strip()
+            .upper()
+            .replace(" ", "_")
+            .replace("-", "_")
+        )
+        hourly = {
+            "UNIT/H",
+            "UNITS/H",
+            "UNIT/HOUR",
+            "UNITS/HOUR",
+            "UNIT_PER_HOUR",
+            "UNITS_PER_HOUR",
+            "EA/H",
+            "EA/HOUR",
+        }
+        per_minute = {
+            "UNIT/MIN",
+            "UNITS/MIN",
+            "UNIT/MINUTE",
+            "UNITS/MINUTE",
+            "UNIT_PER_MINUTE",
+            "UNITS_PER_MINUTE",
+            "EA/MIN",
+            "EA/MINUTE",
+        }
+        if token in hourly:
+            return nominal_rate, "UNITS_PER_HOUR"
+        if token in per_minute:
+            return nominal_rate * Decimal("60"), "UNITS_PER_HOUR"
+        raise APSRuleError(
+            f"unsupported temporal rate_uom for finite-capacity scheduling: {rate_uom}"
+        )
+
+    @staticmethod
+    def _subtract_occupied(
+        start_at: datetime,
+        end_at: datetime,
+        occupied: list[tuple[datetime, datetime]],
+    ) -> list[tuple[datetime, datetime]]:
+        free = [(start_at, end_at)]
+        for busy_start, busy_end in sorted(occupied):
+            next_free: list[tuple[datetime, datetime]] = []
+            for left, right in free:
+                if busy_end <= left or busy_start >= right:
+                    next_free.append((left, right))
+                    continue
+                if left < busy_start:
+                    next_free.append((left, min(busy_start, right)))
+                if busy_end < right:
+                    next_free.append((max(busy_end, left), right))
+            free = [(left, right) for left, right in next_free if right > left]
+        return free
+
+    def _candidate_schedule(
+        self,
+        *,
+        run: SchedulingRun,
+        operation: PlanningOperation,
+        candidate: CapacityCandidate,
+        earliest_start: datetime,
+        occupied_by_resource: dict[UUID, list[tuple[datetime, datetime]]],
+    ) -> tuple[datetime, datetime, Decimal, str, list[dict]]:
+        rate_per_hour, normalized_rate_uom = self._normalize_rate_per_hour(
+            operation.nominal_rate,
+            operation.rate_uom,
+        )
+        intervals = self.session.scalars(
+            select(ResourceAvailabilityInterval)
+            .where(
+                ResourceAvailabilityInterval.run_id == run.id,
+                ResourceAvailabilityInterval.resource_id == candidate.resource_id,
+                ResourceAvailabilityInterval.end_at > earliest_start,
+            )
+            .order_by(ResourceAvailabilityInterval.start_at, ResourceAvailabilityInterval.id)
+        ).all()
+        if not intervals:
+            raise APSRuleError("candidate resource has no projected availability after precedence release")
+
+        remaining = operation.requested_quantity
+        segments: list[dict] = []
+        occupied = occupied_by_resource.get(candidate.resource_id, [])
+        processing_seconds = Decimal("0")
+
+        for interval in intervals:
+            interval_start = max(interval.start_at, earliest_start)
+            if interval.end_at <= interval_start:
+                continue
+            free_ranges = self._subtract_occupied(interval_start, interval.end_at, occupied)
+            effective_rate = (
+                rate_per_hour
+                * candidate.assignment_capacity_factor
+                * interval.calendar_capacity_factor
+            )
+            if effective_rate <= 0:
+                continue
+
+            for free_start, free_end in free_ranges:
+                free_seconds = Decimal(str((free_end - free_start).total_seconds()))
+                if free_seconds <= 0:
+                    continue
+                possible_quantity = effective_rate * free_seconds / Decimal("3600")
+                if possible_quantity <= 0:
+                    continue
+
+                if possible_quantity >= remaining:
+                    needed_seconds = remaining * Decimal("3600") / effective_rate
+                    end_at = free_start + timedelta(seconds=float(needed_seconds))
+                    segments.append(
+                        {
+                            "availability_interval_id": interval.id,
+                            "start_at": free_start,
+                            "end_at": end_at,
+                            "effective_rate_per_hour": effective_rate,
+                            "produced_quantity": remaining,
+                        }
+                    )
+                    processing_seconds += needed_seconds
+                    remaining = Decimal("0")
+                    break
+
+                segments.append(
+                    {
+                        "availability_interval_id": interval.id,
+                        "start_at": free_start,
+                        "end_at": free_end,
+                        "effective_rate_per_hour": effective_rate,
+                        "produced_quantity": possible_quantity,
+                    }
+                )
+                processing_seconds += free_seconds
+                remaining -= possible_quantity
+
+            if remaining <= Decimal("0"):
+                break
+
+        if remaining > Decimal("0"):
+            raise APSRuleError("insufficient finite capacity inside planning horizon")
+
+        return (
+            segments[0]["start_at"],
+            segments[-1]["end_at"],
+            processing_seconds,
+            normalized_rate_uom,
+            segments,
+        )
+
+    def solve_finite_capacity(self, run_id: UUID) -> tuple[SchedulingRun, int, int, datetime, datetime, bool]:
+        run = self.session.get(SchedulingRun, run_id)
+        if run is None:
+            raise APSNotFoundError("scheduling run not found")
+        if run.status == "CANCELLED":
+            raise APSRuleError("cancelled scheduling run cannot be solved")
+        existing = self.session.scalars(
+            select(ScheduledOperation)
+            .where(ScheduledOperation.run_id == run.id)
+            .order_by(ScheduledOperation.sequence_no)
+        ).all()
+        if run.status == "SCHEDULED":
+            if not existing:
+                raise APSRuleError("scheduled run has no scheduled operations")
+            segment_count = self.session.scalar(
+                select(func.count())
+                .select_from(ScheduledOperationSegment)
+                .join(
+                    ScheduledOperation,
+                    ScheduledOperation.id == ScheduledOperationSegment.scheduled_operation_id,
+                )
+                .where(ScheduledOperation.run_id == run.id)
+            ) or 0
+            return (
+                run,
+                len(existing),
+                segment_count,
+                min(item.planned_start for item in existing),
+                max(item.planned_finish for item in existing),
+                True,
+            )
+        if run.status != "CAPACITY_PROJECTED":
+            raise APSRuleError("finite-capacity solve requires a CAPACITY_PROJECTED scheduling run")
+
+        operations = self.session.scalars(
+            select(PlanningOperation)
+            .where(
+                PlanningOperation.run_id == run.id,
+                PlanningOperation.schedulable.is_(True),
+            )
+        ).all()
+        if not operations:
+            raise APSRuleError("capacity-projected run contains no schedulable operations")
+
+        taquillas = {
+            item.id: item
+            for item in self.session.scalars(
+                select(Taquilla).where(
+                    Taquilla.id.in_({operation.taquilla_id for operation in operations})
+                )
+            ).all()
+        }
+        operations = sorted(
+            operations,
+            key=lambda item: (
+                taquillas[item.taquilla_id].sequence_no,
+                item.product_sequence_no,
+                item.routing_sequence_no,
+                str(item.id),
+            ),
+        )
+
+        candidates_by_operation: dict[UUID, list[CapacityCandidate]] = {}
+        for candidate in self.session.scalars(
+            select(CapacityCandidate)
+            .where(CapacityCandidate.run_id == run.id)
+        ).all():
+            candidates_by_operation.setdefault(candidate.planning_operation_id, []).append(candidate)
+
+        resources = {
+            resource.id: resource
+            for resource in self.session.scalars(
+                select(Resource).where(
+                    Resource.id.in_(
+                        {
+                            candidate.resource_id
+                            for candidates in candidates_by_operation.values()
+                            for candidate in candidates
+                        }
+                    )
+                )
+            ).all()
+        }
+
+        scenario = self.get_scenario(run.scenario_id)
+        predecessor_finish: dict[UUID, datetime] = {}
+        occupied_by_resource: dict[UUID, list[tuple[datetime, datetime]]] = {}
+        scheduled_rows: list[ScheduledOperation] = []
+        segment_payloads: list[tuple[ScheduledOperation, list[dict]]] = []
+
+        for sequence_no, operation in enumerate(operations, start=1):
+            candidates = candidates_by_operation.get(operation.id, [])
+            if not candidates:
+                raise APSRuleError("schedulable operation has no capacity candidates")
+
+            earliest_start = predecessor_finish.get(
+                operation.product_line_id,
+                scenario.horizon_start,
+            )
+            alternatives = []
+            blocker_messages = []
+            for candidate in candidates:
+                resource = resources.get(candidate.resource_id)
+                if resource is None:
+                    raise APSNotFoundError("capacity candidate resource not found")
+                try:
+                    start_at, finish_at, processing_seconds, normalized_rate_uom, segments = (
+                        self._candidate_schedule(
+                            run=run,
+                            operation=operation,
+                            candidate=candidate,
+                            earliest_start=earliest_start,
+                            occupied_by_resource=occupied_by_resource,
+                        )
+                    )
+                    alternatives.append(
+                        (
+                            finish_at,
+                            start_at,
+                            resource.code,
+                            str(resource.id),
+                            candidate,
+                            processing_seconds,
+                            normalized_rate_uom,
+                            segments,
+                        )
+                    )
+                except APSRuleError as exc:
+                    blocker_messages.append(f"{resource.code}: {exc}")
+
+            if not alternatives:
+                detail = "; ".join(blocker_messages) or "no feasible candidate resource"
+                raise APSRuleError(
+                    f"operation {operation.source_operation_code} cannot be scheduled: {detail}"
+                )
+
+            alternatives.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
+            (
+                finish_at,
+                start_at,
+                _resource_code,
+                _resource_id,
+                selected,
+                processing_seconds,
+                normalized_rate_uom,
+                segments,
+            ) = alternatives[0]
+
+            scheduled = ScheduledOperation(
+                run_id=run.id,
+                planning_operation_id=operation.id,
+                resource_id=selected.resource_id,
+                sequence_no=sequence_no,
+                planned_start=start_at,
+                planned_finish=finish_at,
+                processing_seconds=processing_seconds,
+                requested_quantity=operation.requested_quantity,
+                nominal_rate=operation.nominal_rate,
+                normalized_rate_uom=normalized_rate_uom,
+                algorithm_key=run.algorithm_key,
+                algorithm_version=run.algorithm_version,
+            )
+            scheduled_rows.append(scheduled)
+            segment_payloads.append((scheduled, segments))
+            predecessor_finish[operation.product_line_id] = finish_at
+            occupied_by_resource.setdefault(selected.resource_id, []).extend(
+                (segment["start_at"], segment["end_at"])
+                for segment in segments
+            )
+
+        try:
+            self.session.add_all(scheduled_rows)
+            self.session.flush()
+            segment_rows: list[ScheduledOperationSegment] = []
+            for scheduled, segments in segment_payloads:
+                for segment_no, segment in enumerate(segments, start=1):
+                    segment_rows.append(
+                        ScheduledOperationSegment(
+                            scheduled_operation_id=scheduled.id,
+                            resource_id=scheduled.resource_id,
+                            availability_interval_id=segment["availability_interval_id"],
+                            segment_no=segment_no,
+                            start_at=segment["start_at"],
+                            end_at=segment["end_at"],
+                            effective_rate_per_hour=segment["effective_rate_per_hour"],
+                            produced_quantity=segment["produced_quantity"],
+                        )
+                    )
+            self.session.add_all(segment_rows)
+            run.status = "SCHEDULED"
+            self.session.add(run)
+            self.session.commit()
+            self.session.refresh(run)
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise APSConflictError("finite-capacity schedule conflicts with existing result") from exc
+
+        return (
+            run,
+            len(scheduled_rows),
+            len(segment_rows),
+            min(item.planned_start for item in scheduled_rows),
+            max(item.planned_finish for item in scheduled_rows),
+            False,
+        )
+
+    def list_scheduled_operations(self, run_id: UUID) -> Sequence[ScheduledOperation]:
+        return self.session.scalars(
+            select(ScheduledOperation)
+            .where(ScheduledOperation.run_id == run_id)
+            .order_by(ScheduledOperation.sequence_no)
+        ).all()
+
+    def list_schedule_segments(self, scheduled_operation_id: UUID) -> Sequence[ScheduledOperationSegment]:
+        if self.session.get(ScheduledOperation, scheduled_operation_id) is None:
+            raise APSNotFoundError("scheduled operation not found")
+        return self.session.scalars(
+            select(ScheduledOperationSegment)
+            .where(ScheduledOperationSegment.scheduled_operation_id == scheduled_operation_id)
+            .order_by(ScheduledOperationSegment.segment_no)
         ).all()
