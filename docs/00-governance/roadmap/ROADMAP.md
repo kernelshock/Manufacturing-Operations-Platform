@@ -1,6 +1,6 @@
 # Manufacturing Operations Platform — Roadmap
 
-Last updated: 2026-10-29  
+Last updated: 2026-11-02  
 Baseline: G0 Architecture Foundation
 
 ## Objective
@@ -14,7 +14,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
 | G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | RELEASED |
-| G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | IN PROGRESS |
+| G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | RELEASED |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
 | G6 | Materials | ABM/BOM, theoretical demand, actual consumption, inventory and reconciliation | PLANNED |
 | G7 | Kanban + Purchasing | PP/PR, replenishment signals, supplier lead time, purchasing and receipts | PLANNED |
@@ -196,3 +196,22 @@ Resolved/deferred for G0:
 - MES actuals remain deferred to G5; materials, purchasing, maintenance and workforce authoritative constraints remain owned by G6/G7/G8/G9;
 - G4.1 starts with scheduling-domain identity, scenario lifecycle, horizon, RBAC, audit and API foundation;
 - G4 status: **IN PROGRESS**.
+
+
+## G4 validation record — 2026-11-02
+- branch: `feat/G4-aps`;
+- base: released G3/main commit `73b42138d5af14c9f7a6830d0a70ea60eba65200`;
+- hardening implementation head: `13605bfe4d14d51af106eeb27b5a8717556e5d6f`;
+- Alembic head: `0024_g4_7`;
+- canonical `G4 APS` PR run #252: **SUCCESS**;
+- security, dependency, migration, G0/G1/G2/G3 regressions, full G4 suite, frontend and released-runtime checks: **PASS**;
+- G4 status at validation: **VALIDATED — awaiting explicit release approval**.
+
+## G4 release record — 2026-11-02
+- explicit release approval received through project direction: **"siguiente movimiento"**, immediately after the recorded G4 VALIDATED checkpoint and release-decision request;
+- final validated branch head: `9dee38a0745f1412e99c709d2c5342937a464a03`;
+- final PR validation: G4 #260, G0 #295, G1 #303, G2 #236 and G3 #248 — **SUCCESS**;
+- PR #10 marked ready and merged into `main`;
+- release merge commit: `0500c3fb89c105f9e5c36cb6bae58ce54ab59ed1`;
+- Alembic head remains `0024_g4_7`;
+- G4 status: **RELEASED**.
