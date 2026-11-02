@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from mop.aps.schemas import SchedulingRunCreate, SchedulingRunRead, SchedulingScenarioCreate, SchedulingScenarioHorizonUpdate, SchedulingScenarioRead, SchedulingScenarioStatusUpdate
+from mop.aps.operation_schemas import ExpansionResult, PlanningOperationRead
 from mop.aps.service import APSConflictError, APSNotFoundError, APSRuleError, APSService
 from mop.audit.context import request_audit_context
 from mop.audit.service import AuditService
