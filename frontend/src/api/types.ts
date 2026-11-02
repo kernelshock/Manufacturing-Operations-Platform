@@ -185,3 +185,79 @@ export type TaquillaAssimilationResult = {
   target_taquilla_id: string | null;
   idempotent_replay: boolean;
 };
+
+
+export type GanttSegment = {
+  segment_no: number;
+  start_at: string;
+  end_at: string;
+  effective_rate_per_hour: string;
+  produced_quantity: string;
+};
+
+export type GanttOperation = {
+  publication_id: string;
+  publication_version: number;
+  publication_status: string;
+  run_id: string;
+  scenario_id: string;
+  plan_id: string;
+  plan_number: string;
+  taquilla_id: string;
+  taquilla_code: string;
+  taquilla_sequence_no: number;
+  product_line_id: string;
+  product_sequence_no: number;
+  article_id: string;
+  article_code: string;
+  article_description: string;
+  deck_position: string;
+  routing_revision_id: string;
+  routing_operation_id: string;
+  routing_sequence_no: number;
+  operation_code: string;
+  operation_description: string | null;
+  resource_id: string;
+  resource_code: string;
+  resource_name: string;
+  work_center_id: string;
+  work_center_code: string;
+  work_center_name: string;
+  area_id: string;
+  area_code: string;
+  area_name: string;
+  sequence_no: number;
+  planned_start: string;
+  planned_finish: string;
+  processing_seconds: string;
+  requested_quantity: string;
+  segments: GanttSegment[];
+};
+
+export type GanttPublication = {
+  publication_id: string;
+  scenario_id: string;
+  run_id: string;
+  plan_id: string;
+  plan_number: string;
+  version_no: number;
+  status: string;
+  published_at: string;
+  schedule_fingerprint: string;
+  operation_count: number;
+};
+
+export type GanttProjection = {
+  scope: "MASTER" | "PLAN";
+  plan_id: string | null;
+  plan_number: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  publications: GanttPublication[];
+  operations: GanttOperation[];
+  operation_count: number;
+  taquilla_count: number;
+  resource_count: number;
+  constraints_evaluated: string[];
+  constraints_not_evaluated: string[];
+};
