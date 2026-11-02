@@ -68,7 +68,7 @@ Until later gates are released, G4 must not fabricate material, maintenance or w
 - **G4.2 — Demand / Routing Operation Expansion — COMPLETED:** exact G3 demand and G2 routing bindings materialized into immutable planning-operation snapshots with full provenance.
 - **G4.3 — Calendar & Capacity Projection — COMPLETED:** schedulable resource candidates and exact calendar availability intervals projected from G1/G2, including breaks and off-shift gaps.
 - **G4.4 — Finite-Capacity Sequencing Engine — COMPLETED:** deterministic precedence-aware scheduling, concrete resource assignment, finite-capacity occupancy and planned timestamps.
-- **G4.5 — Schedule Lifecycle / Replan / Publish:** draft solve, compare, publish, supersede and controlled replanning.
+- **G4.5 — Schedule Lifecycle / Replan / Publish — COMPLETED:** governed replan lineage, comparison, immutable publication snapshots and explicit supersession.
 - **G4.6 — Gantt Projection & Frontend:** master/per-plan Gantt, zoom/scale, blockers and explainable schedule state.
 - **G4.7 — What-if & Exception Evaluation:** isolated scenario changes, comparison metrics and explicit apply/discard workflow.
 - **G4.8 — Gate Hardening:** regression, migration, solver invariants, RBAC/audit, deterministic replay, security, frontend and runtime evidence.
@@ -128,4 +128,15 @@ G4.4 is **COMPLETED**.
 - routing precedence, finite resource occupancy and deterministic earliest-finish selection are enforced;
 - MES-owned actuals and schedule publication remain outside G4.4.
 
-Next slice: **G4.5 — Schedule Lifecycle / Replan / Publish**.
+G4.5 is **COMPLETED**.
+
+- validated implementation head: `9dfe702dd7c4c7bc005e00db330102b1c5833fd8`;
+- Alembic head: `0023_g4_5`;
+- G4 APS push run #162: **SUCCESS**;
+- calculated runs and published schedules are separate identities;
+- replans require explicit provenance and reason from the currently published run;
+- publication snapshots are immutable, versioned and supersedable;
+- PostgreSQL enforces exactly one CURRENT publication per scenario;
+- candidate replans can be compared to their published source before release.
+
+Next slice: **G4.6 — Gantt Projection & Frontend**.
