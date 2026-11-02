@@ -50,7 +50,9 @@ class SchedulingRun(Base):
     input_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     expanded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     operation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    replan_from_run_id: Mapped[UUID | None] = mapped_column(ForeignKey("aps_scheduling_run.id", ondelete="RESTRICT"), nullable=True)
+    replan_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    scenario: Mapped[SchedulingScenario] = relationship(back_populates="runs")
+    scenario: Mapped[SchedulingScenario] = relationship(back_populates="runs", foreign_keys=[scenario_id])
