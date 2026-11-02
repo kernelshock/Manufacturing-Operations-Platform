@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G4.7 isolated what-if evaluation with resource blackout/capacity-factor exceptions, comparison metrics and explicit apply/discard workflow.
 - G4.6 read-only published-schedule Gantt projection with master/per-plan frontend, adjustable scale and productive-segment gap rendering.
 - G4.5 governed schedule lifecycle with controlled replan, comparison, immutable publication snapshots and atomic supersession.
 - G4.4 deterministic finite-capacity sequencing with planned timestamps, concrete resource assignment and break-aware productive segments.
