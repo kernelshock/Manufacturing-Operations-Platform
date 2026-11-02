@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ScenarioStatus = Literal["DRAFT", "READY", "ARCHIVED"]
-RunStatus = Literal["CREATED", "CANCELLED"]
+RunStatus = Literal["CREATED", "EXPANDED", "CANCELLED"]
 
 
 def _trim(value: str) -> str:
