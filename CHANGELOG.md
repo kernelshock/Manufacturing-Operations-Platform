@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G5.1 MES execution dispatch foundation with CURRENT-publication snapshots, mes.read/mes.edit, audited lifecycle and no premature execution actuals.
 - G5 MES gate bootstrap with explicit actual-execution ownership, dispatch/traceability roadmap and released G4 baseline.
 - G4.8 final APS gate hardening with explicit ownership/RBAC/audit/determinism invariants; G4 formally released.
 - G4.7 isolated what-if evaluation with resource blackout/capacity-factor exceptions, comparison metrics and explicit apply/discard workflow.
