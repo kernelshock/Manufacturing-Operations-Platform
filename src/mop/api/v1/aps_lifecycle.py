@@ -12,6 +12,7 @@ from mop.aps.lifecycle_schemas import (
     ReplanCreate,
     ReplanResult,
     SchedulePublicationRead,
+    ScheduleComparisonRead,
 )
 from mop.aps.service import APSConflictError, APSNotFoundError, APSRuleError, APSService
 from mop.audit.context import request_audit_context
@@ -120,3 +121,12 @@ def list_published_operations(
     _: User = Depends(require_global_permission("aps.read")),
 ):
     return translate(lambda: app.list_published_operations(publication_id))
+
+
+@router.get("/runs/{run_id}/compare-to-published", response_model=ScheduleComparisonRead)
+def compare_to_published(
+    run_id: UUID,
+    app: APSService = Depends(service),
+    _: User = Depends(require_global_permission("aps.read")),
+):
+    return ScheduleComparisonRead(**translate(lambda: app.compare_replan_to_published(run_id)))
