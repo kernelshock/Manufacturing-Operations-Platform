@@ -13,7 +13,7 @@ Deliver a modular, configurable Manufacturing Operations Management platform tha
 | G0 | Architecture Foundation | Architecture, governance, canonical model, events, roadmap and release rules approved | RELEASED |
 | G1 | Platform Core | Organization/plant model, identity, roles, configuration, audit and core API running | RELEASED |
 | G2 | Master Data | Products, variants, materials, suppliers, resources, calendars and importers | RELEASED |
-| G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | IN PROGRESS |
+| G3 | Demand / Plan / Taquilla / Routing | Plans, taquillas, products and configurable routing operational | VALIDATED |
 | G4 | APS | Finite-capacity scheduling, Gantt, constraints, priorities and what-if | PLANNED |
 | G5 | MES | Shop-floor execution, start/finish, quantities, scrap, transfer and traceability | PLANNED |
 | G6 | Materials | ABM/BOM, theoretical demand, actual consumption, inventory and reconciliation | PLANNED |
@@ -166,3 +166,16 @@ Resolved/deferred for G0:
 - MES actual execution timestamps/quantities remain deferred to G5;
 - G3.1 starts with stable Plan/Taquilla identity and lifecycle;
 - G3 status: **IN PROGRESS**.
+
+
+## G3 validation record — 2026-11-02
+- branch: `feat/G3-demand-plan-routing`;
+- base: released G2/main commit `115b8dfe11a94d1d2587f5c6937b0383f0f05e65`;
+- hardening implementation head: `627fc2341c5bcd050ab43e0cbf0b58f7e2762b7f`;
+- Alembic head: `0018_g3_6`;
+- `G3 Demand Plan Taquilla Routing` push run #100: **SUCCESS**;
+- security baseline, dependency audits, migration integrity, G0/G1/G2 regressions, full G3 tests, frontend validation and released-runtime regression: **PASS**;
+- explicit hardening invariants verify G3 ownership boundaries, RBAC/audit expectations, assimilation idempotency/explicit source semantics and absence of APS/MES-owned state;
+- G3 status: **VALIDATED — awaiting explicit release approval**;
+- PR #9 remains **DRAFT**;
+- no merge/release is authorized by validation alone.
