@@ -5,7 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
-- G3.8 gate hardening with executable cross-slice ownership/RBAC/audit/idempotency invariants; G3 is VALIDATED pending explicit release approval.
+- G3.8 gate hardening with executable cross-slice ownership/RBAC/audit/idempotency invariants; G3 was validated and formally released.
 - G3.7 operational Plan/Taquilla/Product/Routing projection with demand frontend, blocker visibility, assimilation review queue and normalized import workflow.
 - G3.6 governed Taquilla assimilation with idempotent staging, one/two-document provenance, explicit deck validation, exact G2 product resolution, duplicate quarantine and transactional apply.
 - G3.5 governed lifecycle and historical completion with ON_TIME/DELAYED administrative classification, reasoned cancellation and safe DRAFT correction without fabricated MES actuals.
@@ -41,6 +41,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 - Automated G0 repository structure check.
 
 ### Changed
+- G3 Demand / Plan / Taquilla / Routing released on 2026-11-02 after explicit approval; PR #9 merged to `main` as `8bae480b40474a4ac14fa892dec12ea02c51bb08`.
 - G2 Master Data released on 2026-10-29 after explicit approval; PR #8 merged to `main` as `e476edb8f1862613ff90f2a22a514d3f53a05ec5`.
 - G1 Platform Core released on 2026-10-29 after explicit approval; PR #6 merged to `main` as `3412a9b3f78303166f81e22e32a7b167ad2dc19e`.
 - G0 Architecture Foundation released on 2026-10-28 after explicit approval; PR #1 merged to `main` as `6f79f82155789c02c8138b2caec1f617b46619db`.
