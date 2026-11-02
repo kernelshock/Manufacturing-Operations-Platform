@@ -38,7 +38,7 @@ function statusClass(status: string) {
   return "status-pill neutral";
 }
 
-export function DemandPanel() {
+export function DemandPanel({ canEdit }: { canEdit: boolean }) {
   const [plans, setPlans] = useState<ProductionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [projection, setProjection] = useState<OperationalPlanProjection | null>(null);
@@ -46,6 +46,9 @@ export function DemandPanel() {
   const [loading, setLoading] = useState(true);
   const [projectionLoading, setProjectionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importPayload, setImportPayload] = useState("");
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -110,6 +113,48 @@ export function DemandPanel() {
   const reviewBatches = batches.filter(
     (batch) => batch.status === "REVIEW_REQUIRED"
   );
+
+  async function refreshDemand() {
+    const [planData, batchData] = await Promise.all([
+      api.productionPlans(),
+      api.assimilationBatches()
+    ]);
+    setPlans(planData);
+    setBatches(batchData);
+    if (selectedPlanId) {
+      setProjection(await api.operationalProjection(selectedPlanId));
+    }
+  }
+
+  async function submitImport() {
+    setImportMessage(null);
+    setError(null);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(importPayload);
+    } catch {
+      setError("El contrato de importación debe ser JSON válido.");
+      return;
+    }
+    setImporting(true);
+    try {
+      const result = await api.importTaquilla(payload);
+      setImportMessage(
+        result.batch.status === "APPLIED"
+          ? `Taquilla aplicada: ${result.batch.taquilla_code}`
+          : `Importación en ${statusLabel(result.batch.status)} con ${result.issues.length} observaciones.`
+      );
+      await refreshDemand();
+    } catch (reason: unknown) {
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "No fue posible importar la Taquilla."
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
 
   return (
     <>
@@ -299,6 +344,41 @@ export function DemandPanel() {
             )}
           </section>
         </>
+      ) : null}
+
+
+      {canEdit ? (
+        <section className="content-section">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Carga controlada</p>
+              <h2>Importar contrato normalizado de Taquilla</h2>
+            </div>
+            <span className="status-pill neutral">demand.edit</span>
+          </div>
+          <p className="muted">
+            Pegá únicamente el contrato JSON normalizado de G3.6. Esta pantalla no
+            interpreta PDFs, nombres de archivo ni orden de páginas.
+          </p>
+          <textarea
+            className="import-textarea"
+            value={importPayload}
+            onChange={(event) => setImportPayload(event.target.value)}
+            placeholder='{"schema_version":"1.0.0", ...}'
+            rows={10}
+          />
+          <div className="form-actions">
+            <button
+              type="button"
+              className="primary-button"
+              disabled={importing || !importPayload.trim()}
+              onClick={() => void submitImport()}
+            >
+              {importing ? "Validando…" : "Validar e importar"}
+            </button>
+            {importMessage ? <span className="muted">{importMessage}</span> : null}
+          </div>
+        </section>
       ) : null}
 
       <section className="content-section">
