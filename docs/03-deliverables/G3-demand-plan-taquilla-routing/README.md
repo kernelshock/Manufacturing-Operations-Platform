@@ -1,6 +1,6 @@
 # G3 — Demand / Plan / Taquilla / Routing
 
-Status: **IN PROGRESS**  
+Status: **VALIDATED — awaiting explicit release approval**  
 Started: 2026-10-29  
 Base: released G2 main `115b8dfe11a94d1d2587f5c6937b0383f0f05e65`
 
@@ -57,7 +57,7 @@ G3 introduces the canonical transactional identities for:
 - **G3.5 — Lifecycle & Historical Completion — COMPLETED:** cancellation/error correction plus administrative completion classification for imported historical plans without fabricating MES actuals.
 - **G3.6 — Taquilla Assimilation — COMPLETED:** controlled import, duplicate detection, source provenance and validation for one/two-document orders.
 - **G3.7 — Operational Projection & Frontend — COMPLETED:** plan/taquilla views and operator workflows needed before APS handoff.
-- **G3.8 — Gate Hardening:** migration integrity, regressions, RBAC/audit, idempotency, security, runtime and release evidence.
+- **G3.8 — Gate Hardening — COMPLETED:** migration integrity, regressions, RBAC/audit, idempotency, security, runtime and release evidence.
 
 ## G3 exit criteria
 
@@ -76,9 +76,27 @@ G3 is eligible for VALIDATED only when:
 - G0/G1/G2 regressions, G3 tests, schema drift, dependency/security audits and runtime regression are green;
 - explicit release approval is received before merge/release.
 
-## Current slice
+## Current status
 
-**G3.8 — Gate Hardening**
+**G3 VALIDATED — awaiting explicit release approval**
+
+### G3.8 — Gate Hardening
+- hardening implementation head: `627fc2341c5bcd050ab43e0cbf0b58f7e2762b7f`;
+- canonical validation: `G3 Demand Plan Taquilla Routing` push run #100 — **SUCCESS**;
+- Alembic head remains `0018_g3_6`;
+- added explicit gate-hardening invariants for G3 scope/ownership, slice completion, RBAC, mutation audit, assimilation semantics and frontend APS boundary;
+- workflow executes the hardening invariant suite separately before the aggregate G3 gate;
+- one pre-validation run (#99) correctly failed on a syntax defect inside the new hardening test itself; the defect was corrected before validation and no domain/migration/runtime defect was masked;
+- single Alembic head, clean upgrade, `alembic check`, full downgrade to base and replay to head pass;
+- G0/G1/G2 regressions and complete G3 suite pass;
+- frontend npm audit, typecheck, tests and production build pass;
+- secret scan, supply-chain pin checks and Python dependency audit pass;
+- released-runtime regression passes;
+- aggregate G3 gate passes;
+- G3 meets all recorded exit criteria and is now **VALIDATED**;
+- PR #9 remains DRAFT;
+- no merge or RELEASED status is authorized until explicit release approval is received.
+
 
 ### G3.7 — Operational Projection & Frontend
 - implementation head: `865e07cef52f2534f3c9c6d4567891a94f76adc6`;
