@@ -34,6 +34,8 @@ from mop.mes.schemas import (
     SetupStartCreate,
 )
 from mop.mes.service import MESConflictError, MESRuleError, MESService
+from mop.mes.rework_service import ReworkService
+from mop.mes.rework_schemas import ReworkCaseCreate, ReworkComplete, ReworkStart, ReworkStepCreate
 from mop.persistence.database import DatabaseManager
 
 pytestmark = pytest.mark.skipif(
@@ -596,6 +598,87 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
                 None,
             )
 
+        rework = ReworkService(session)
+        case, case_replay = rework.create_case(
+            ReworkCaseCreate(
+                source_execution_operation_id=operation.id,
+                return_execution_operation_id=successor.id,
+                case_code=f"RW-{suffix}",
+                reason_code="QUALITY_REPAIR",
+                reason_note="Controlled repair loop",
+                quantity=Decimal("1.5"),
+            ),
+            None,
+        )
+        assert case_replay is False
+        assert case.status == "OPEN"
+
+        case_replay_entity, case_replay = rework.create_case(
+            ReworkCaseCreate(
+                source_execution_operation_id=operation.id,
+                return_execution_operation_id=successor.id,
+                case_code=f"RW-{suffix}",
+                reason_code="QUALITY_REPAIR",
+                reason_note="Controlled repair loop",
+                quantity=Decimal("1.5"),
+            ),
+            None,
+        )
+        assert case_replay is True
+        assert case_replay_entity.id == case.id
+
+        first = rework.add_step(
+            case.id,
+            ReworkStepCreate(routing_operation_id=routing_op_2.id, resource_id=resource.id),
+        )
+        second = rework.add_step(
+            case.id,
+            ReworkStepCreate(routing_operation_id=routing_op.id, resource_id=actual_resource.id),
+        )
+        third = rework.add_step(
+            case.id,
+            ReworkStepCreate(routing_operation_id=routing_op_2.id, resource_id=resource.id),
+        )
+        assert [x.routing_operation_id for x in rework.list_steps(case.id)] == [
+            routing_op_2.id, routing_op.id, routing_op_2.id
+        ]
+
+        for ix, step in enumerate([first, second, third]):
+            started_step, step_replay = rework.start_step(
+                step.id,
+                ReworkStart(occurred_at=start_at + timedelta(minutes=65, seconds=2 + ix * 10)),
+                None,
+            )
+            assert step_replay is False
+            assert started_step.status == "RUNNING"
+            completed_step, step_replay = rework.complete_step(
+                step.id,
+                ReworkComplete(
+                    occurred_at=start_at + timedelta(minutes=65, seconds=8 + ix * 10),
+                    produced_quantity=Decimal("1.5"),
+                ),
+                None,
+            )
+            assert step_replay is False
+            assert completed_step.status == "COMPLETED"
+
+        with pytest.raises(MESRuleError):
+            rework.add_step(
+                case.id,
+                ReworkStepCreate(routing_operation_id=routing_op.id, resource_id=resource.id),
+            )
+
+        returned_case, return_replay = rework.return_case(
+            case.id, start_at + timedelta(minutes=65, seconds=45), None
+        )
+        assert return_replay is False
+        assert returned_case.status == "RETURNED"
+        returned_again, return_replay = rework.return_case(
+            case.id, start_at + timedelta(minutes=65, seconds=45), None
+        )
+        assert return_replay is True
+        assert returned_again.id == case.id
+
         handoff_1, replay = mes.transfer_wip(
             operation.id,
             HandoffTransferCreate(
@@ -614,7 +697,7 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
             operation.id,
             HandoffTransferCreate(
                 to_execution_operation_id=successor.id,
-                quantity=Decimal("5.5"),
+                quantity=Decimal("4"),
                 occurred_at=start_at + timedelta(minutes=67),
                 note="Remaining WIP transfer",
             ),
@@ -675,14 +758,17 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
         assert source_trace.predecessor_operation_id is None
         assert source_trace.successor_operation_id == successor.id
         assert source_trace.produced_quantity == Decimal("9.5")
-        assert source_trace.outgoing_transferred_quantity == Decimal("9.50000000")
-        assert source_trace.outgoing_received_quantity == Decimal("9.50000000")
+        assert source_trace.outgoing_transferred_quantity == Decimal("8.00000000")
+        assert source_trace.outgoing_received_quantity == Decimal("8.00000000")
+        assert source_trace.rework_allocated_quantity == Decimal("1.50000000")
+        assert source_trace.rework_returned_quantity == Decimal("1.50000000")
         assert source_trace.available_to_transfer == Decimal("0E-8")
 
         successor_trace = mes.get_wip_trace(successor.id)
         assert successor_trace.predecessor_operation_id == operation.id
-        assert successor_trace.incoming_transferred_quantity == Decimal("9.50000000")
-        assert successor_trace.incoming_received_quantity == Decimal("9.50000000")
+        assert successor_trace.incoming_transferred_quantity == Decimal("8.00000000")
+        assert successor_trace.incoming_received_quantity == Decimal("8.00000000")
+        assert successor_trace.incoming_returned_rework_quantity == Decimal("1.50000000")
 
         handoffs = list(mes.list_handoffs(operation.id))
         assert [item.sequence_no for item in handoffs] == [1, 2]
