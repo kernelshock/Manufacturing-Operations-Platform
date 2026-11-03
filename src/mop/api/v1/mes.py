@@ -11,9 +11,13 @@ from mop.iam.dependencies import require_global_permission
 from mop.iam.models import User
 from mop.mes.schemas import (
     DispatchMaterializationResult,
+    ExecutionActionResult,
+    ExecutionCompleteCreate,
     ExecutionDispatchCreate,
     ExecutionDispatchRead,
+    ExecutionOperationEventRead,
     ExecutionOperationRead,
+    ExecutionStartCreate,
 )
 from mop.mes.service import MESConflictError, MESNotFoundError, MESRuleError, MESService
 from mop.persistence.dependencies import get_session
@@ -177,3 +181,99 @@ def cancel_dispatch(
             details={"publication_id": str(dispatch.publication_id)},
         )
     return dispatch
+
+
+
+@router.get(
+    "/operations/{operation_id}",
+    response_model=ExecutionOperationRead,
+)
+def get_operation(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.get_operation(operation_id))
+
+
+@router.get(
+    "/operations/{operation_id}/events",
+    response_model=list[ExecutionOperationEventRead],
+)
+def list_operation_events(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.list_operation_events(operation_id))
+
+
+@router.post(
+    "/operations/{operation_id}/start",
+    response_model=ExecutionActionResult,
+)
+def start_operation(
+    operation_id: UUID,
+    payload: ExecutionStartCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    operation, event, replay = _translate(
+        lambda: app.start_operation(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.operation.start",
+        object_type="execution_operation",
+        object_id=operation.id,
+        details={
+            "dispatch_id": str(operation.dispatch_id),
+            "occurred_at": event.occurred_at.isoformat(),
+            "idempotent_replay": replay,
+        },
+    )
+    return ExecutionActionResult(
+        operation=operation,
+        event=event,
+        idempotent_replay=replay,
+    )
+
+
+@router.post(
+    "/operations/{operation_id}/complete",
+    response_model=ExecutionActionResult,
+)
+def complete_operation(
+    operation_id: UUID,
+    payload: ExecutionCompleteCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    operation, event, replay = _translate(
+        lambda: app.complete_operation(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.operation.complete",
+        object_type="execution_operation",
+        object_id=operation.id,
+        details={
+            "dispatch_id": str(operation.dispatch_id),
+            "occurred_at": event.occurred_at.isoformat(),
+            "produced_quantity": str(event.produced_quantity),
+            "idempotent_replay": replay,
+        },
+    )
+    return ExecutionActionResult(
+        operation=operation,
+        event=event,
+        idempotent_replay=replay,
+    )
