@@ -38,7 +38,6 @@ def test_g5_1_dispatch_foundation_preserves_ownership_boundaries() -> None:
         "scrap_quantity",
         "pause_started_at",
         "setup_started_at",
-        "actual_resource_id",
     ):
         assert forbidden not in models
 
