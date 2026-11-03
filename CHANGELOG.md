@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G5.4 MES adjacent-operation WIP transfer/receive traceability with partial quantities and predecessor-gated successor start.
 - G5.3 MES setup, repeatable interruption/pause-resume evidence, actual-resource deviation and observational planned-vs-actual metrics.
 - G5.2 MES operation START/COMPLETE lifecycle with actual timestamps, explicit produced quantity, event evidence and audited idempotent API.
 - G5.1 MES execution dispatch foundation with CURRENT-publication snapshots, mes.read/mes.edit, audited lifecycle and no premature execution actuals.
