@@ -36,7 +36,7 @@ def test_g5_4_wip_handoff_contract() -> None:
     assert "WIP handoff target must be the immediate execution successor" in service
     assert "WIP can only transfer from a COMPLETED predecessor" in service
     assert "WIP transfer quantity exceeds predecessor produced quantity" in service
-    assert "execution successor requires received WIP from its immediate predecessor" in service
+    assert "execution successor requires received WIP or an explicit returned rework path" in service
 
     for forbidden in (
         "inventory_balance_id",
