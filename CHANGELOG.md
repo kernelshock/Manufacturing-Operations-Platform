@@ -5,6 +5,14 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G5.7 integrated responsive MES shop-floor operator capture and permission-gated dispatch/operation monitoring (CI validation pending).
+- G5.6 read-only MES-to-APS actual-versus-plan feedback and conservative operation/dispatch completion classifications (validation pending).
+- G5.5 governed MES repair loops with actual execution steps, controlled return and WIP allocation reconciliation.
+- G5.4 MES adjacent-operation WIP transfer/receive traceability with partial quantities and predecessor-gated successor start.
+- G5.3 MES setup, repeatable interruption/pause-resume evidence, actual-resource deviation and observational planned-vs-actual metrics.
+- G5.2 MES operation START/COMPLETE lifecycle with actual timestamps, explicit produced quantity, event evidence and audited idempotent API.
+- G5.1 MES execution dispatch foundation with CURRENT-publication snapshots, mes.read/mes.edit, audited lifecycle and no premature execution actuals.
+- G5 MES gate bootstrap with explicit actual-execution ownership, dispatch/traceability roadmap and released G4 baseline.
 - G4.8 final APS gate hardening with explicit ownership/RBAC/audit/determinism invariants; G4 formally released.
 - G4.7 isolated what-if evaluation with resource blackout/capacity-factor exceptions, comparison metrics and explicit apply/discard workflow.
 - G4.6 read-only published-schedule Gantt projection with master/per-plan frontend, adjustable scale and productive-segment gap rendering.
