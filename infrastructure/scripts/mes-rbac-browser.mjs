@@ -121,12 +121,14 @@ try {
 
   await login(users.unprivileged.username,password);
   await check(403, read);
+  await check(403, "/api/v1/mes/resources");
   await check(403, change, "POST", {});
   await inspectUI({mesVisible:false,captureVisible:false});
   console.log("MES RBAC unprivileged PASS: hidden + HTTP 403");
   await logout();
 
   await login(users.viewer.username,password);
+  await check(200, "/api/v1/mes/resources");
   await check(200, read);
   await check(403, change, "POST", {});
   await check(403, "/api/v1/iam/users");
@@ -135,6 +137,8 @@ try {
   await logout();
 
   await login(users.operator.username,password);
+  await check(200, "/api/v1/mes/resources");
+  await check(403, "/api/v1/core/resources");
   await check(200, read);
   await check(404, change, "POST", {});
   await check(403, "/api/v1/iam/users");
