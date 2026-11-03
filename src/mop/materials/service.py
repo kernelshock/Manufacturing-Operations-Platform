@@ -91,11 +91,13 @@ class MaterialsService:
 
     def balance(self, article_id: UUID, location_id: UUID) -> BalanceRead:
         row = self.session.execute(
-            select(func.count(MaterialMovement.id), func.coalesce(func.sum(MaterialMovement.signed_quantity), 0),
-                   func.min(MaterialMovement.uom_id))
+            select(func.count(MaterialMovement.id), func.coalesce(func.sum(MaterialMovement.signed_quantity), 0))
             .where(MaterialMovement.article_id == article_id, MaterialMovement.location_id == location_id)
         ).one()
-        count, amount, unit_id = row
+        count, amount = row
+        unit_id = self.session.scalar(select(MaterialMovement.uom_id).where(
+            MaterialMovement.article_id == article_id, MaterialMovement.location_id == location_id
+        ).limit(1)) if count else None
         return BalanceRead(article_id=article_id, location_id=location_id,
                            uom_id=unit_id if count else None,
                            initialized=bool(count), on_hand=Decimal(amount) if count else None)
@@ -187,7 +189,7 @@ class MaterialsService:
         original = self.session.get(MaterialMovement, movement_id)
         if original is None:
             raise MaterialsNotFound("movement not found")
-        if original.kind == "REVERSAL":
+        if original.kind in ("REVERSAL", "OPENING_ZERO"):
             raise MaterialsRule("cannot reverse a reversal")
         self._advisory_lock(f"balance:{original.article_id}:{original.location_id}")
         if self.session.scalar(select(MaterialMovement.id).where(MaterialMovement.reversal_of_id == movement_id)):
