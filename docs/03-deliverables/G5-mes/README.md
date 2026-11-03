@@ -70,7 +70,7 @@ G5 may reference maintenance/workforce/material context once those later gates e
 
 - **G5.1 — Execution Domain & Dispatch Foundation — COMPLETED:** canonical dispatch/execution-operation identities, CURRENT-publication materialization, lifecycle, RBAC, audit and API baseline.
 - **G5.2 — Operation Start / Finish & Quantity Capture — COMPLETED:** explicit START/COMPLETE events, actual timestamps, produced quantity, idempotent lifecycle and audit.
-- **G5.3 — Setup / Pause / Interruption / Deviation:** optional setup, pause/resume, interruption reasons, delay evidence and planned-vs-actual deviation.
+- **G5.3 — Setup / Pause / Interruption / Deviation — COMPLETED:** optional setup, repeatable pause/resume interruptions, actual-resource evidence and observational plan-vs-actual deviations.
 - **G5.4 — Transfer / Handoff & WIP Traceability:** predecessor/successor handoff, WIP movement and operation-to-operation traceability.
 - **G5.5 — Rework & Alternative Execution Path:** explicit repair/rework loops and governed deviation from nominal routing without rewriting G2/G3 history.
 - **G5.6 — APS Feedback & Completion Classification:** actual-vs-planned timing, delay classification and feedback to replanning without mutating published G4 schedules.
@@ -122,6 +122,20 @@ G5.2 is **COMPLETED**.
 - conflicting completion evidence is rejected;
 - G5.2 still excludes pause/setup/interruption/scrap/actual-resource deviation.
 
+G5.3 is **COMPLETED**.
+
+- validated implementation head: `7aba83e03e32ed887511a880214c55c365d68614`;
+- Alembic head: `0027_g5_3`;
+- G5 MES push run #63: **SUCCESS**;
+- optional setup is explicit and must close before operation START;
+- operation lifecycle now supports RUNNING ↔ PAUSED with repeatable interruption history;
+- every pause requires an explicit reason code;
+- at most one interruption can remain open per operation;
+- actual resource remains unknown unless explicitly supplied;
+- alternate actual resource requires a deviation reason and never rewrites planned resource;
+- deviation projection derives start/finish/quantity/resource/setup/interruption deltas without automatic causal classification;
+- G5.3 still excludes G8 maintenance authority, G9 workforce authority and G5.4 WIP handoff.
+
 The next slice is:
 
-**G5.3 — Setup / Pause / Interruption / Deviation**
+**G5.4 — Transfer / Handoff & WIP Traceability**
