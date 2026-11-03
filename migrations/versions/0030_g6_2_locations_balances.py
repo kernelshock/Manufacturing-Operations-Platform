@@ -3,7 +3,7 @@
 Revision ID: 0030_g6_2
 Revises: 0029_g5_5
 """
-from uuid import UUID
+from uuid import UUID, NAMESPACE_URL, uuid5
 from alembic import op
 import sqlalchemy as sa
 
@@ -13,8 +13,8 @@ branch_labels = None
 depends_on = None
 
 ADMIN = UUID("20000000-0000-0000-0000-000000000001")
-READ = UUID("10000000-0000-0000-0000-000000000020")
-EDIT = UUID("10000000-0000-0000-0000-000000000021")
+READ = uuid5(NAMESPACE_URL, "faic-mop/g6/materials.read")
+EDIT = uuid5(NAMESPACE_URL, "faic-mop/g6/materials.edit")
 
 
 def upgrade():
