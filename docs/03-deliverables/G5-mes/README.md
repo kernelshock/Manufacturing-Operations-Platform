@@ -69,7 +69,7 @@ G5 may reference maintenance/workforce/material context once those later gates e
 ## Planned slices
 
 - **G5.1 — Execution Domain & Dispatch Foundation — COMPLETED:** canonical dispatch/execution-operation identities, CURRENT-publication materialization, lifecycle, RBAC, audit and API baseline.
-- **G5.2 — Operation Start / Finish & Quantity Capture:** actual start/finish, produced quantity and completion semantics with explicit operator action.
+- **G5.2 — Operation Start / Finish & Quantity Capture — COMPLETED:** explicit START/COMPLETE events, actual timestamps, produced quantity, idempotent lifecycle and audit.
 - **G5.3 — Setup / Pause / Interruption / Deviation:** optional setup, pause/resume, interruption reasons, delay evidence and planned-vs-actual deviation.
 - **G5.4 — Transfer / Handoff & WIP Traceability:** predecessor/successor handoff, WIP movement and operation-to-operation traceability.
 - **G5.5 — Rework & Alternative Execution Path:** explicit repair/rework loops and governed deviation from nominal routing without rewriting G2/G3 history.
@@ -108,6 +108,20 @@ G5.1 is **COMPLETED**.
 - G5.1 stores planned evidence only and introduces no actual start/finish, produced quantity, scrap, pause/setup, operator or actual-resource state;
 - `mes.read` / `mes.edit` and audited dispatch mutations are active.
 
+G5.2 is **COMPLETED**.
+
+- validated implementation head: `4957868d221f068e17fa337b1f92f92dc732bc0c`;
+- Alembic head: `0026_g5_2`;
+- G5 MES push run #31: **SUCCESS**;
+- operation lifecycle: PENDING → RUNNING → COMPLETED;
+- START/COMPLETE are explicit MES events with actor/time evidence;
+- actual start/finish remain separate from G4 planned timestamps;
+- produced quantity is explicit Decimal-safe actual data and may differ from requested quantity;
+- no scrap is inferred from quantity variance;
+- replay of identical START/COMPLETE is idempotent;
+- conflicting completion evidence is rejected;
+- G5.2 still excludes pause/setup/interruption/scrap/actual-resource deviation.
+
 The next slice is:
 
-**G5.2 — Operation Start / Finish & Quantity Capture**
+**G5.3 — Setup / Pause / Interruption / Deviation**
