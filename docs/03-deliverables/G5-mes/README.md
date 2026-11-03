@@ -176,3 +176,11 @@ G5.6 CI verification: implementation head `b62c6268624681e8a5e8a4f2f45461c79b1da
 - G0 #388, G1 #393, G2 #326, G3 #338, G4 #350: SUCCESS on same SHA.
 - G5.7 slice COMPLETED for automated integration; live browser E2E and operational acceptance remain release blockers under G5.8, not claimed as passed.
 - G5.8 work opened with a validation plan and cross-layer regression contract. No merge/release authorized.
+
+## G5.8 shop-floor UI hardening — 2026-11-03
+
+The former UUID-only resource input and API-only WIP/rework workflow have been replaced by an operator-facing implementation. Resource labels are served read-only through MES permissions and preserved as canonical IDs on write. The advanced shop-floor panel exposes WIP TRANSFER/RECEIVE and governed rework case, steps and return. These controls reuse existing G5.4/G5.5 contracts without modifying APS publications or routing revisions.
+
+Chrome/React/FastAPI/PostgreSQL acceptance first passed on G5 MES #273 for all new controls; G0–G4 also passed at the same implementation SHA. Additional UX/RBAC hardening and this documentary update require final-HEAD CI before a new formal gate decision. [Evidence](./G5.8-EVIDENCE.md) · [Gate decision](./G5.8-GATE-DECISION.md).
+
+**G5 is NOT RELEASED**. PR #13 remains DRAFT pending final same-SHA technical verification and separate user authorization for merge and release.
