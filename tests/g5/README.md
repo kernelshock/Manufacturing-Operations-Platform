@@ -13,3 +13,15 @@ Coverage includes:
 - mes.read / mes.edit server-side authorization contracts;
 - audited create/release/cancel mutations;
 - explicit exclusion of actual start/finish, produced quantity, scrap, pause/setup, operator and actual-resource state from G5.1.
+
+
+G5.2 adds coverage for:
+- PENDING → RUNNING → COMPLETED operation lifecycle;
+- explicit START and COMPLETE events;
+- actual start/finish separated from planned timestamps;
+- Decimal-safe produced quantity capture;
+- produced quantity differing from requested quantity without implicit scrap;
+- rejection of completion before start and finish before actual start;
+- idempotent replay of identical execution actions;
+- conflict on attempts to rewrite completed quantity/evidence;
+- continued exclusion of pause/setup/scrap/actual-resource authority.
