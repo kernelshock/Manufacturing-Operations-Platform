@@ -3,11 +3,15 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runNominalBrowserFlow } from "./mes-browser-flow.mjs";
+import { runWipReworkBrowserFlow } from "./mes-browser-wip-flow.mjs";
 
 const origin = process.env.MOP_BROWSER_ORIGIN ?? "http://127.0.0.1:18080";
 const username = process.env.MOP_ADMIN_USERNAME ?? "smoke-admin";
 const password = process.env.MOP_BOOTSTRAP_ADMIN_PASSWORD;
 if (!password) throw new Error("MOP_BOOTSTRAP_ADMIN_PASSWORD missing");
+if (!process.env.MOP_MES_FIXTURE_JSON) throw new Error("MES fixture manifest missing");
+const fixture = JSON.parse(await readFile(process.env.MOP_MES_FIXTURE_JSON, "utf8"));
 const dir = await mkdtemp(join(tmpdir(), "mop-chrome-"));
 const chrome = spawn(process.env.MOP_CHROME_BINARY ?? "google-chrome", [
   "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
@@ -83,7 +87,11 @@ try {
   await poll(async () => await evaluate('document.body.textContent.includes("Sin despachos disponibles") || Boolean(document.querySelector(".mes-operation-row"))'), "MES dispatch state missing");
   const state = await evaluate('({selector:Boolean(document.querySelector("#mes-dispatch")), empty:document.body.textContent.includes("Sin despachos disponibles"), rows:document.querySelectorAll(".mes-operation-row").length})');
   if (!state.selector || (!state.empty && state.rows === 0)) throw new Error("Invalid MES screen state");
-  console.log("MES browser smoke PASSED:", JSON.stringify(state));
+  if (state.empty || state.rows !== 2) throw new Error("Two-operation RELEASED dispatch is required for G5.8");
+  const dispatchId = await evaluate('document.querySelector("#mes-dispatch").value');
+  if (dispatchId !== fixture.dispatch_id) throw new Error("Wrong active MES dispatch");
+  const operator = await runNominalBrowserFlow({evaluate, type, poll, fixture});
+  await runWipReworkBrowserFlow({evaluate, fixture, operator});
 } finally {
   ws?.close();
   chrome.kill("SIGTERM");
