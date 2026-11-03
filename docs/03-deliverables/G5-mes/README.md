@@ -164,4 +164,4 @@ G5.5 is **COMPLETED**.
 
 The next slice is:
 
-**G5.6 — APS Feedback & Completion Classification**
+**G5.6 — APS Feedback & Completion Classification** (implementation in branch; CI validation pending)
