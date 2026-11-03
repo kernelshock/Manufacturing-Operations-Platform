@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,12 +13,15 @@ from mop.aps.lifecycle_models import SchedulePublication, PublishedScheduledOper
 from mop.aps.models import SchedulingScenario
 from mop.aps.operation_models import PlanningOperation
 from mop.core.models import Resource
-from mop.mes.models import ExecutionDispatch, ExecutionInterruption, ExecutionOperation, ExecutionOperationEvent, ExecutionSetup
+from mop.mes.models import ExecutionDispatch, ExecutionHandoff, ExecutionInterruption, ExecutionOperation, ExecutionOperationEvent, ExecutionSetup
 from mop.mes.schemas import (
     ExecutionCompleteCreate,
     ExecutionDeviationRead,
     ExecutionDispatchCreate,
     ExecutionStartCreate,
+    ExecutionWIPTraceRead,
+    HandoffReceiveCreate,
+    HandoffTransferCreate,
     InterruptionResumeCreate,
     InterruptionStartCreate,
     SetupFinishCreate,
@@ -239,6 +242,190 @@ class MESService:
             raise MESNotFoundError("execution dispatch not found")
         return dispatch
 
+
+    def _adjacent_operations(
+        self,
+        operation: ExecutionOperation,
+    ) -> tuple[ExecutionOperation | None, ExecutionOperation | None]:
+        siblings = list(
+            self.session.scalars(
+                select(ExecutionOperation)
+                .where(
+                    ExecutionOperation.dispatch_id == operation.dispatch_id,
+                    ExecutionOperation.product_line_id == operation.product_line_id,
+                )
+                .order_by(
+                    ExecutionOperation.routing_sequence_no,
+                    ExecutionOperation.id,
+                )
+            ).all()
+        )
+        predecessor = None
+        successor = None
+        for index, item in enumerate(siblings):
+            if item.id != operation.id:
+                continue
+            if index > 0:
+                predecessor = siblings[index - 1]
+            if index + 1 < len(siblings):
+                successor = siblings[index + 1]
+            break
+        return predecessor, successor
+
+    def list_handoffs(
+        self,
+        operation_id: UUID,
+    ) -> Sequence[ExecutionHandoff]:
+        self.get_operation(operation_id)
+        return self.session.scalars(
+            select(ExecutionHandoff)
+            .where(
+                (ExecutionHandoff.from_execution_operation_id == operation_id)
+                | (ExecutionHandoff.to_execution_operation_id == operation_id)
+            )
+            .order_by(
+                ExecutionHandoff.transferred_at,
+                ExecutionHandoff.sequence_no,
+                ExecutionHandoff.created_at,
+            )
+        ).all()
+
+    def transfer_wip(
+        self,
+        from_operation_id: UUID,
+        data: HandoffTransferCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionHandoff, bool]:
+        source = self.get_operation(from_operation_id)
+        target = self.get_operation(data.to_execution_operation_id)
+        if source.dispatch_id != target.dispatch_id:
+            raise MESRuleError("WIP handoff operations must belong to the same dispatch")
+        if source.product_line_id != target.product_line_id:
+            raise MESRuleError("WIP handoff operations must belong to the same product line")
+
+        _, expected_successor = self._adjacent_operations(source)
+        if expected_successor is None or expected_successor.id != target.id:
+            raise MESRuleError("WIP handoff target must be the immediate execution successor")
+        if source.status != "COMPLETED" or source.produced_quantity is None:
+            raise MESRuleError("WIP can only transfer from a COMPLETED predecessor")
+        if target.status == "COMPLETED":
+            raise MESRuleError("WIP cannot transfer to an already COMPLETED successor")
+
+        already_transferred = self.session.scalar(
+            select(func.coalesce(func.sum(ExecutionHandoff.quantity), 0))
+            .where(
+                ExecutionHandoff.from_execution_operation_id == source.id,
+                ExecutionHandoff.to_execution_operation_id == target.id,
+            )
+        )
+        total_after = Decimal(str(already_transferred)) + data.quantity
+        if total_after > source.produced_quantity:
+            raise MESRuleError("WIP transfer quantity exceeds predecessor produced quantity")
+
+        latest_sequence = self.session.scalar(
+            select(func.coalesce(func.max(ExecutionHandoff.sequence_no), 0))
+            .where(
+                ExecutionHandoff.from_execution_operation_id == source.id,
+                ExecutionHandoff.to_execution_operation_id == target.id,
+            )
+        )
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        if source.actual_finish is not None and occurred_at < source.actual_finish:
+            raise MESRuleError("WIP transfer cannot precede predecessor actual finish")
+
+        handoff = ExecutionHandoff(
+            dispatch_id=source.dispatch_id,
+            product_line_id=source.product_line_id,
+            from_execution_operation_id=source.id,
+            to_execution_operation_id=target.id,
+            sequence_no=int(latest_sequence) + 1,
+            quantity=data.quantity,
+            status="TRANSFERRED",
+            transferred_at=occurred_at,
+            transferred_by=actor_id,
+            note=data.note,
+        )
+        try:
+            self.session.add(handoff)
+            self.session.commit()
+            self.session.refresh(handoff)
+            return handoff, False
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MESConflictError("WIP handoff identity already exists") from exc
+
+    def receive_handoff(
+        self,
+        handoff_id: UUID,
+        data: HandoffReceiveCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionHandoff, bool]:
+        handoff = self.session.get(ExecutionHandoff, handoff_id)
+        if handoff is None:
+            raise MESNotFoundError("execution handoff not found")
+        if handoff.status == "RECEIVED":
+            if data.occurred_at is not None and data.occurred_at != handoff.received_at:
+                raise MESConflictError("WIP handoff was already received at a different timestamp")
+            return handoff, True
+        if handoff.status != "TRANSFERRED":
+            raise MESRuleError("only TRANSFERRED WIP handoff can be received")
+
+        target = self.get_operation(handoff.to_execution_operation_id)
+        if target.status == "COMPLETED":
+            raise MESRuleError("WIP handoff cannot be received by a COMPLETED successor")
+
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        if occurred_at < handoff.transferred_at:
+            raise MESRuleError("WIP receipt cannot precede transfer")
+
+        handoff.status = "RECEIVED"
+        handoff.received_at = occurred_at
+        handoff.received_by = actor_id
+        return self._commit(handoff), False
+
+    def get_wip_trace(self, operation_id: UUID) -> ExecutionWIPTraceRead:
+        operation = self.get_operation(operation_id)
+        predecessor, successor = self._adjacent_operations(operation)
+
+        incoming_transferred = self.session.scalar(
+            select(func.coalesce(func.sum(ExecutionHandoff.quantity), 0))
+            .where(ExecutionHandoff.to_execution_operation_id == operation.id)
+        )
+        incoming_received = self.session.scalar(
+            select(func.coalesce(func.sum(ExecutionHandoff.quantity), 0))
+            .where(
+                ExecutionHandoff.to_execution_operation_id == operation.id,
+                ExecutionHandoff.status == "RECEIVED",
+            )
+        )
+        outgoing_transferred = self.session.scalar(
+            select(func.coalesce(func.sum(ExecutionHandoff.quantity), 0))
+            .where(ExecutionHandoff.from_execution_operation_id == operation.id)
+        )
+        outgoing_received = self.session.scalar(
+            select(func.coalesce(func.sum(ExecutionHandoff.quantity), 0))
+            .where(
+                ExecutionHandoff.from_execution_operation_id == operation.id,
+                ExecutionHandoff.status == "RECEIVED",
+            )
+        )
+
+        available_to_transfer = None
+        if operation.produced_quantity is not None:
+            available_to_transfer = operation.produced_quantity - Decimal(str(outgoing_transferred))
+
+        return ExecutionWIPTraceRead(
+            operation_id=operation.id,
+            predecessor_operation_id=predecessor.id if predecessor else None,
+            successor_operation_id=successor.id if successor else None,
+            produced_quantity=operation.produced_quantity,
+            incoming_transferred_quantity=Decimal(str(incoming_transferred)),
+            incoming_received_quantity=Decimal(str(incoming_received)),
+            outgoing_transferred_quantity=Decimal(str(outgoing_transferred)),
+            outgoing_received_quantity=Decimal(str(outgoing_received)),
+            available_to_transfer=available_to_transfer,
+        )
+
     def start_operation(
         self,
         operation_id: UUID,
@@ -271,6 +458,19 @@ class MESService:
 
         if operation.status != "PENDING":
             raise MESRuleError("only PENDING execution operation can be started")
+
+        predecessor, _ = self._adjacent_operations(operation)
+        if predecessor is not None:
+            received_quantity = self.session.scalar(
+                select(func.coalesce(func.sum(ExecutionHandoff.quantity), 0))
+                .where(
+                    ExecutionHandoff.from_execution_operation_id == predecessor.id,
+                    ExecutionHandoff.to_execution_operation_id == operation.id,
+                    ExecutionHandoff.status == "RECEIVED",
+                )
+            )
+            if Decimal(str(received_quantity)) <= 0:
+                raise MESRuleError("execution successor requires received WIP from its immediate predecessor")
 
         setup = self.session.scalar(
             select(ExecutionSetup).where(ExecutionSetup.execution_operation_id == operation.id)
