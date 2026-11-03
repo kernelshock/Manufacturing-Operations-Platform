@@ -49,3 +49,14 @@ G5.4 adds coverage for:
 - successor START blocked until WIP is received;
 - WIP incoming/outgoing/remaining trace projection;
 - continued separation from G6 inventory/warehouse authority.
+
+
+G5.5 covers:
+- governed rework case creation and idempotent case-code replay;
+- source completion and same ProductLine/dispatch boundaries;
+- ordered alternative/repeated routing steps with real execution timestamps and quantities;
+- explicit return to a PENDING execution operation;
+- rejection of route edits after execution begins;
+- isolation of rework allocation from normal WIP transfers;
+- reconciliation of nominal and rework output against produced quantity;
+- no G2/G3/G4 or G6/G8/G9 authority mutations.
