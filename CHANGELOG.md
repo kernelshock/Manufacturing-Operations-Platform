@@ -5,6 +5,7 @@ All notable changes to the Manufacturing Operations Platform are documented here
 ## [Unreleased]
 
 ### Added
+- G5.7 integrated responsive MES shop-floor operator capture and permission-gated dispatch/operation monitoring (CI validation pending).
 - G5.6 read-only MES-to-APS actual-versus-plan feedback and conservative operation/dispatch completion classifications (validation pending).
 - G5.5 governed MES repair loops with actual execution steps, controlled return and WIP allocation reconciliation.
 - G5.4 MES adjacent-operation WIP transfer/receive traceability with partial quantities and predecessor-gated successor start.
