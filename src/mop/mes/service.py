@@ -14,6 +14,7 @@ from mop.aps.models import SchedulingScenario
 from mop.aps.operation_models import PlanningOperation
 from mop.core.models import Resource
 from mop.mes.models import ExecutionDispatch, ExecutionHandoff, ExecutionInterruption, ExecutionOperation, ExecutionOperationEvent, ExecutionSetup
+from mop.mes.rework_models import ReworkCase
 from mop.mes.schemas import (
     ExecutionCompleteCreate,
     ExecutionDeviationRead,
@@ -296,7 +297,13 @@ class MESService:
         data: HandoffTransferCreate,
         actor_id: UUID | None,
     ) -> tuple[ExecutionHandoff, bool]:
-        source = self.get_operation(from_operation_id)
+        source = self.session.scalar(
+            select(ExecutionOperation)
+            .where(ExecutionOperation.id == from_operation_id)
+            .with_for_update()
+        )
+        if source is None:
+            raise MESNotFoundError("source execution operation not found")
         target = self.get_operation(data.to_execution_operation_id)
         if source.dispatch_id != target.dispatch_id:
             raise MESRuleError("WIP handoff operations must belong to the same dispatch")
@@ -318,9 +325,15 @@ class MESService:
                 ExecutionHandoff.to_execution_operation_id == target.id,
             )
         )
-        total_after = Decimal(str(already_transferred)) + data.quantity
+        allocated_to_rework = self.session.scalar(
+            select(func.coalesce(func.sum(ReworkCase.quantity), 0)).where(
+                ReworkCase.source_execution_operation_id == source.id,
+                ReworkCase.status != "CANCELLED",
+            )
+        )
+        total_after = Decimal(str(already_transferred)) + Decimal(str(allocated_to_rework)) + data.quantity
         if total_after > source.produced_quantity:
-            raise MESRuleError("WIP transfer quantity exceeds predecessor produced quantity")
+            raise MESRuleError("WIP transfer quantity exceeds predecessor produced quantity or reserved rework quantity")
 
         latest_sequence = self.session.scalar(
             select(func.coalesce(func.max(ExecutionHandoff.sequence_no), 0))
@@ -469,8 +482,15 @@ class MESService:
                     ExecutionHandoff.status == "RECEIVED",
                 )
             )
-            if Decimal(str(received_quantity)) <= 0:
-                raise MESRuleError("execution successor requires received WIP from its immediate predecessor")
+            returned_rework = self.session.scalar(
+                select(func.coalesce(func.sum(ReworkCase.quantity), 0)).where(
+                    ReworkCase.dispatch_id == operation.dispatch_id,
+                    ReworkCase.return_execution_operation_id == operation.id,
+                    ReworkCase.status == "RETURNED",
+                )
+            )
+            if Decimal(str(received_quantity)) <= 0 and Decimal(str(returned_rework)) <= 0:
+                raise MESRuleError("execution successor requires received WIP or an explicit returned rework path")
 
         setup = self.session.scalar(
             select(ExecutionSetup).where(ExecutionSetup.execution_operation_id == operation.id)
