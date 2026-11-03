@@ -60,6 +60,7 @@ export function MESAdvancedPanel({dispatchId,operations,selectedId,canEdit,resou
   const eligibleRoutes = operations.filter(op => selected && op.dispatch_id === dispatchId &&
     op.product_line_id === selected.product_line_id && op.routing_operation_id);
   const target = successors.find(op => op.id === targetId) ?? successors[0] ?? null;
+  const transferTarget = successors[0] ?? null;
   const selectedCaseSteps = caseSteps.filter(step => step.case_id === caseId).sort((a,b)=>a.sequence_no-b.sequence_no);
 
   useEffect(() => {
@@ -117,15 +118,15 @@ export function MESAdvancedPanel({dispatchId,operations,selectedId,canEdit,resou
       <div className="mes-form">
         <h3>Transferir al proceso siguiente</h3>
         <label>Operación destino
-          <select aria-label="Destino WIP" value={target?.id??""} onChange={e=>setTargetId(e.target.value)}>
-            {successors.length===0?<option value="">Sin sucesor disponible</option>:successors.map(op=><option key={op.id} value={op.id}>{op.routing_sequence_no}. {op.operation_code} · {op.operation_description}</option>)}
+          <select aria-label="Destino WIP" value={transferTarget?.id??""} disabled>
+            {transferTarget?<option value={transferTarget.id}>{transferTarget.routing_sequence_no}. {transferTarget.operation_code} · {transferTarget.operation_description}</option>:<option value="">Sin sucesor disponible</option>}
           </select>
         </label>
         <label>Cantidad WIP
           <input aria-label="Cantidad WIP" inputMode="decimal" placeholder="Cantidad a transferir" value={amount} onChange={e=>setAmount(e.target.value.replace(",","."))}/>
         </label>
-        <button type="button" disabled={!canEdit||busy||selected.status!=="COMPLETED"||!target||!positive(amount)}
-          onClick={()=>target&&void act(`${base}/operations/${selected.id}/handoffs/transfer`,{to_execution_operation_id:target.id,quantity:amount})}>
+        <button type="button" disabled={!canEdit||busy||selected.status!=="COMPLETED"||!transferTarget||!positive(amount)}
+          onClick={()=>transferTarget&&void act(`${base}/operations/${selected.id}/handoffs/transfer`,{to_execution_operation_id:transferTarget.id,quantity:amount})}>
           Transferir WIP
         </button>
         <h3>Recepción de WIP</h3>
