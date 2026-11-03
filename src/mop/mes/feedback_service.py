@@ -112,8 +112,7 @@ class FeedbackService:
             delayed_count=sum(item.classification == "DELAYED" for item in items),
             quantity_shortfall_count=quantity_shortfall_count,
             open_rework_count=open_rework,
-            replan_review_recommended=(classification == "DELAYED" or
-                any(item.classification == "IN_PROGRESS" and item.finish_delta_seconds is not None for item in items)
-                or quantity_shortfall_count > 0),
+            replan_review_recommended=(classification == "DELAYED"
+                or quantity_shortfall_count > 0 or open_rework > 0),
             operations=items,
         )
