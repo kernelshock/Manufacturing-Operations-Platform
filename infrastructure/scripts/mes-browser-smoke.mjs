@@ -96,7 +96,7 @@ try {
   const dispatchId = await evaluate('document.querySelector("#mes-dispatch").value');
   if (dispatchId !== fixture.dispatch_id) throw new Error("Wrong active MES dispatch");
   const operator = await runNominalBrowserFlow({evaluate, type, poll, fixture});
-  await runWipReworkBrowserFlow({evaluate, fixture, operator});
+  await runWipReworkBrowserFlow({evaluate, type, poll, fixture, operator});
   await verifyOperatorAcceptance({evaluate, poll, fixture, operatorUser:accounts.operator});
   const logout = await evaluate('(async()=>{const r=await fetch("/api/v1/auth/logout",{method:"POST"});return r.status})()');
   if (logout !== 204) throw new Error("Operator logout failed");
