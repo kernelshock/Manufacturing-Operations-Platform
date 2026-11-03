@@ -101,6 +101,8 @@ node "$ROOT/infrastructure/scripts/mes-rbac-browser.mjs"
 MOP_BROWSER_ORIGIN="http://127.0.0.1:$WEB_PORT" \
 MOP_ADMIN_USERNAME="$ADMIN_USERNAME" \
 MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+MOP_RBAC_TEST_PASSWORD="$RBAC_PASSWORD" \
+MOP_MES_RBAC_USERS_JSON="$RBAC_USERS_FILE" \
 MOP_MES_FIXTURE_JSON="$FIXTURE_FILE" \
 node "$ROOT/infrastructure/scripts/mes-browser-smoke.mjs"
 
