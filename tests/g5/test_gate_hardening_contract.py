@@ -21,7 +21,9 @@ def test_mes_shopfloor_is_permission_gated_and_uses_versioned_api():
     assert "apiFetch<Dispatch[]>" in panel
     assert "apiFetch<Operation[]>" in panel
     assert 'dispatch?.status !== "RELEASED"' in panel
-    assert 'if (!selected || !canEdit' in panel
+    assert "canCaptureOperation(selected, dispatchId, canEdit, dispatch?.status ?? null)" in panel
+    guard = source("frontend/src/shell/mesCaptureGuards.ts")
+    assert "operation.dispatch_id === selectedDispatchId" in guard
 
 
 def test_mes_capture_requires_explicit_quantity_and_pause_reason():
