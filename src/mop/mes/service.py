@@ -257,7 +257,7 @@ class MESService:
             )
         )
         if existing is not None:
-            if operation.status not in {"RUNNING", "COMPLETED"}:
+            if operation.status not in {"RUNNING", "PAUSED", "COMPLETED"}:
                 raise MESConflictError("START event exists but execution operation state is inconsistent")
             if data.occurred_at is not None and data.occurred_at != existing.occurred_at:
                 raise MESConflictError("execution operation has already started at a different timestamp")
