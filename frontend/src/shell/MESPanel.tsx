@@ -88,7 +88,7 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
     return () => { live = false; };
   }, [selectedId, refresh]);
 
-  const selected = operations.find(op => op.id === selectedId) ?? null;
+  const selected = operations.find(op => op.id === selectedId && op.dispatch_id === dispatchId) ?? null;
   const dispatch = dispatches.find(item => item.id === dispatchId) ?? null;
   const groups = useMemo(() => {
     const result = new Map<string, Operation[]>();
@@ -101,7 +101,7 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
 
   const reload = useCallback(() => setRefresh(current => current + 1), []);
   async function submit(action: "start" | "complete" | "pause" | "resume") {
-    if (!selected || !canEdit || dispatch?.status !== "RELEASED") return;
+    if (!selected || !canEdit || selected.dispatch_id !== dispatchId || dispatch?.status !== "RELEASED") return;
     if (action === "complete" && (!/^(?:\d+)(?:\.\d{1,8})?$/.test(quantity) || Number(quantity) <= 0)) {
       setError("Ingresá una cantidad producida positiva con hasta ocho decimales.");
       return;
@@ -147,7 +147,7 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
         </div>
         <div className="demand-plan-selector">
           <label htmlFor="mes-dispatch">Despacho de producción</label>
-          <select id="mes-dispatch" value={dispatchId} onChange={event => setDispatchId(event.target.value)}>
+          <select id="mes-dispatch" value={dispatchId} onChange={event => { setDispatchId(event.target.value); setOperations([]); setSelectedId(""); setFeedback(null); setOperationFeedback(null); setQuantity(""); setReason(""); setResourceId(""); setResourceReason(""); setMessage(""); setError(""); }}>
             {dispatches.length === 0 ? <option value="">Sin despachos</option> : null}
             {dispatches.map(item => (
               <option key={item.id} value={item.id}>{item.dispatch_code} · {label(item.status)}</option>
