@@ -13,11 +13,20 @@ from mop.mes.schemas import (
     DispatchMaterializationResult,
     ExecutionActionResult,
     ExecutionCompleteCreate,
+    ExecutionDeviationRead,
     ExecutionDispatchCreate,
     ExecutionDispatchRead,
+    ExecutionInterruptionRead,
     ExecutionOperationEventRead,
     ExecutionOperationRead,
+    ExecutionSetupRead,
     ExecutionStartCreate,
+    InterruptionActionResult,
+    InterruptionResumeCreate,
+    InterruptionStartCreate,
+    SetupActionResult,
+    SetupFinishCreate,
+    SetupStartCreate,
 )
 from mop.mes.service import MESConflictError, MESNotFoundError, MESRuleError, MESService
 from mop.persistence.dependencies import get_session
@@ -277,3 +286,181 @@ def complete_operation(
         event=event,
         idempotent_replay=replay,
     )
+
+
+
+@router.get(
+    "/operations/{operation_id}/setup",
+    response_model=ExecutionSetupRead | None,
+)
+def get_setup(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.get_setup(operation_id))
+
+
+@router.post(
+    "/operations/{operation_id}/setup/start",
+    response_model=SetupActionResult,
+)
+def start_setup(
+    operation_id: UUID,
+    payload: SetupStartCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    operation, setup, replay = _translate(
+        lambda: app.start_setup(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.operation.setup.start",
+        object_type="execution_operation",
+        object_id=operation.id,
+        details={
+            "setup_id": str(setup.id),
+            "occurred_at": setup.started_at.isoformat(),
+            "idempotent_replay": replay,
+        },
+    )
+    return SetupActionResult(
+        operation=operation,
+        setup=setup,
+        idempotent_replay=replay,
+    )
+
+
+@router.post(
+    "/operations/{operation_id}/setup/finish",
+    response_model=SetupActionResult,
+)
+def finish_setup(
+    operation_id: UUID,
+    payload: SetupFinishCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    operation, setup, replay = _translate(
+        lambda: app.finish_setup(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.operation.setup.finish",
+        object_type="execution_operation",
+        object_id=operation.id,
+        details={
+            "setup_id": str(setup.id),
+            "occurred_at": setup.finished_at.isoformat() if setup.finished_at else None,
+            "idempotent_replay": replay,
+        },
+    )
+    return SetupActionResult(
+        operation=operation,
+        setup=setup,
+        idempotent_replay=replay,
+    )
+
+
+@router.get(
+    "/operations/{operation_id}/interruptions",
+    response_model=list[ExecutionInterruptionRead],
+)
+def list_interruptions(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.list_interruptions(operation_id))
+
+
+@router.post(
+    "/operations/{operation_id}/pause",
+    response_model=InterruptionActionResult,
+)
+def pause_operation(
+    operation_id: UUID,
+    payload: InterruptionStartCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    operation, interruption, replay = _translate(
+        lambda: app.pause_operation(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.operation.pause",
+        object_type="execution_operation",
+        object_id=operation.id,
+        details={
+            "interruption_id": str(interruption.id),
+            "reason_code": interruption.reason_code,
+            "occurred_at": interruption.started_at.isoformat(),
+            "idempotent_replay": replay,
+        },
+    )
+    return InterruptionActionResult(
+        operation=operation,
+        interruption=interruption,
+        idempotent_replay=replay,
+    )
+
+
+@router.post(
+    "/operations/{operation_id}/resume",
+    response_model=InterruptionActionResult,
+)
+def resume_operation(
+    operation_id: UUID,
+    payload: InterruptionResumeCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    operation, interruption, replay = _translate(
+        lambda: app.resume_operation(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.operation.resume",
+        object_type="execution_operation",
+        object_id=operation.id,
+        details={
+            "interruption_id": str(interruption.id),
+            "occurred_at": interruption.ended_at.isoformat() if interruption.ended_at else None,
+            "idempotent_replay": replay,
+        },
+    )
+    return InterruptionActionResult(
+        operation=operation,
+        interruption=interruption,
+        idempotent_replay=replay,
+    )
+
+
+@router.get(
+    "/operations/{operation_id}/deviation",
+    response_model=ExecutionDeviationRead,
+)
+def get_deviation(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.get_deviation(operation_id))
