@@ -172,5 +172,5 @@ jobs:
     steps:
       - run: |
           echo "G5 MES validation passed for implemented G5 scope."
-          echo "G5.1 through G5.4 are implemented and regression-protected."
+          echo "G5.1 through G5.5 are implemented and regression-protected."
           echo "G5 remains IN PROGRESS; this workflow does not authorize release."
