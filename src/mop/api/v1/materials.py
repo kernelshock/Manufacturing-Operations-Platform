@@ -1,7 +1,9 @@
 """G6.2 — operational materials warehouse and immutable ledger endpoints."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from mop.iam.dependencies import require_global_permission
@@ -11,6 +13,8 @@ from mop.materials.schemas import (
     MovementReverse, PostingResult, WarehouseCreate, WarehouseRead,
 )
 from mop.materials.service import MaterialsConflict, MaterialsNotFound, MaterialsRule, MaterialsService
+from mop.materials.requirement_schemas import MaterialDemandProjection
+from mop.materials.requirements import MaterialRequirementsService
 from mop.persistence.dependencies import get_session
 
 router = APIRouter(prefix="/materials", tags=["materials"])
@@ -104,3 +108,24 @@ def list_movements(
     _: User = Depends(require_global_permission("materials.read")),
 ):
     return app.list_movements(article_id, location_id)
+
+
+@router.get("/plans/{plan_id}/requirements", response_model=MaterialDemandProjection)
+def plan_material_requirements(
+    plan_id: UUID,
+    effective_at: datetime = Query(..., description="Explicit, timezone-aware BOM effectivity timestamp"),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    """Read-only theoretical explosion; never posts, reserves or subtracts stock."""
+    return checked(lambda: MaterialRequirementsService(session).project(plan_id, effective_at))
+
+
+@router.get("/taquillas/{taquilla_id}/requirements", response_model=MaterialDemandProjection)
+def taquilla_material_requirements(
+    taquilla_id: UUID,
+    effective_at: datetime = Query(..., description="Explicit, timezone-aware BOM effectivity timestamp"),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    return checked(lambda: MaterialRequirementsService(session).project_taquilla(taquilla_id, effective_at))
