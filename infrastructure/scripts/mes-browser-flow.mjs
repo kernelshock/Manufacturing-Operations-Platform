@@ -40,6 +40,10 @@ export async function runNominalBrowserFlow({evaluate, type, poll, fixture}) {
   await click("Reanudar operación");
   await expectState(fixture.source_operation_id, "RUNNING");
 
+  // The React control must fail closed when quantity is blank.
+  await click("Finalizar y registrar cantidad");
+  await poll(async()=>evaluate('Boolean(document.querySelector(".inline-error[role=alert]"))'),"Blank quantity was not rejected by UI");
+  await expectState(fixture.source_operation_id, "RUNNING");
   await fill('.mes-form input[placeholder="Cantidad real"]', "9.5");
   await click("Finalizar y registrar cantidad");
   const complete = await expectState(fixture.source_operation_id, "COMPLETED");
