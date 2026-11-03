@@ -423,9 +423,31 @@ class MESService:
             )
         )
 
+        allocated_rework = self.session.scalar(
+            select(func.coalesce(func.sum(ReworkCase.quantity), 0)).where(
+                ReworkCase.source_execution_operation_id == operation.id,
+                ReworkCase.status != "CANCELLED",
+            )
+        )
+        returned_rework = self.session.scalar(
+            select(func.coalesce(func.sum(ReworkCase.quantity), 0)).where(
+                ReworkCase.source_execution_operation_id == operation.id,
+                ReworkCase.status == "RETURNED",
+            )
+        )
+        incoming_rework = self.session.scalar(
+            select(func.coalesce(func.sum(ReworkCase.quantity), 0)).where(
+                ReworkCase.return_execution_operation_id == operation.id,
+                ReworkCase.status == "RETURNED",
+            )
+        )
         available_to_transfer = None
         if operation.produced_quantity is not None:
-            available_to_transfer = operation.produced_quantity - Decimal(str(outgoing_transferred))
+            available_to_transfer = (
+                operation.produced_quantity
+                - Decimal(str(outgoing_transferred))
+                - Decimal(str(allocated_rework))
+            )
 
         return ExecutionWIPTraceRead(
             operation_id=operation.id,
@@ -436,6 +458,9 @@ class MESService:
             incoming_received_quantity=Decimal(str(incoming_received)),
             outgoing_transferred_quantity=Decimal(str(outgoing_transferred)),
             outgoing_received_quantity=Decimal(str(outgoing_received)),
+            rework_allocated_quantity=Decimal(str(allocated_rework)),
+            rework_returned_quantity=Decimal(str(returned_rework)),
+            incoming_returned_rework_quantity=Decimal(str(incoming_rework)),
             available_to_transfer=available_to_transfer,
         )
 
