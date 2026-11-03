@@ -285,4 +285,7 @@ class ExecutionWIPTraceRead(BaseModel):
     incoming_received_quantity: Decimal
     outgoing_transferred_quantity: Decimal
     outgoing_received_quantity: Decimal
+    rework_allocated_quantity: Decimal
+    rework_returned_quantity: Decimal
+    incoming_returned_rework_quantity: Decimal
     available_to_transfer: Decimal | None
