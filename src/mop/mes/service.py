@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 from mop.aps.lifecycle_models import SchedulePublication, PublishedScheduledOperation
 from mop.aps.models import SchedulingScenario
 from mop.aps.operation_models import PlanningOperation
-from mop.mes.models import ExecutionDispatch, ExecutionOperation
-from mop.mes.schemas import ExecutionDispatchCreate
+from mop.mes.models import ExecutionDispatch, ExecutionOperation, ExecutionOperationEvent
+from mop.mes.schemas import ExecutionCompleteCreate, ExecutionDispatchCreate, ExecutionStartCreate
 
 
 class MESConflictError(ValueError):
@@ -206,3 +206,133 @@ class MESService:
         dispatch.status = "CANCELLED"
         dispatch.cancelled_at = datetime.now(timezone.utc)
         return self._commit(dispatch)
+
+
+    def get_operation(self, operation_id: UUID) -> ExecutionOperation:
+        operation = self.session.get(ExecutionOperation, operation_id)
+        if operation is None:
+            raise MESNotFoundError("execution operation not found")
+        return operation
+
+    def list_operation_events(self, operation_id: UUID) -> Sequence[ExecutionOperationEvent]:
+        self.get_operation(operation_id)
+        return self.session.scalars(
+            select(ExecutionOperationEvent)
+            .where(ExecutionOperationEvent.execution_operation_id == operation_id)
+            .order_by(ExecutionOperationEvent.occurred_at, ExecutionOperationEvent.created_at)
+        ).all()
+
+    def _get_operation_dispatch(self, operation: ExecutionOperation) -> ExecutionDispatch:
+        dispatch = self.session.get(ExecutionDispatch, operation.dispatch_id)
+        if dispatch is None:
+            raise MESNotFoundError("execution dispatch not found")
+        return dispatch
+
+    def start_operation(
+        self,
+        operation_id: UUID,
+        data: ExecutionStartCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionOperation, ExecutionOperationEvent, bool]:
+        operation = self.get_operation(operation_id)
+        dispatch = self._get_operation_dispatch(operation)
+        if dispatch.status != "RELEASED":
+            raise MESRuleError("execution operation can only start from a RELEASED dispatch")
+
+        existing = self.session.scalar(
+            select(ExecutionOperationEvent).where(
+                ExecutionOperationEvent.execution_operation_id == operation.id,
+                ExecutionOperationEvent.event_type == "START",
+            )
+        )
+        if existing is not None:
+            if operation.status not in {"RUNNING", "COMPLETED"}:
+                raise MESConflictError("START event exists but execution operation state is inconsistent")
+            if data.occurred_at is not None and data.occurred_at != existing.occurred_at:
+                raise MESConflictError("execution operation has already started at a different timestamp")
+            if data.note is not None and data.note != existing.note:
+                raise MESConflictError("execution operation START event already exists with different evidence")
+            return operation, existing, True
+
+        if operation.status != "PENDING":
+            raise MESRuleError("only PENDING execution operation can be started")
+
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        event = ExecutionOperationEvent(
+            execution_operation_id=operation.id,
+            event_type="START",
+            occurred_at=occurred_at,
+            note=data.note,
+            actor_user_id=actor_id,
+        )
+        try:
+            operation.status = "RUNNING"
+            operation.actual_start = occurred_at
+            operation.started_by = actor_id
+            self.session.add(operation)
+            self.session.add(event)
+            self.session.commit()
+            self.session.refresh(operation)
+            self.session.refresh(event)
+            return operation, event, False
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MESConflictError("execution START event already exists") from exc
+
+    def complete_operation(
+        self,
+        operation_id: UUID,
+        data: ExecutionCompleteCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionOperation, ExecutionOperationEvent, bool]:
+        operation = self.get_operation(operation_id)
+        dispatch = self._get_operation_dispatch(operation)
+        if dispatch.status != "RELEASED":
+            raise MESRuleError("execution operation can only complete from a RELEASED dispatch")
+
+        existing = self.session.scalar(
+            select(ExecutionOperationEvent).where(
+                ExecutionOperationEvent.execution_operation_id == operation.id,
+                ExecutionOperationEvent.event_type == "COMPLETE",
+            )
+        )
+        if existing is not None:
+            if operation.status != "COMPLETED":
+                raise MESConflictError("COMPLETE event exists but execution operation state is inconsistent")
+            if existing.produced_quantity != data.produced_quantity:
+                raise MESConflictError("execution operation is already completed with a different produced quantity")
+            if data.occurred_at is not None and data.occurred_at != existing.occurred_at:
+                raise MESConflictError("execution operation is already completed at a different timestamp")
+            if data.note is not None and data.note != existing.note:
+                raise MESConflictError("execution operation COMPLETE event already exists with different evidence")
+            return operation, existing, True
+
+        if operation.status != "RUNNING" or operation.actual_start is None:
+            raise MESRuleError("only RUNNING execution operation can be completed")
+
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        if occurred_at < operation.actual_start:
+            raise MESRuleError("actual finish cannot precede actual start")
+
+        event = ExecutionOperationEvent(
+            execution_operation_id=operation.id,
+            event_type="COMPLETE",
+            occurred_at=occurred_at,
+            produced_quantity=data.produced_quantity,
+            note=data.note,
+            actor_user_id=actor_id,
+        )
+        try:
+            operation.status = "COMPLETED"
+            operation.actual_finish = occurred_at
+            operation.produced_quantity = data.produced_quantity
+            operation.completed_by = actor_id
+            self.session.add(operation)
+            self.session.add(event)
+            self.session.commit()
+            self.session.refresh(operation)
+            self.session.refresh(event)
+            return operation, event, False
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MESConflictError("execution COMPLETE event already exists") from exc
