@@ -74,8 +74,8 @@ G5 may reference maintenance/workforce/material context once those later gates e
 - **G5.4 — Transfer / Handoff & WIP Traceability — COMPLETED:** adjacent-operation WIP transfer/receive, partial quantities, successor eligibility and execution trace projection.
 - **G5.5 — Rework & Alternative Execution Path — COMPLETED:** governed rework cases, ordered actual repair steps, explicit return and WIP budget reconciliation without rewriting nominal routing.
 - **G5.6 — APS Feedback & Completion Classification — COMPLETED:** actual-vs-planned timing, delay classification and feedback to replanning without mutating published G4 schedules.
-- **G5.7 — Shop-floor Frontend & Rapid Tracking — IMPLEMENTED (VALIDATION PENDING):** operator-first start/finish/quantity interaction plus leader/manager execution projection.
-- **G5.8 — Gate Hardening:** migration integrity, execution invariants, RBAC/audit, regressions, frontend, security and runtime evidence.
+- **G5.7 — Shop-floor Frontend & Rapid Tracking — COMPLETED (AUTOMATED CI):** operator-first start/finish/quantity interaction plus leader/manager execution projection.
+- **G5.8 — Gate Hardening — IN PROGRESS:** migration integrity, execution invariants, RBAC/audit, regressions, frontend, security and runtime evidence.
 
 ## G5 exit criteria
 
@@ -164,7 +164,15 @@ G5.5 is **COMPLETED**.
 
 The next slice is:
 
-**G5.7 — Shop-floor Frontend & Rapid Tracking** (implementation in branch; CI validation pending)
+**G5.8 — Gate Hardening** (in progress; browser E2E and final release validation pending)
 
 
 G5.6 CI verification: implementation head `b62c6268624681e8a5e8a4f2f45461c79b1da768`, G5 MES PR run #150 SUCCESS; G0–G4 workflows SUCCESS at same commit. G5.7 UI implementation is awaiting its own validation run.
+
+
+## G5.7 automated completion / G5.8 opening — 2026-11-03
+- G5.7 implementation head: `4b84dd5ac78931e15b64fd97e3d34cae3ddec408`.
+- G5 MES workflow #165: SUCCESS, including backend-mes, frontend-regression, hardening-baseline, runtime-regression, g5-gate.
+- G0 #388, G1 #393, G2 #326, G3 #338, G4 #350: SUCCESS on same SHA.
+- G5.7 slice COMPLETED for automated integration; live browser E2E and operational acceptance remain release blockers under G5.8, not claimed as passed.
+- G5.8 work opened with a validation plan and cross-layer regression contract. No merge/release authorized.
