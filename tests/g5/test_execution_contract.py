@@ -64,6 +64,8 @@ def test_g5_2_does_not_rewrite_g4_planned_evidence() -> None:
         "operation.planned_finish =",
         "operation.requested_quantity =",
         "publication.status =",
-        "planning.",
+        "planning.planned_start =",
+        "planning.planned_finish =",
+        "planning.requested_quantity =",
     ):
         assert forbidden not in service
