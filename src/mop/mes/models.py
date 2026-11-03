@@ -259,3 +259,60 @@ class ExecutionInterruption(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+
+class ExecutionHandoff(Base):
+    __tablename__ = "mes_execution_handoff"
+    __table_args__ = (
+        UniqueConstraint(
+            "from_execution_operation_id",
+            "to_execution_operation_id",
+            "sequence_no",
+            name="uq_mes_execution_handoff_edge_sequence",
+        ),
+        CheckConstraint("sequence_no > 0", name="ck_mes_execution_handoff_sequence_positive"),
+        CheckConstraint("quantity > 0", name="ck_mes_execution_handoff_quantity_positive"),
+        CheckConstraint(
+            "status IN ('TRANSFERRED', 'RECEIVED')",
+            name="ck_mes_execution_handoff_status",
+        ),
+        CheckConstraint(
+            "(status = 'TRANSFERRED' AND received_at IS NULL) OR "
+            "(status = 'RECEIVED' AND received_at IS NOT NULL)",
+            name="ck_mes_execution_handoff_lifecycle",
+        ),
+        CheckConstraint(
+            "received_at IS NULL OR received_at >= transferred_at",
+            name="ck_mes_execution_handoff_interval",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    dispatch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mes_execution_dispatch.id", ondelete="RESTRICT"), nullable=False
+    )
+    product_line_id: Mapped[UUID] = mapped_column(
+        ForeignKey("demand_taquilla_product_line.id", ondelete="RESTRICT"), nullable=False
+    )
+    from_execution_operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mes_execution_operation.id", ondelete="RESTRICT"), nullable=False
+    )
+    to_execution_operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mes_execution_operation.id", ondelete="RESTRICT"), nullable=False
+    )
+    sequence_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(24, 8), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="TRANSFERRED")
+    transferred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    transferred_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    received_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
