@@ -235,3 +235,57 @@ def test_projection_rejects_unapproved_root_and_incomplete_sources():
         # A failed read-only projection must not change existing inventory.
         with db.session() as session:
             assert session.scalar(select(func.count(MaterialMovement.id)))==before
+
+
+def test_effective_revision_ambiguity_and_unmapped_uom_fail_closed():
+    settings=Settings(environment="test",_env_file=None)
+    db=DatabaseManager(settings.database_url)
+    suffix=uuid4().hex[:8].upper()
+    username=f"g63-ambiguous-{suffix.lower()}"
+    with db.session() as session:
+        iam=IdentityService(session)
+        actor=iam.create_user(UserCreate(username=username,display_name="G6 Admin",password=PASSWORD))
+        role=session.scalar(select(Role).where(Role.code=="ADMIN"))
+        iam.assign_role(actor.id,RoleAssignmentCreate(role_id=role.id,scope_type="global"))
+    with TestClient(create_app(settings,database=db)) as client:
+        assert client.post("/api/v1/auth/login",json={
+            "username":username,"password":PASSWORD
+        }).status_code==200
+        uom=write(client,"/api/v1/master-data/uoms",{
+            "code":f"AMB-{suffix}","dimension":"COUNT","canonical":True,
+        })["id"]
+        product=new_article(client,suffix,"AMBPROD","FINISHED_PRODUCT",uom)
+        component=new_article(client,suffix,"AMBMAT","PURCHASED",uom)
+        at=datetime.now(timezone.utc)-timedelta(minutes=3)
+        rev_a=rev(client,product)
+        rev_b=rev(client,product)
+        bom(client,rev_a,at,[(component,"1",uom,None,None)])
+        bom(client,rev_b,at,[(component,"2",uom,None,None)])
+        plan=write(client,"/api/v1/demand/plans",{
+            "plan_number":f"AMB-G63-{suffix}",
+        })
+        tq=write(client,f"/api/v1/demand/plans/{plan['id']}/taquillas",{
+            "taquilla_code":f"AMB-G63-TQ-{suffix}","sequence_no":1,
+        })
+        add_line(client,tq["id"],product,1,"4")
+        endpoint=f"/api/v1/materials/plans/{plan['id']}/requirements"
+        effect={"effective_at":(at+timedelta(minutes=1)).isoformat()}
+        rejected=client.get(endpoint,params=effect)
+        assert rejected.status_code==422,rejected.text
+        assert "ambiguous ACTIVE BOM" in rejected.json()["detail"]
+
+        product2=new_article(client,suffix,"BADUOM","FINISHED_PRODUCT",uom)
+        rev2=rev(client,product2)
+        bom(client,rev2,at,[(component,"1",None,None,None)])
+        plan2=write(client,"/api/v1/demand/plans",{
+            "plan_number":f"UOM-G63-{suffix}",
+        })
+        tq2=write(client,f"/api/v1/demand/plans/{plan2['id']}/taquillas",{
+            "taquilla_code":f"UOM-G63-TQ-{suffix}","sequence_no":1,
+        })
+        add_line(client,tq2["id"],product2,1,"1")
+        rejected_unit=client.get(
+            f"/api/v1/materials/plans/{plan2['id']}/requirements",params=effect,
+        )
+        assert rejected_unit.status_code==422,rejected_unit.text
+        assert "canonical component UoM" in rejected_unit.json()["detail"]
