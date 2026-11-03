@@ -11,9 +11,11 @@ ADMIN_PASSWORD="${MOP_BOOTSTRAP_ADMIN_PASSWORD:?Set MOP_BOOTSTRAP_ADMIN_PASSWORD
 COOKIE_JAR="$(mktemp)"
 HEADER_FILE="$(mktemp)"
 FIXTURE_FILE="$(mktemp)"
+RBAC_USERS_FILE="$(mktemp)"
+RBAC_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
 
 cleanup() {
-  rm -f "$COOKIE_JAR" "$HEADER_FILE" "$FIXTURE_FILE"
+  rm -f "$COOKIE_JAR" "$HEADER_FILE" "$FIXTURE_FILE" "$RBAC_USERS_FILE"
   docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -77,6 +79,22 @@ if [[ ! -s "$FIXTURE_FILE" ]]; then
   echo "MES browser fixture did not return a dispatch manifest" >&2
   exit 1
 fi
+
+# G5.8 RBAC identities are test-only and scoped to the disposable CI database.
+RBAC_LOG="$(docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T -e MOP_RBAC_TEST_PASSWORD="$RBAC_PASSWORD" api python - < "$ROOT/infrastructure/scripts/mes-rbac-fixture.py")"
+printf '%s\n' "$RBAC_LOG" | sed -n 's/^MES_RBAC_USERS=//p' > "$RBAC_USERS_FILE"
+if [[ ! -s "$RBAC_USERS_FILE" ]]; then
+  echo "RBAC fixture did not return test users" >&2
+  exit 1
+fi
+
+MOP_BROWSER_ORIGIN="http://127.0.0.1:$WEB_PORT" \\
+MOP_ADMIN_USERNAME="$ADMIN_USERNAME" \\
+MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \\
+MOP_RBAC_TEST_PASSWORD="$RBAC_PASSWORD" \\
+MOP_MES_RBAC_USERS_JSON="$RBAC_USERS_FILE" \\
+MOP_MES_FIXTURE_JSON="$FIXTURE_FILE" \\
+node "$ROOT/infrastructure/scripts/mes-rbac-browser.mjs"
 
 # Exercise the actual React application through headless Chrome while FastAPI and
 # PostgreSQL containers are alive; this complements the HTTP/runtime checks.
