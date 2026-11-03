@@ -68,6 +68,13 @@ curl --fail --silent --show-error \
 grep -q "\"username\":\"$ADMIN_USERNAME\"" /tmp/mop-me.json
 curl --fail --silent --show-error -b "$COOKIE_JAR" "http://127.0.0.1:$WEB_PORT/api/v1/audit/events?limit=5" >/tmp/mop-audit.json
 
+# Exercise the actual React application through headless Chrome while FastAPI and
+# PostgreSQL containers are alive; this complements the HTTP/runtime checks.
+MOP_BROWSER_ORIGIN="http://127.0.0.1:$WEB_PORT" \
+MOP_ADMIN_USERNAME="$ADMIN_USERNAME" \
+MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+node "$ROOT/infrastructure/scripts/mes-browser-smoke.mjs"
+
 RATE_LIMITED=0
 for _ in $(seq 1 20); do
   code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
