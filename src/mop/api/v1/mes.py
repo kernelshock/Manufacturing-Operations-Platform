@@ -1,6 +1,9 @@
 """G5.1 MES execution dispatch API."""
 
 from uuid import UUID
+from sqlalchemy import select
+from pydantic import BaseModel
+from mop.core.models import Resource
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -560,3 +563,30 @@ def get_wip_trace(
     _: User = Depends(require_global_permission("mes.read")),
 ):
     return _translate(lambda: app.get_wip_trace(operation_id))
+
+
+class MESResourceOption(BaseModel):
+    id: UUID
+    code: str
+    name: str
+    work_center_id: UUID
+
+@router.get("/resources", response_model=list[MESResourceOption])
+def list_mes_resource_options(
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    """Read-only active resource labels for MES capture without core IAM elevation.
+
+    This does not grant core write access or override MES start validation.
+    """
+    resources = session.scalars(
+        select(Resource).where(Resource.active.is_(True)).order_by(Resource.code, Resource.name)
+    ).all()
+    return [
+        MESResourceOption(
+            id=resource.id, code=resource.code, name=resource.name,
+            work_center_id=resource.work_center_id,
+        )
+        for resource in resources
+    ]
