@@ -3,7 +3,9 @@ import { api, apiFetch } from "../api/client";
 import type { OperationalPlanProjection } from "../api/types";
 import { mesDisplayLabels } from "./mesDisplayLabels";
 import { canCaptureOperation } from "./mesCaptureGuards";
+import { MESAdvancedPanel } from "./MESAdvancedPanel";
 
+type ResourceOption = { id: string; code: string; name: string; work_center_id: string };
 type Dispatch = { id: string; dispatch_code: string; plan_id: string; status: string; operation_count: number };
 type Operation = {
   id: string; dispatch_id: string; taquilla_id: string; product_line_id: string;
@@ -48,6 +50,7 @@ export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canRead
   const [reason, setReason] = useState("");
   const [resourceId, setResourceId] = useState("");
   const [resourceReason, setResourceReason] = useState("");
+  const [resourceOptions, setResourceOptions] = useState<ResourceOption[]>([]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -66,6 +69,14 @@ export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canRead
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [refresh]);
+
+  useEffect(() => {
+    let live = true;
+    apiFetch<ResourceOption[]>(`${base}/resources`)
+      .then(items => { if (live) setResourceOptions(items); })
+      .catch(() => { if (live) setResourceOptions([]); });
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     if (!dispatchId) { setOperations([]); setFeedback(null); return; }
@@ -217,7 +228,7 @@ export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canRead
                 {dispatch?.status !== "RELEASED" ? <p className="muted">El despacho debe estar liberado para registrar ejecución.</p> : null}
                 {canEdit && dispatch?.status === "RELEASED" && selected.status === "PENDING" ? (
                   <div className="mes-form">
-                    <label>Recurso real (UUID, opcional)<input value={resourceId} onChange={e => setResourceId(e.target.value)} placeholder="Por defecto, no informado"/></label>
+                    <label>Recurso real (opcional)<select aria-label="Recurso real" value={resourceId} onChange={e => setResourceId(e.target.value)}><option value="">No informado (utilizar planificación)</option>{resourceOptions.map(resource => <option key={resource.id} value={resource.id}>{resource.code} · {resource.name}</option>)}</select></label>
                     <label>Motivo de desvío de recurso<input value={resourceReason} onChange={e => setResourceReason(e.target.value)} /></label>
                     <button className="primary-button" type="button" disabled={busy} onClick={() => void submit("start")}>Iniciar operación</button>
                     <small>El backend verifica WIP recibido y setup; una operación bloqueada no puede iniciarse.</small>
@@ -239,6 +250,7 @@ export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canRead
           </div>
         </div>
       </section>
+      <MESAdvancedPanel dispatchId={dispatchId} operations={operations} selectedId={selectedId} canEdit={canEdit && dispatch?.status === "RELEASED"} resources={resourceOptions} refresh={refresh} onChanged={reload} />
     </>
   );
 }
