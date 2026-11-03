@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -11,8 +12,18 @@ from sqlalchemy.orm import Session
 from mop.aps.lifecycle_models import SchedulePublication, PublishedScheduledOperation
 from mop.aps.models import SchedulingScenario
 from mop.aps.operation_models import PlanningOperation
-from mop.mes.models import ExecutionDispatch, ExecutionOperation, ExecutionOperationEvent
-from mop.mes.schemas import ExecutionCompleteCreate, ExecutionDispatchCreate, ExecutionStartCreate
+from mop.core.models import Resource
+from mop.mes.models import ExecutionDispatch, ExecutionInterruption, ExecutionOperation, ExecutionOperationEvent, ExecutionSetup
+from mop.mes.schemas import (
+    ExecutionCompleteCreate,
+    ExecutionDeviationRead,
+    ExecutionDispatchCreate,
+    ExecutionStartCreate,
+    InterruptionResumeCreate,
+    InterruptionStartCreate,
+    SetupFinishCreate,
+    SetupStartCreate,
+)
 
 
 class MESConflictError(ValueError):
@@ -252,10 +263,33 @@ class MESService:
                 raise MESConflictError("execution operation has already started at a different timestamp")
             if data.note is not None and data.note != existing.note:
                 raise MESConflictError("execution operation START event already exists with different evidence")
+            if data.actual_resource_id is not None and data.actual_resource_id != operation.actual_resource_id:
+                raise MESConflictError("execution operation has already started with different actual resource evidence")
+            if data.resource_deviation_reason is not None and data.resource_deviation_reason != operation.resource_deviation_reason:
+                raise MESConflictError("execution operation has already started with different resource deviation evidence")
             return operation, existing, True
 
         if operation.status != "PENDING":
             raise MESRuleError("only PENDING execution operation can be started")
+
+        setup = self.session.scalar(
+            select(ExecutionSetup).where(ExecutionSetup.execution_operation_id == operation.id)
+        )
+        if setup is not None and setup.finished_at is None:
+            raise MESRuleError("execution operation cannot start while setup is still open")
+
+        if data.actual_resource_id is not None:
+            actual_resource = self.session.get(Resource, data.actual_resource_id)
+            if actual_resource is None:
+                raise MESNotFoundError("actual execution resource not found")
+            if not actual_resource.active:
+                raise MESRuleError("actual execution resource must be active")
+            if actual_resource.id != operation.planned_resource_id and not (data.resource_deviation_reason or "").strip():
+                raise MESRuleError("resource deviation reason is required when actual resource differs from planned resource")
+            if actual_resource.id == operation.planned_resource_id and data.resource_deviation_reason is not None:
+                raise MESRuleError("resource deviation reason is only valid when actual resource differs from planned resource")
+        elif data.resource_deviation_reason is not None:
+            raise MESRuleError("resource deviation reason requires actual_resource_id")
 
         occurred_at = data.occurred_at or datetime.now(timezone.utc)
         event = ExecutionOperationEvent(
@@ -269,6 +303,12 @@ class MESService:
             operation.status = "RUNNING"
             operation.actual_start = occurred_at
             operation.started_by = actor_id
+            operation.actual_resource_id = data.actual_resource_id
+            operation.resource_deviation_reason = (
+                data.resource_deviation_reason.strip()
+                if data.resource_deviation_reason is not None
+                else None
+            )
             self.session.add(operation)
             self.session.add(event)
             self.session.commit()
@@ -336,3 +376,237 @@ class MESService:
         except IntegrityError as exc:
             self.session.rollback()
             raise MESConflictError("execution COMPLETE event already exists") from exc
+
+
+    def get_setup(self, operation_id: UUID) -> ExecutionSetup | None:
+        self.get_operation(operation_id)
+        return self.session.scalar(
+            select(ExecutionSetup).where(ExecutionSetup.execution_operation_id == operation_id)
+        )
+
+    def start_setup(
+        self,
+        operation_id: UUID,
+        data: SetupStartCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionOperation, ExecutionSetup, bool]:
+        operation = self.get_operation(operation_id)
+        dispatch = self._get_operation_dispatch(operation)
+        if dispatch.status != "RELEASED":
+            raise MESRuleError("setup can only start from a RELEASED dispatch")
+
+        existing = self.get_setup(operation.id)
+        if existing is not None:
+            if data.occurred_at is not None and data.occurred_at != existing.started_at:
+                raise MESConflictError("setup has already started at a different timestamp")
+            if data.note is not None and data.note != existing.note:
+                raise MESConflictError("setup already exists with different evidence")
+            return operation, existing, True
+
+        if operation.status != "PENDING":
+            raise MESRuleError("setup can only start while execution operation is PENDING")
+
+        setup = ExecutionSetup(
+            execution_operation_id=operation.id,
+            started_at=data.occurred_at or datetime.now(timezone.utc),
+            note=data.note,
+            started_by=actor_id,
+        )
+        try:
+            self.session.add(setup)
+            self.session.commit()
+            self.session.refresh(setup)
+            return operation, setup, False
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MESConflictError("setup already exists for execution operation") from exc
+
+    def finish_setup(
+        self,
+        operation_id: UUID,
+        data: SetupFinishCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionOperation, ExecutionSetup, bool]:
+        operation = self.get_operation(operation_id)
+        setup = self.get_setup(operation.id)
+        if setup is None:
+            raise MESRuleError("setup has not been started")
+        if setup.finished_at is not None:
+            if data.occurred_at is not None and data.occurred_at != setup.finished_at:
+                raise MESConflictError("setup has already finished at a different timestamp")
+            return operation, setup, True
+        if operation.status != "PENDING":
+            raise MESRuleError("setup can only finish before execution operation starts")
+
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        if occurred_at < setup.started_at:
+            raise MESRuleError("setup finish cannot precede setup start")
+        setup.finished_at = occurred_at
+        setup.finished_by = actor_id
+        return operation, self._commit(setup), False
+
+    def list_interruptions(self, operation_id: UUID) -> Sequence[ExecutionInterruption]:
+        self.get_operation(operation_id)
+        return self.session.scalars(
+            select(ExecutionInterruption)
+            .where(ExecutionInterruption.execution_operation_id == operation_id)
+            .order_by(ExecutionInterruption.started_at, ExecutionInterruption.created_at)
+        ).all()
+
+    def _open_interruption(self, operation_id: UUID) -> ExecutionInterruption | None:
+        return self.session.scalar(
+            select(ExecutionInterruption).where(
+                ExecutionInterruption.execution_operation_id == operation_id,
+                ExecutionInterruption.ended_at.is_(None),
+            )
+        )
+
+    def pause_operation(
+        self,
+        operation_id: UUID,
+        data: InterruptionStartCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionOperation, ExecutionInterruption, bool]:
+        operation = self.get_operation(operation_id)
+        dispatch = self._get_operation_dispatch(operation)
+        if dispatch.status != "RELEASED":
+            raise MESRuleError("execution operation can only pause from a RELEASED dispatch")
+
+        existing = self._open_interruption(operation.id)
+        if existing is not None:
+            if operation.status != "PAUSED":
+                raise MESConflictError("open interruption exists but operation is not PAUSED")
+            if existing.reason_code != data.reason_code.strip():
+                raise MESConflictError("open interruption already exists with a different reason")
+            if data.reason_note is not None and data.reason_note != existing.reason_note:
+                raise MESConflictError("open interruption already exists with different evidence")
+            if data.occurred_at is not None and data.occurred_at != existing.started_at:
+                raise MESConflictError("open interruption already exists at a different timestamp")
+            return operation, existing, True
+
+        if operation.status != "RUNNING":
+            raise MESRuleError("only RUNNING execution operation can be paused")
+
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        if operation.actual_start is not None and occurred_at < operation.actual_start:
+            raise MESRuleError("interruption cannot precede actual start")
+
+        interruption = ExecutionInterruption(
+            execution_operation_id=operation.id,
+            started_at=occurred_at,
+            reason_code=data.reason_code.strip(),
+            reason_note=data.reason_note,
+            started_by=actor_id,
+        )
+        try:
+            operation.status = "PAUSED"
+            self.session.add(operation)
+            self.session.add(interruption)
+            self.session.commit()
+            self.session.refresh(operation)
+            self.session.refresh(interruption)
+            return operation, interruption, False
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MESConflictError("execution interruption could not be recorded") from exc
+
+    def resume_operation(
+        self,
+        operation_id: UUID,
+        data: InterruptionResumeCreate,
+        actor_id: UUID | None,
+    ) -> tuple[ExecutionOperation, ExecutionInterruption, bool]:
+        operation = self.get_operation(operation_id)
+        interruption = self._open_interruption(operation.id)
+        if interruption is None:
+            if operation.status == "RUNNING":
+                latest = self.session.scalar(
+                    select(ExecutionInterruption)
+                    .where(ExecutionInterruption.execution_operation_id == operation.id)
+                    .order_by(ExecutionInterruption.started_at.desc())
+                    .limit(1)
+                )
+                if latest is not None and latest.ended_at is not None:
+                    if data.occurred_at is not None and data.occurred_at != latest.ended_at:
+                        raise MESConflictError("latest interruption already resumed at a different timestamp")
+                    return operation, latest, True
+            raise MESRuleError("execution operation has no open interruption to resume")
+
+        if operation.status != "PAUSED":
+            raise MESConflictError("open interruption exists but operation is not PAUSED")
+
+        occurred_at = data.occurred_at or datetime.now(timezone.utc)
+        if occurred_at < interruption.started_at:
+            raise MESRuleError("resume cannot precede interruption start")
+
+        interruption.ended_at = occurred_at
+        interruption.ended_by = actor_id
+        operation.status = "RUNNING"
+        try:
+            self.session.add(operation)
+            self.session.add(interruption)
+            self.session.commit()
+            self.session.refresh(operation)
+            self.session.refresh(interruption)
+            return operation, interruption, False
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise MESConflictError("execution interruption resume failed") from exc
+
+    def get_deviation(self, operation_id: UUID) -> ExecutionDeviationRead:
+        operation = self.get_operation(operation_id)
+        setup = self.get_setup(operation.id)
+        interruptions = list(self.list_interruptions(operation.id))
+
+        setup_seconds = None
+        if setup is not None and setup.finished_at is not None:
+            setup_seconds = Decimal(str((setup.finished_at - setup.started_at).total_seconds()))
+
+        interruption_seconds = Decimal("0")
+        open_interruption = False
+        for interruption in interruptions:
+            if interruption.ended_at is None:
+                open_interruption = True
+                continue
+            interruption_seconds += Decimal(
+                str((interruption.ended_at - interruption.started_at).total_seconds())
+            )
+
+        start_delta = None
+        if operation.actual_start is not None:
+            start_delta = Decimal(
+                str((operation.actual_start - operation.planned_start).total_seconds())
+            )
+
+        finish_delta = None
+        if operation.actual_finish is not None:
+            finish_delta = Decimal(
+                str((operation.actual_finish - operation.planned_finish).total_seconds())
+            )
+
+        quantity_delta = None
+        if operation.produced_quantity is not None:
+            quantity_delta = operation.produced_quantity - operation.requested_quantity
+
+        resource_deviation = None
+        if operation.actual_resource_id is not None:
+            resource_deviation = operation.actual_resource_id != operation.planned_resource_id
+
+        return ExecutionDeviationRead(
+            operation_id=operation.id,
+            planned_start=operation.planned_start,
+            actual_start=operation.actual_start,
+            start_delta_seconds=start_delta,
+            planned_finish=operation.planned_finish,
+            actual_finish=operation.actual_finish,
+            finish_delta_seconds=finish_delta,
+            requested_quantity=operation.requested_quantity,
+            produced_quantity=operation.produced_quantity,
+            quantity_delta=quantity_delta,
+            planned_resource_id=operation.planned_resource_id,
+            actual_resource_id=operation.actual_resource_id,
+            resource_deviation=resource_deviation,
+            setup_seconds=setup_seconds,
+            interruption_seconds=interruption_seconds,
+            open_interruption=open_interruption,
+        )
