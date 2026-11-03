@@ -36,6 +36,7 @@ export async function runWipReworkBrowserFlow({evaluate, fixture, operator}) {
   });
   await ok(base + "/handoffs/" + transfer.handoff.id + "/receive", "POST", {});
 
+  const steps = [];
   for (const routing of [
     fixture.routing_operation_2_id,
     fixture.routing_operation_id,
@@ -45,6 +46,10 @@ export async function runWipReworkBrowserFlow({evaluate, fixture, operator}) {
       routing_operation_id: routing,
       resource_id: fixture.resource_id
     });
+    steps.push(step);
+  }
+  // G5.5 locks the route as soon as execution begins.
+  for (const step of steps) {
     await ok(base + "/rework/steps/" + step.id + "/start", "POST", {});
     await ok(base + "/rework/steps/" + step.id + "/complete", "POST", {produced_quantity:"1.5"});
   }
