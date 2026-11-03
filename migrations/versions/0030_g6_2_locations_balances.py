@@ -60,10 +60,10 @@ def upgrade():
         sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("posted_by", sa.Uuid(), nullable=False),
         sa.Column("posted_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.CheckConstraint("quantity > 0", name="ck_mat_movement_quantity_positive"),
-        sa.CheckConstraint("signed_quantity <> 0", name="ck_mat_movement_signed_nonzero"),
+        sa.CheckConstraint("quantity >= 0", name="ck_mat_movement_quantity_positive"),
+        sa.CheckConstraint("(kind = 'OPENING_ZERO' AND signed_quantity = 0 AND quantity = 0) OR (kind <> 'OPENING_ZERO' AND signed_quantity <> 0 AND quantity > 0)", name="ck_mat_movement_signed_nonzero"),
         sa.CheckConstraint(
-            "(kind IN ('OPENING', 'RECEIPT', 'ADJUSTMENT_IN') AND signed_quantity > 0) OR "
+            "(kind = 'OPENING_ZERO' AND signed_quantity = 0) OR (kind IN ('OPENING', 'RECEIPT', 'ADJUSTMENT_IN') AND signed_quantity > 0) OR "
             "(kind IN ('ISSUE', 'ADJUSTMENT_OUT') AND signed_quantity < 0) OR "
             "(kind = 'REVERSAL' AND reversal_of_id IS NOT NULL)", name="ck_mat_movement_kind_sign"
         ),
