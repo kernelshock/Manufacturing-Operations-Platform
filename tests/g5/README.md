@@ -37,3 +37,15 @@ G5.3 adds coverage for:
 - explicit actual-resource capture and mandatory deviation reason for alternate resource;
 - observational start/finish/quantity/resource/setup/interruption deltas;
 - continued exclusion of maintenance/workforce/material causal authority.
+
+
+G5.4 adds coverage for:
+- two-operation nominal-route execution;
+- predecessor completion before WIP transfer;
+- partial WIP transfer quantities;
+- cumulative transfer bounded by predecessor produced quantity;
+- explicit TRANSFERRED → RECEIVED lifecycle;
+- idempotent receipt replay;
+- successor START blocked until WIP is received;
+- WIP incoming/outgoing/remaining trace projection;
+- continued separation from G6 inventory/warehouse authority.
