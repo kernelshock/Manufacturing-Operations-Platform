@@ -30,8 +30,16 @@ export async function runNominalBrowserFlow({evaluate, type, poll, fixture}) {
   }
 
   await select(fixture.source_operation_id);
+  await poll(async()=>evaluate('document.querySelectorAll("select[aria-label=\\'Recurso real\\'] option").length > 1'),"Descriptive resource selector was not populated");
+  const choice = await evaluate('(()=>{const select=document.querySelector("select[aria-label=\\'Recurso real\\']");const option=Array.from(select.options).find(item=>item.value==='+JSON.stringify(fixture.actual_resource_id)+');if(!option||!option.textContent.includes(" · "))return false;select.value=option.value;select.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+  if (!choice) throw new Error("Canonical actual resource code/name not available");
+  await fill(".mes-form input", "CAPACITY_DEVIATION");
   await click("Iniciar operación");
-  await expectState(fixture.source_operation_id, "RUNNING");
+  const started = await expectState(fixture.source_operation_id, "RUNNING");
+  if(started.actual_resource_id!==fixture.actual_resource_id || started.resource_deviation_reason!=="CAPACITY_DEVIATION") {
+    throw new Error("Descriptive resource selection did not persist the canonical resource and reason");
+  }
+  console.log("MES resource selector PASSED: real code/name option captured as UUID");
 
   await fill('.mes-form input[placeholder="Código de causa"]', "PROCESS_CHECK");
   await click("Pausar operación");
