@@ -7,6 +7,7 @@ import { AuditPanel } from "./AuditPanel";
 import { MasterDataPanel } from "./MasterDataPanel";
 import { DemandPanel } from "./DemandPanel";
 import { GanttPanel } from "./GanttPanel";
+import { MESPanel } from "./MESPanel";
 import {
   ContextSelector,
   type PlantContext
@@ -14,7 +15,6 @@ import {
 import { useSystemStatus } from "./useSystemStatus";
 
 const futureModules = [
-  "MES",
   "Kanban",
   "Mantenimiento",
   "Compras"
@@ -123,6 +123,7 @@ export function AppShell({ user }: { user: CurrentUser }) {
             <DemandPanel canEdit={user.permissions.includes("demand.edit")} />
           ) : null}
           {activeModule.id === "aps" ? <GanttPanel canEdit={user.permissions.includes("aps.edit")} /> : null}
+          {activeModule.id === "mes" ? <MESPanel canEdit={user.permissions.includes("mes.edit")} /> : null}
           {activeModule.id === "audit" ? <AuditPanel /> : null}
           {activeModule.id === "admin" ? (
             <AdminPanel permissions={user.permissions} />
