@@ -22,8 +22,8 @@ from mop.master_data.models import (
     RoutingOperation,
     RoutingRevision,
 )
-from mop.mes.schemas import ExecutionDispatchCreate
-from mop.mes.service import MESRuleError, MESService
+from mop.mes.schemas import ExecutionCompleteCreate, ExecutionDispatchCreate, ExecutionStartCreate
+from mop.mes.service import MESConflictError, MESRuleError, MESService
 from mop.persistence.database import DatabaseManager
 
 pytestmark = pytest.mark.skipif(
@@ -286,6 +286,101 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
         released_again = mes.release_dispatch(dispatch.id)
         assert released_again.id == released.id
         assert released_again.status == "RELEASED"
+
+        with pytest.raises(MESRuleError):
+            mes.complete_operation(
+                operation.id,
+                ExecutionCompleteCreate(
+                    produced_quantity=Decimal("9.5"),
+                    occurred_at=start_at + timedelta(minutes=50),
+                ),
+                None,
+            )
+
+        started, start_event, start_replay = mes.start_operation(
+            operation.id,
+            ExecutionStartCreate(
+                occurred_at=start_at + timedelta(minutes=5),
+                note="Operator start",
+            ),
+            None,
+        )
+        assert start_replay is False
+        assert started.status == "RUNNING"
+        assert started.actual_start == start_at + timedelta(minutes=5)
+        assert started.actual_finish is None
+        assert started.produced_quantity is None
+        assert started.planned_start == start_at
+        assert start_event.event_type == "START"
+        assert start_event.produced_quantity is None
+
+        started_again, replay_start_event, start_replay = mes.start_operation(
+            operation.id,
+            ExecutionStartCreate(
+                occurred_at=start_at + timedelta(minutes=5),
+                note="Operator start",
+            ),
+            None,
+        )
+        assert start_replay is True
+        assert started_again.id == operation.id
+        assert replay_start_event.id == start_event.id
+
+        with pytest.raises(MESRuleError):
+            mes.complete_operation(
+                operation.id,
+                ExecutionCompleteCreate(
+                    produced_quantity=Decimal("9.5"),
+                    occurred_at=start_at,
+                ),
+                None,
+            )
+
+        completed, complete_event, complete_replay = mes.complete_operation(
+            operation.id,
+            ExecutionCompleteCreate(
+                produced_quantity=Decimal("9.5"),
+                occurred_at=start_at + timedelta(minutes=55),
+                note="Explicit completed quantity",
+            ),
+            None,
+        )
+        assert complete_replay is False
+        assert completed.status == "COMPLETED"
+        assert completed.actual_start == start_at + timedelta(minutes=5)
+        assert completed.actual_finish == start_at + timedelta(minutes=55)
+        assert completed.produced_quantity == Decimal("9.5")
+        assert completed.requested_quantity == Decimal("10")
+        assert completed.planned_start == start_at
+        assert completed.planned_finish == start_at + timedelta(hours=1)
+        assert complete_event.event_type == "COMPLETE"
+        assert complete_event.produced_quantity == Decimal("9.5")
+
+        completed_again, replay_complete_event, complete_replay = mes.complete_operation(
+            operation.id,
+            ExecutionCompleteCreate(
+                produced_quantity=Decimal("9.5"),
+                occurred_at=start_at + timedelta(minutes=55),
+                note="Explicit completed quantity",
+            ),
+            None,
+        )
+        assert complete_replay is True
+        assert completed_again.id == operation.id
+        assert replay_complete_event.id == complete_event.id
+
+        with pytest.raises(MESConflictError):
+            mes.complete_operation(
+                operation.id,
+                ExecutionCompleteCreate(
+                    produced_quantity=Decimal("10"),
+                    occurred_at=start_at + timedelta(minutes=55),
+                ),
+                None,
+            )
+
+        events = list(mes.list_operation_events(operation.id))
+        assert [event.event_type for event in events] == ["START", "COMPLETE"]
 
         history = session.get(SchedulePublication, publication.id)
         assert history is not None
