@@ -15,7 +15,10 @@ export async function runNominalBrowserFlow({evaluate, type, poll, fixture}) {
   }
   async function click(label) {
     const expression = 'Array.from(document.querySelectorAll(".mes-capture-panel button")).find(b=>b.textContent.includes(' + JSON.stringify(label) + '))';
-    await poll(async () => evaluate('Boolean(' + expression + ')'), "Missing MES button: " + label);
+    // A persisted backend transition can precede React's busy-state release.
+    // Wait until the actual DOM control is enabled before clicking; a click on
+    // a disabled button is a silent no-op and causes intermittent false E2E failures.
+    await poll(async () => evaluate('Boolean(' + expression + ' && !(' + expression + ').disabled)'), "MES button missing or disabled: " + label);
     await evaluate(expression + ".click()");
   }
   async function select(id) {
