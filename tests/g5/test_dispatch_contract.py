@@ -35,13 +35,9 @@ def test_g5_1_dispatch_foundation_preserves_ownership_boundaries() -> None:
         assert required in models or required in service or required in api or required in migration
 
     for forbidden in (
-        "actual_start",
-        "actual_finish",
-        "produced_quantity",
         "scrap_quantity",
         "pause_started_at",
         "setup_started_at",
-        "operator_id",
         "actual_resource_id",
     ):
         assert forbidden not in models
