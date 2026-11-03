@@ -1,7 +1,7 @@
 /** Advanced MES WIP/rework operations through the same authenticated browser session.
- * G5.7 has no WIP/rework buttons; the operator actions stay DOM-driven.
+ * Advanced transfers, receipts, case creation and repair steps are driven through React controls.
  */
-export async function runWipReworkBrowserFlow({evaluate, fixture, operator}) {
+export async function runWipReworkBrowserFlow({evaluate, type, poll, fixture, operator}) {
   const base = "/api/v1/mes";
   async function request(path, method = "GET", body) {
     const js = '(async () => { const r = await fetch(' + JSON.stringify(path) +
@@ -22,39 +22,85 @@ export async function runWipReworkBrowserFlow({evaluate, fixture, operator}) {
   const before = await ok(base + "/dispatches/" + fixture.dispatch_id);
   if (before.schedule_fingerprint !== fixture.schedule_fingerprint) throw new Error("APS publication fingerprint changed before WIP");
 
-  const created = await ok(base + "/rework/cases", "POST", {
-    source_execution_operation_id: fixture.source_operation_id,
-    return_execution_operation_id: fixture.successor_operation_id,
-    case_code: "RW-" + fixture.dispatch_code,
-    reason_code: "QUALITY_REPAIR",
-    quantity: "1.5"
-  });
-  const caseId = created.case.id;
-  const transfer = await ok(base + "/operations/" + fixture.source_operation_id + "/handoffs/transfer", "POST", {
-    to_execution_operation_id: fixture.successor_operation_id,
-    quantity: "8.0"
-  });
-  await ok(base + "/handoffs/" + transfer.handoff.id + "/receive", "POST", {});
+  // Drive all advanced actions using the real React interface; use GET only for assertions.
+  const ui = ".mes-advanced-panel";
+  async function setInput(selector, value) {
+    await poll(async()=>evaluate('Boolean(document.querySelector('+JSON.stringify(selector)+'))'),"Advanced input missing: "+selector);
+    await evaluate('document.querySelector('+JSON.stringify(selector)+').focus();document.querySelector('+JSON.stringify(selector)+').select()');
+    await type(selector,value);
+  }
+  async function setOption(selector, value) {
+    const found = await poll(async()=>evaluate('(()=>{const el=document.querySelector('+JSON.stringify(selector)+');return Boolean(el&&Array.from(el.options).some(option=>option.value==='+JSON.stringify(value)+'))})()'),"Option unavailable: "+selector);
+    if(!found) throw new Error("Option missing");
+    await evaluate('(()=>{const el=document.querySelector('+JSON.stringify(selector)+');el.value='+JSON.stringify(value)+';el.dispatchEvent(new Event("change",{bubbles:true}))})()');
+  }
+  async function press(label) {
+    const expr='Array.from(document.querySelectorAll('+JSON.stringify(ui+' button')+')).find(b=>b.textContent.trim()==='+JSON.stringify(label)+'&&!b.disabled)';
+    await poll(async()=>evaluate('Boolean('+expr+')'),"Advanced action disabled/missing: "+label);
+    await evaluate(expr+'.click()');
+  }
+  await operator.select(fixture.source_operation_id);
+  const caseCode = "RW-" + fixture.dispatch_code;
+  await setInput(ui+' input[placeholder="Código de retrabajo"]',caseCode);
+  await setInput(ui+' input[placeholder="Código de causa"]',"QUALITY_REPAIR");
+  await setInput(ui+' input[placeholder="Cantidad retrabajo"]',"1.5");
+  await press("Crear caso");
+  const created = await poll(async()=>{
+    const response = await ok(base+"/rework/dispatches/"+fixture.dispatch_id+"/cases");
+    return response.find(item=>item.case_code===caseCode)??null;
+  },"Rework case was not created through UI");
+  const caseId = created.id;
+  await setOption(ui+' select[aria-label="Caso de retrabajo"]',caseId);
 
-  const steps = [];
-  for (const routing of [
-    fixture.routing_operation_2_id,
-    fixture.routing_operation_id,
-    fixture.routing_operation_2_id
-  ]) {
-    const step = await ok(base + "/rework/cases/" + caseId + "/steps", "POST", {
-      routing_operation_id: routing,
-      resource_id: fixture.resource_id
-    });
-    steps.push(step);
+  // Define the entire repair route before starting execution (G5.5 governance).
+  const routeIds = [
+    fixture.routing_operation_2_id,fixture.routing_operation_id,fixture.routing_operation_2_id
+  ];
+  for(let i=0;i<routeIds.length;i++) {
+    await setOption(ui+' select[aria-label="Proceso de reparación"]',routeIds[i]);
+    await setOption(ui+' select[aria-label="Recurso de reparación"]',fixture.resource_id);
+    await press("Agregar paso de reparación");
+    await poll(async()=>{
+      const result=await ok(base+"/rework/cases/"+caseId+"/steps");
+      return result.length===i+1;
+    },"Repair step not saved through UI");
   }
-  // G5.5 locks the route as soon as execution begins.
-  for (const step of steps) {
-    await ok(base + "/rework/steps/" + step.id + "/start", "POST", {});
-    await ok(base + "/rework/steps/" + step.id + "/complete", "POST", {produced_quantity:"1.5"});
+  console.log("MES rework route UI PASSED: three governed steps added before execution");
+
+  await setInput(ui+' input[placeholder="Cantidad a transferir"]',"8.0");
+  await press("Transferir WIP");
+  const transfers = await poll(async()=>{
+    const rows=await ok(base+"/operations/"+fixture.source_operation_id+"/handoffs");
+    return rows.filter(item=>item.to_execution_operation_id===fixture.successor_operation_id).length>0?rows:null;
+  },"WIP transfer was not recorded from UI");
+  const transfer=transfers.find(item=>item.to_execution_operation_id===fixture.successor_operation_id);
+  await press("Recibir WIP");
+  await poll(async()=>{
+    const rows=await ok(base+"/operations/"+fixture.source_operation_id+"/handoffs");
+    return rows.some(item=>item.id===transfer.id&&item.status==="RECEIVED");
+  },"WIP receipt was not recorded through UI");
+  console.log("MES WIP controls PASSED: transfer 8 and receive from React interface");
+
+  for(let i=0;i<routeIds.length;i++) {
+    await press("Iniciar reparación");
+    await poll(async()=>{
+      const rows=await ok(base+"/rework/cases/"+caseId+"/steps");
+      return rows[i]?.status==="RUNNING";
+    },"Repair step did not start through UI");
+    await setInput(ui+' input[aria-label="Cantidad de reparación"]',"1.5");
+    await press("Finalizar reparación");
+    await poll(async()=>{
+      const rows=await ok(base+"/rework/cases/"+caseId+"/steps");
+      return rows[i]?.status==="COMPLETED" && Number(rows[i]?.produced_quantity)===1.5;
+    },"Repair step was not completed through UI");
   }
-  const returned = await ok(base + "/rework/cases/" + caseId + "/return", "POST", {});
-  if (returned.case.status !== "RETURNED") throw new Error("Rework case has not returned");
+  await press("Devolver retrabajo al flujo");
+  const returned = await poll(async()=>{
+    const result=await ok(base+"/rework/cases/"+caseId);
+    return result.status==="RETURNED"?{case:result}:null;
+  },"Rework return not saved through UI");
+  console.log("MES rework controls PASSED: all repair steps executed and case returned via UI");
+  await operator.select(fixture.successor_operation_id);
 
   // Nominal successor must be started and finished through React UI controls.
   await operator.click("Iniciar operación");
