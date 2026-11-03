@@ -71,12 +71,12 @@ class ExecutionOperation(Base):
         CheckConstraint("requested_quantity > 0", name="ck_mes_execution_requested_quantity_positive"),
         CheckConstraint("planned_finish > planned_start", name="ck_mes_execution_planned_interval"),
         CheckConstraint(
-            "status IN ('PENDING', 'RUNNING', 'COMPLETED')",
+            "status IN ('PENDING', 'RUNNING', 'PAUSED', 'COMPLETED')",
             name="ck_mes_execution_operation_status",
         ),
         CheckConstraint(
             "(status = 'PENDING' AND actual_start IS NULL AND actual_finish IS NULL AND produced_quantity IS NULL) OR "
-            "(status = 'RUNNING' AND actual_start IS NOT NULL AND actual_finish IS NULL AND produced_quantity IS NULL) OR "
+            "(status IN ('RUNNING', 'PAUSED') AND actual_start IS NOT NULL AND actual_finish IS NULL AND produced_quantity IS NULL) OR "
             "(status = 'COMPLETED' AND actual_start IS NOT NULL AND actual_finish IS NOT NULL AND produced_quantity IS NOT NULL)",
             name="ck_mes_execution_operation_lifecycle",
         ),
@@ -149,6 +149,10 @@ class ExecutionOperation(Base):
     completed_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
     )
+    actual_resource_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("core_resource.id", ondelete="RESTRICT"), nullable=True
+    )
+    resource_deviation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -183,6 +187,67 @@ class ExecutionOperationEvent(Base):
     produced_quantity: Mapped[Decimal | None] = mapped_column(Numeric(24, 8), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     actor_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+
+class ExecutionSetup(Base):
+    __tablename__ = "mes_execution_setup"
+    __table_args__ = (
+        UniqueConstraint("execution_operation_id", name="uq_mes_execution_setup_operation"),
+        CheckConstraint(
+            "finished_at IS NULL OR finished_at >= started_at",
+            name="ck_mes_execution_setup_interval",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    execution_operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mes_execution_operation.id", ondelete="RESTRICT"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    finished_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ExecutionInterruption(Base):
+    __tablename__ = "mes_execution_interruption"
+    __table_args__ = (
+        CheckConstraint(
+            "ended_at IS NULL OR ended_at >= started_at",
+            name="ck_mes_execution_interruption_interval",
+        ),
+        CheckConstraint(
+            "length(trim(reason_code)) > 0",
+            name="ck_mes_execution_interruption_reason_code",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    execution_operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mes_execution_operation.id", ondelete="RESTRICT"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    reason_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    ended_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
