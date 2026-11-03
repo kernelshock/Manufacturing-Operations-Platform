@@ -227,9 +227,11 @@ def test_projection_rejects_unapproved_root_and_incomplete_sources():
         line=add_line(client,t["id"],product,1,"1")
         endpoint=f"/api/v1/materials/plans/{plan['id']}/requirements"
         at=datetime.now(timezone.utc)
+        with db.session() as session:
+            before = session.scalar(select(func.count(MaterialMovement.id)))
         response=client.get(endpoint,params={"effective_at":at.isoformat()})
         assert response.status_code==422
         assert "no effective ACTIVE BOM" in response.json()["detail"]
-        # G6 must never manufacture a partial balance from incomplete BOM.
+        # A failed read-only projection must not change existing inventory.
         with db.session() as session:
-            assert session.scalar(select(func.count(MaterialMovement.id)))==0
+            assert session.scalar(select(func.count(MaterialMovement.id)))==before
