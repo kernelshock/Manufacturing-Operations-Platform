@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, apiFetch } from "../api/client";
 import type { OperationalPlanProjection } from "../api/types";
+import { mesDisplayLabels } from "./mesDisplayLabels";
 import { canCaptureOperation } from "./mesCaptureGuards";
 
 type Dispatch = { id: string; dispatch_code: string; plan_id: string; status: string; operation_count: number };
@@ -104,16 +105,7 @@ export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canRead
 
   const selected = operations.find(op => op.id === selectedId && op.dispatch_id === dispatchId) ?? null;
   const dispatch = dispatches.find(item => item.id === dispatchId) ?? null;
-  const labels = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const taquilla of planProjection?.taquillas ?? []) {
-      map.set(`taquilla:${taquilla.id}`, taquilla.taquilla_code);
-      for (const product of taquilla.products) {
-        map.set(`product:${product.id}`, `${product.article_code} · ${product.article_description}`);
-      }
-    }
-    return map;
-  }, [planProjection]);
+  const labels = useMemo(() => mesDisplayLabels(planProjection), [planProjection]);
   const groups = useMemo(() => {
     const result = new Map<string, Operation[]>();
     for (const op of operations.filter(item => item.dispatch_id === dispatchId)) {
