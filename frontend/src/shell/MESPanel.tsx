@@ -228,7 +228,7 @@ export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canRead
                 {dispatch?.status !== "RELEASED" ? <p className="muted">El despacho debe estar liberado para registrar ejecución.</p> : null}
                 {canEdit && dispatch?.status === "RELEASED" && selected.status === "PENDING" ? (
                   <div className="mes-form">
-                    <label>Recurso real (opcional)<select aria-label="Recurso real" value={resourceId} onChange={e => setResourceId(e.target.value)}><option value="">No informado (utilizar planificación)</option>{resourceOptions.map(resource => <option key={resource.id} value={resource.id}>{resource.code} · {resource.name}</option>)}</select></label>
+                    <label>Recurso real (opcional)<select aria-label="Recurso real" value={resourceId} onChange={e => setResourceId(e.target.value)}><option value="">No registrar recurso real (previsto solo como referencia)</option>{resourceOptions.map(resource => <option key={resource.id} value={resource.id}>{resource.code} · {resource.name}</option>)}</select></label>
                     <label>Motivo de desvío de recurso<input value={resourceReason} onChange={e => setResourceReason(e.target.value)} /></label>
                     <button className="primary-button" type="button" disabled={busy} onClick={() => void submit("start")}>Iniciar operación</button>
                     <small>El backend verifica WIP recibido y setup; una operación bloqueada no puede iniciarse.</small>
