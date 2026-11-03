@@ -8,8 +8,6 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
 
-import pytest
-
 from mop.aps.capacity_models import ResourceAvailabilityInterval
 from mop.aps.lifecycle_models import SchedulePublication
 from mop.aps.models import SchedulingRun, SchedulingScenario
