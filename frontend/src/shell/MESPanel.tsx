@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiFetch } from "../api/client";
+import { api, apiFetch } from "../api/client";
+import type { OperationalPlanProjection } from "../api/types";
 import { canCaptureOperation } from "./mesCaptureGuards";
 
 type Dispatch = { id: string; dispatch_code: string; plan_id: string; status: string; operation_count: number };
@@ -34,12 +35,13 @@ function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "No fue posible completar la operación.";
 }
 
-export function MESPanel({ canEdit }: { canEdit: boolean }) {
+export function MESPanel({ canEdit, canReadDemand }: { canEdit: boolean; canReadDemand: boolean }) {
   const [dispatches, setDispatches] = useState<Dispatch[]>([]);
   const [dispatchId, setDispatchId] = useState("");
   const [operations, setOperations] = useState<Operation[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [feedback, setFeedback] = useState<DispatchFeedback | null>(null);
+  const [planProjection, setPlanProjection] = useState<OperationalPlanProjection | null>(null);
   const [operationFeedback, setOperationFeedback] = useState<OperationFeedback | null>(null);
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
@@ -81,6 +83,17 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
   }, [dispatchId, refresh]);
 
   useEffect(() => {
+    if (!canReadDemand || !dispatchId) { setPlanProjection(null); return; }
+    const dispatch = dispatches.find(item => item.id === dispatchId);
+    if (!dispatch) { setPlanProjection(null); return; }
+    let active = true;
+    api.operationalProjection(dispatch.plan_id)
+      .then(projection => { if (active) setPlanProjection(projection); })
+      .catch(() => { if (active) setPlanProjection(null); });
+    return () => { active = false; };
+  }, [canReadDemand, dispatchId, dispatches]);
+
+  useEffect(() => {
     if (!selectedId) { setOperationFeedback(null); return; }
     let live = true;
     apiFetch<OperationFeedback>(`${base}/feedback/operations/${encodeURIComponent(selectedId)}`)
@@ -91,14 +104,24 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
 
   const selected = operations.find(op => op.id === selectedId && op.dispatch_id === dispatchId) ?? null;
   const dispatch = dispatches.find(item => item.id === dispatchId) ?? null;
+  const labels = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const taquilla of planProjection?.taquillas ?? []) {
+      map.set(`taquilla:${taquilla.id}`, taquilla.taquilla_code);
+      for (const product of taquilla.products) {
+        map.set(`product:${product.id}`, `${product.article_code} · ${product.article_description}`);
+      }
+    }
+    return map;
+  }, [planProjection]);
   const groups = useMemo(() => {
     const result = new Map<string, Operation[]>();
-    for (const op of operations) {
+    for (const op of operations.filter(item => item.dispatch_id === dispatchId)) {
       const key = `${op.taquilla_id} / ${op.product_line_id}`;
       result.set(key, [...(result.get(key) ?? []), op]);
     }
     return [...result.entries()];
-  }, [operations]);
+  }, [operations, dispatchId]);
 
   const reload = useCallback(() => setRefresh(current => current + 1), []);
   async function submit(action: "start" | "complete" | "pause" | "resume") {
@@ -148,7 +171,7 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
         </div>
         <div className="demand-plan-selector">
           <label htmlFor="mes-dispatch">Despacho de producción</label>
-          <select id="mes-dispatch" value={dispatchId} onChange={event => { setDispatchId(event.target.value); setOperations([]); setSelectedId(""); setFeedback(null); setOperationFeedback(null); setQuantity(""); setReason(""); setResourceId(""); setResourceReason(""); setMessage(""); setError(""); }}>
+          <select id="mes-dispatch" value={dispatchId} onChange={event => { setDispatchId(event.target.value); setOperations([]); setSelectedId(""); setFeedback(null); setOperationFeedback(null); setPlanProjection(null); setQuantity(""); setReason(""); setResourceId(""); setResourceReason(""); setMessage(""); setError(""); }}>
             {dispatches.length === 0 ? <option value="">Sin despachos</option> : null}
             {dispatches.map(item => (
               <option key={item.id} value={item.id}>{item.dispatch_code} · {label(item.status)}</option>
@@ -175,7 +198,7 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
           <div className="mes-operation-list">
             {groups.map(([key, items]) => (
               <div key={key}>
-                <p className="muted mes-group-label">Taquilla {items[0].taquilla_id.slice(0, 8)} · Producto {items[0].product_line_id.slice(0, 8)}</p>
+                <p className="muted mes-group-label">Taquilla {labels.get(`taquilla:${items[0].taquilla_id}`) ?? items[0].taquilla_id.slice(0, 8)} · Producto {labels.get(`product:${items[0].product_line_id}`) ?? items[0].product_line_id.slice(0, 8)}</p>
                 {items.map(op => (
                   <button key={op.id} className={`mes-operation-row ${selectedId === op.id ? "selected" : ""}`}
                     type="button" aria-pressed={selectedId === op.id} onClick={() => { setSelectedId(op.id); setMessage(""); setError(""); }}>
