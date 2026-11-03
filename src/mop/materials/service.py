@@ -1,7 +1,7 @@
 """G6.2 — transactional operational stock ledger, not ERP accounting inventory."""
 from datetime import datetime, timezone
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -61,9 +61,8 @@ class MaterialsService:
         plant = self.session.get(Plant, data.plant_id)
         if plant is None or not plant.active:
             raise MaterialsRule("active plant is required")
-        entity = MaterialWarehouse(plant_id=data.plant_id, code=data.code, name=data.name.strip())
+        entity = MaterialWarehouse(id=uuid4(), plant_id=data.plant_id, code=data.code, name=data.name.strip())
         self.session.add(entity)
-        self.session.flush()
         self._audit(actor_id, username, "materials.warehouse.create", entity)
         return self._commit(entity)
 
@@ -71,9 +70,8 @@ class MaterialsService:
         wh = self.session.get(MaterialWarehouse, data.warehouse_id)
         if wh is None or not wh.active:
             raise MaterialsRule("active warehouse is required")
-        entity = MaterialLocation(warehouse_id=data.warehouse_id, code=data.code, name=data.name.strip())
+        entity = MaterialLocation(id=uuid4(), warehouse_id=data.warehouse_id, code=data.code, name=data.name.strip())
         self.session.add(entity)
-        self.session.flush()
         self._audit(actor_id, username, "materials.location.create", entity)
         return self._commit(entity)
 
@@ -128,7 +126,6 @@ class MaterialsService:
 
     def _store(self, entity: MaterialMovement, actor_id: UUID, username: str):
         self.session.add(entity)
-        self.session.flush()
         self._audit(actor_id, username, "materials.movement.post", entity)
         return self._commit(entity)
 
@@ -165,7 +162,7 @@ class MaterialsService:
         if current.initialized and (current.on_hand or Decimal("0")) + signed < 0:
             raise MaterialsRule("insufficient stock; negative stock is not authorized")
         entity = MaterialMovement(
-            article_id=data.article_id, location_id=data.location_id, uom_id=data.uom_id,
+            id=uuid4(), article_id=data.article_id, location_id=data.location_id, uom_id=data.uom_id,
             kind=data.kind, quantity=qty, signed_quantity=signed,
             source_system=data.source_system, source_reference=data.source_reference,
             idempotency_key=data.idempotency_key,
@@ -199,7 +196,7 @@ class MaterialsService:
         if current.on_hand is None or current.on_hand + signed < 0:
             raise MaterialsRule("reversal would create negative stock")
         entity = MaterialMovement(
-            article_id=original.article_id, location_id=original.location_id,
+            id=uuid4(), article_id=original.article_id, location_id=original.location_id,
             uom_id=original.uom_id, kind="REVERSAL", quantity=original.quantity,
             signed_quantity=signed, source_system=data.source_system.strip(),
             source_reference=data.source_reference.strip(),
