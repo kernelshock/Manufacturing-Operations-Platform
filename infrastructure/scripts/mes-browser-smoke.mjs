@@ -5,11 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runNominalBrowserFlow } from "./mes-browser-flow.mjs";
 import { runWipReworkBrowserFlow } from "./mes-browser-wip-flow.mjs";
+import { verifyOperatorAcceptance, verifyOperatorAuditAsAdmin } from "./mes-operator-acceptance.mjs";
 
 const origin = process.env.MOP_BROWSER_ORIGIN ?? "http://127.0.0.1:18080";
-const username = process.env.MOP_ADMIN_USERNAME ?? "smoke-admin";
-const password = process.env.MOP_BOOTSTRAP_ADMIN_PASSWORD;
-if (!password) throw new Error("MOP_BOOTSTRAP_ADMIN_PASSWORD missing");
+const accountsPath = process.env.MOP_MES_RBAC_USERS_JSON;
+if (!accountsPath || !process.env.MOP_RBAC_TEST_PASSWORD || !process.env.MOP_BOOTSTRAP_ADMIN_PASSWORD) {
+  throw new Error("Operator identity, password or admin audit credentials missing");
+}
+const accounts = JSON.parse(await readFile(accountsPath, "utf8"));
+const username = accounts.operator.username;
+const password = process.env.MOP_RBAC_TEST_PASSWORD;
 if (!process.env.MOP_MES_FIXTURE_JSON) throw new Error("MES fixture manifest missing");
 const fixture = JSON.parse(await readFile(process.env.MOP_MES_FIXTURE_JSON, "utf8"));
 const dir = await mkdtemp(join(tmpdir(), "mop-chrome-"));
@@ -92,6 +97,16 @@ try {
   if (dispatchId !== fixture.dispatch_id) throw new Error("Wrong active MES dispatch");
   const operator = await runNominalBrowserFlow({evaluate, type, poll, fixture});
   await runWipReworkBrowserFlow({evaluate, fixture, operator});
+  await verifyOperatorAcceptance({evaluate, poll, fixture, operatorUser:accounts.operator});
+  const logout = await evaluate('(async()=>{const r=await fetch("/api/v1/auth/logout",{method:"POST"});return r.status})()');
+  if (logout !== 204) throw new Error("Operator logout failed");
+  await command("Page.navigate", {url:origin});
+  await poll(async()=>evaluate('Boolean(document.querySelector("input[autocomplete=username]"))'),"Admin audit login missing");
+  await type("input[autocomplete=username]",process.env.MOP_ADMIN_USERNAME ?? "smoke-admin");
+  await type("input[autocomplete=current-password]",process.env.MOP_BOOTSTRAP_ADMIN_PASSWORD);
+  await evaluate('document.querySelector("form").requestSubmit()');
+  await poll(async()=>evaluate('Boolean(document.querySelector("nav"))'),"Admin audit authentication failed");
+  await verifyOperatorAuditAsAdmin({evaluate,fixture,operatorUser:accounts.operator});
 } finally {
   ws?.close();
   chrome.kill("SIGTERM");
