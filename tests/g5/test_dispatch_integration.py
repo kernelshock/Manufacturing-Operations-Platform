@@ -22,7 +22,15 @@ from mop.master_data.models import (
     RoutingOperation,
     RoutingRevision,
 )
-from mop.mes.schemas import ExecutionCompleteCreate, ExecutionDispatchCreate, ExecutionStartCreate
+from mop.mes.schemas import (
+    ExecutionCompleteCreate,
+    ExecutionDispatchCreate,
+    ExecutionStartCreate,
+    InterruptionResumeCreate,
+    InterruptionStartCreate,
+    SetupFinishCreate,
+    SetupStartCreate,
+)
 from mop.mes.service import MESConflictError, MESRuleError, MESService
 from mop.persistence.database import DatabaseManager
 
@@ -57,6 +65,15 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
             active=True,
         )
         session.add(resource)
+        session.flush()
+        actual_resource = Resource(
+            work_center_id=wc.id,
+            code=f"R2-{suffix}",
+            name="Alternate execution resource",
+            resource_type="machine",
+            active=True,
+        )
+        session.add(actual_resource)
         session.flush()
 
         calendar = ManufacturingCalendar(
@@ -297,11 +314,54 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
                 None,
             )
 
+        setup_operation, setup, setup_replay = mes.start_setup(
+            operation.id,
+            SetupStartCreate(
+                occurred_at=start_at - timedelta(minutes=10),
+                note="Optional setup",
+            ),
+            None,
+        )
+        assert setup_replay is False
+        assert setup_operation.status == "PENDING"
+        assert setup.finished_at is None
+
+        with pytest.raises(MESRuleError):
+            mes.start_operation(
+                operation.id,
+                ExecutionStartCreate(
+                    occurred_at=start_at,
+                    actual_resource_id=actual_resource.id,
+                    resource_deviation_reason="Backup machine selected",
+                ),
+                None,
+            )
+
+        _, setup_finished, setup_finish_replay = mes.finish_setup(
+            operation.id,
+            SetupFinishCreate(occurred_at=start_at - timedelta(minutes=2)),
+            None,
+        )
+        assert setup_finish_replay is False
+        assert setup_finished.finished_at == start_at - timedelta(minutes=2)
+
+        with pytest.raises(MESRuleError):
+            mes.start_operation(
+                operation.id,
+                ExecutionStartCreate(
+                    occurred_at=start_at + timedelta(minutes=5),
+                    actual_resource_id=actual_resource.id,
+                ),
+                None,
+            )
+
         started, start_event, start_replay = mes.start_operation(
             operation.id,
             ExecutionStartCreate(
                 occurred_at=start_at + timedelta(minutes=5),
                 note="Operator start",
+                actual_resource_id=actual_resource.id,
+                resource_deviation_reason="Backup machine selected",
             ),
             None,
         )
@@ -310,6 +370,8 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
         assert started.actual_start == start_at + timedelta(minutes=5)
         assert started.actual_finish is None
         assert started.produced_quantity is None
+        assert started.actual_resource_id == actual_resource.id
+        assert started.resource_deviation_reason == "Backup machine selected"
         assert started.planned_start == start_at
         assert start_event.event_type == "START"
         assert start_event.produced_quantity is None
@@ -319,12 +381,70 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
             ExecutionStartCreate(
                 occurred_at=start_at + timedelta(minutes=5),
                 note="Operator start",
+                actual_resource_id=actual_resource.id,
+                resource_deviation_reason="Backup machine selected",
             ),
             None,
         )
         assert start_replay is True
         assert started_again.id == operation.id
         assert replay_start_event.id == start_event.id
+
+        paused, first_interruption, pause_replay = mes.pause_operation(
+            operation.id,
+            InterruptionStartCreate(
+                reason_code="PROCESS_CHECK",
+                reason_note="Inspection requested by leader",
+                occurred_at=start_at + timedelta(minutes=20),
+            ),
+            None,
+        )
+        assert pause_replay is False
+        assert paused.status == "PAUSED"
+        assert first_interruption.ended_at is None
+
+        with pytest.raises(MESRuleError):
+            mes.complete_operation(
+                operation.id,
+                ExecutionCompleteCreate(
+                    produced_quantity=Decimal("9.5"),
+                    occurred_at=start_at + timedelta(minutes=25),
+                ),
+                None,
+            )
+
+        resumed, first_interruption, resume_replay = mes.resume_operation(
+            operation.id,
+            InterruptionResumeCreate(
+                occurred_at=start_at + timedelta(minutes=30),
+            ),
+            None,
+        )
+        assert resume_replay is False
+        assert resumed.status == "RUNNING"
+        assert first_interruption.ended_at == start_at + timedelta(minutes=30)
+
+        paused_again, second_interruption, _ = mes.pause_operation(
+            operation.id,
+            InterruptionStartCreate(
+                reason_code="OPERATOR_HOLD",
+                reason_note="Temporary production hold",
+                occurred_at=start_at + timedelta(minutes=40),
+            ),
+            None,
+        )
+        assert paused_again.status == "PAUSED"
+        assert second_interruption.id != first_interruption.id
+
+        resumed_again, second_interruption, _ = mes.resume_operation(
+            operation.id,
+            InterruptionResumeCreate(
+                occurred_at=start_at + timedelta(minutes=45),
+            ),
+            None,
+        )
+        assert resumed_again.status == "RUNNING"
+        assert second_interruption.ended_at == start_at + timedelta(minutes=45)
 
         with pytest.raises(MESRuleError):
             mes.complete_operation(
@@ -340,7 +460,7 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
             operation.id,
             ExecutionCompleteCreate(
                 produced_quantity=Decimal("9.5"),
-                occurred_at=start_at + timedelta(minutes=55),
+                occurred_at=start_at + timedelta(minutes=65),
                 note="Explicit completed quantity",
             ),
             None,
@@ -348,7 +468,7 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
         assert complete_replay is False
         assert completed.status == "COMPLETED"
         assert completed.actual_start == start_at + timedelta(minutes=5)
-        assert completed.actual_finish == start_at + timedelta(minutes=55)
+        assert completed.actual_finish == start_at + timedelta(minutes=65)
         assert completed.produced_quantity == Decimal("9.5")
         assert completed.requested_quantity == Decimal("10")
         assert completed.planned_start == start_at
@@ -360,7 +480,7 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
             operation.id,
             ExecutionCompleteCreate(
                 produced_quantity=Decimal("9.5"),
-                occurred_at=start_at + timedelta(minutes=55),
+                occurred_at=start_at + timedelta(minutes=65),
                 note="Explicit completed quantity",
             ),
             None,
@@ -374,13 +494,26 @@ def test_current_publication_materializes_idempotent_dispatch_and_requires_curre
                 operation.id,
                 ExecutionCompleteCreate(
                     produced_quantity=Decimal("10"),
-                    occurred_at=start_at + timedelta(minutes=55),
+                    occurred_at=start_at + timedelta(minutes=65),
                 ),
                 None,
             )
 
         events = list(mes.list_operation_events(operation.id))
         assert [event.event_type for event in events] == ["START", "COMPLETE"]
+
+        interruptions = list(mes.list_interruptions(operation.id))
+        assert len(interruptions) == 2
+        assert [item.reason_code for item in interruptions] == ["PROCESS_CHECK", "OPERATOR_HOLD"]
+
+        deviation = mes.get_deviation(operation.id)
+        assert deviation.start_delta_seconds == Decimal("300.0")
+        assert deviation.finish_delta_seconds == Decimal("300.0")
+        assert deviation.quantity_delta == Decimal("-0.50000000")
+        assert deviation.resource_deviation is True
+        assert deviation.setup_seconds == Decimal("480.0")
+        assert deviation.interruption_seconds == Decimal("900.0")
+        assert deviation.open_interruption is False
 
         history = session.get(SchedulePublication, publication.id)
         assert history is not None
