@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from mop.persistence.base import Base
@@ -70,7 +70,24 @@ class ExecutionOperation(Base):
         CheckConstraint("product_sequence_no > 0", name="ck_mes_execution_product_sequence_positive"),
         CheckConstraint("requested_quantity > 0", name="ck_mes_execution_requested_quantity_positive"),
         CheckConstraint("planned_finish > planned_start", name="ck_mes_execution_planned_interval"),
-        CheckConstraint("status IN ('PENDING')", name="ck_mes_execution_operation_status_g5_1"),
+        CheckConstraint(
+            "status IN ('PENDING', 'RUNNING', 'COMPLETED')",
+            name="ck_mes_execution_operation_status",
+        ),
+        CheckConstraint(
+            "(status = 'PENDING' AND actual_start IS NULL AND actual_finish IS NULL AND produced_quantity IS NULL) OR "
+            "(status = 'RUNNING' AND actual_start IS NOT NULL AND actual_finish IS NULL AND produced_quantity IS NULL) OR "
+            "(status = 'COMPLETED' AND actual_start IS NOT NULL AND actual_finish IS NOT NULL AND produced_quantity IS NOT NULL)",
+            name="ck_mes_execution_operation_lifecycle",
+        ),
+        CheckConstraint(
+            "actual_finish IS NULL OR actual_finish >= actual_start",
+            name="ck_mes_execution_actual_interval",
+        ),
+        CheckConstraint(
+            "produced_quantity IS NULL OR produced_quantity > 0",
+            name="ck_mes_execution_produced_quantity_positive",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -123,6 +140,51 @@ class ExecutionOperation(Base):
     planned_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     planned_finish: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
+    actual_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_finish: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    produced_quantity: Mapped[Decimal | None] = mapped_column(Numeric(24, 8), nullable=True)
+    started_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    completed_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+
+class ExecutionOperationEvent(Base):
+    __tablename__ = "mes_execution_operation_event"
+    __table_args__ = (
+        UniqueConstraint(
+            "execution_operation_id",
+            "event_type",
+            name="uq_mes_execution_operation_event_type",
+        ),
+        CheckConstraint(
+            "event_type IN ('START', 'COMPLETE')",
+            name="ck_mes_execution_operation_event_type_g5_2",
+        ),
+        CheckConstraint(
+            "(event_type = 'START' AND produced_quantity IS NULL) OR "
+            "(event_type = 'COMPLETE' AND produced_quantity IS NOT NULL AND produced_quantity > 0)",
+            name="ck_mes_execution_operation_event_quantity",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    execution_operation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mes_execution_operation.id", ondelete="RESTRICT"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    produced_quantity: Mapped[Decimal | None] = mapped_column(Numeric(24, 8), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("iam_user.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
