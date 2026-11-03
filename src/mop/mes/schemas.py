@@ -224,3 +224,65 @@ class ExecutionDeviationRead(BaseModel):
     setup_seconds: Decimal | None
     interruption_seconds: Decimal
     open_interruption: bool
+
+
+
+class HandoffTransferCreate(BaseModel):
+    to_execution_operation_id: UUID
+    quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+    occurred_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class HandoffReceiveCreate(BaseModel):
+    occurred_at: datetime | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class ExecutionHandoffRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    dispatch_id: UUID
+    product_line_id: UUID
+    from_execution_operation_id: UUID
+    to_execution_operation_id: UUID
+    sequence_no: int
+    quantity: Decimal
+    status: str
+    transferred_at: datetime
+    transferred_by: UUID | None
+    received_at: datetime | None
+    received_by: UUID | None
+    note: str | None
+    created_at: datetime
+
+
+class HandoffActionResult(BaseModel):
+    handoff: ExecutionHandoffRead
+    idempotent_replay: bool
+
+
+class ExecutionWIPTraceRead(BaseModel):
+    operation_id: UUID
+    predecessor_operation_id: UUID | None
+    successor_operation_id: UUID | None
+    produced_quantity: Decimal | None
+    incoming_transferred_quantity: Decimal
+    incoming_received_quantity: Decimal
+    outgoing_transferred_quantity: Decimal
+    outgoing_received_quantity: Decimal
+    available_to_transfer: Decimal | None
