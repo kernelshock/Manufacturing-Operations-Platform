@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
+import { canCaptureOperation } from "./mesCaptureGuards";
 
 type Dispatch = { id: string; dispatch_code: string; plan_id: string; status: string; operation_count: number };
 type Operation = {
@@ -101,7 +102,7 @@ export function MESPanel({ canEdit }: { canEdit: boolean }) {
 
   const reload = useCallback(() => setRefresh(current => current + 1), []);
   async function submit(action: "start" | "complete" | "pause" | "resume") {
-    if (!selected || !canEdit || selected.dispatch_id !== dispatchId || dispatch?.status !== "RELEASED") return;
+    if (!canCaptureOperation(selected, dispatchId, canEdit, dispatch?.status ?? null) || !selected) return;
     if (action === "complete" && (!/^(?:\d+)(?:\.\d{1,8})?$/.test(quantity) || Number(quantity) <= 0)) {
       setError("Ingresá una cantidad producida positiva con hasta ocho decimales.");
       return;
