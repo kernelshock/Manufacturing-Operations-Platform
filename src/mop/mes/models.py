@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from mop.persistence.base import Base
@@ -233,6 +233,12 @@ class ExecutionInterruption(Base):
         CheckConstraint(
             "length(trim(reason_code)) > 0",
             name="ck_mes_execution_interruption_reason_code",
+        ),
+        Index(
+            "uq_mes_execution_open_interruption",
+            "execution_operation_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
         ),
     )
 
