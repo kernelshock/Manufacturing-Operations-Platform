@@ -123,7 +123,7 @@ export function AppShell({ user }: { user: CurrentUser }) {
             <DemandPanel canEdit={user.permissions.includes("demand.edit")} />
           ) : null}
           {activeModule.id === "aps" ? <GanttPanel canEdit={user.permissions.includes("aps.edit")} /> : null}
-          {activeModule.id === "mes" ? <MESPanel canEdit={user.permissions.includes("mes.edit")} /> : null}
+          {activeModule.id === "mes" ? <MESPanel canEdit={user.permissions.includes("mes.edit")} canReadDemand={user.permissions.includes("demand.read")} /> : null}
           {activeModule.id === "audit" ? <AuditPanel /> : null}
           {activeModule.id === "admin" ? (
             <AdminPanel permissions={user.permissions} />
