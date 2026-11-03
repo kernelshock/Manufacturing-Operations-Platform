@@ -10,9 +10,10 @@ ADMIN_USERNAME="${MOP_ADMIN_USERNAME:-smoke-admin}"
 ADMIN_PASSWORD="${MOP_BOOTSTRAP_ADMIN_PASSWORD:?Set MOP_BOOTSTRAP_ADMIN_PASSWORD for runtime smoke test}"
 COOKIE_JAR="$(mktemp)"
 HEADER_FILE="$(mktemp)"
+FIXTURE_FILE="$(mktemp)"
 
 cleanup() {
-  rm -f "$COOKIE_JAR" "$HEADER_FILE"
+  rm -f "$COOKIE_JAR" "$HEADER_FILE" "$FIXTURE_FILE"
   docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -68,11 +69,21 @@ curl --fail --silent --show-error \
 grep -q "\"username\":\"$ADMIN_USERNAME\"" /tmp/mop-me.json
 curl --fail --silent --show-error -b "$COOKIE_JAR" "http://127.0.0.1:$WEB_PORT/api/v1/audit/events?limit=5" >/tmp/mop-audit.json
 
+# Seed canonical G2/G3/G4 data, publish APS, and release one real MES dispatch.
+# Stream fixture source into the isolated API container without rebuilding the image.
+SEED_LOG="$(docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api python - < "$ROOT/infrastructure/scripts/mes-browser-fixture.py")"
+printf '%s\n' "$SEED_LOG" | sed -n 's/^MES_BROWSER_FIXTURE=//p' > "$FIXTURE_FILE"
+if [[ ! -s "$FIXTURE_FILE" ]]; then
+  echo "MES browser fixture did not return a dispatch manifest" >&2
+  exit 1
+fi
+
 # Exercise the actual React application through headless Chrome while FastAPI and
 # PostgreSQL containers are alive; this complements the HTTP/runtime checks.
 MOP_BROWSER_ORIGIN="http://127.0.0.1:$WEB_PORT" \
 MOP_ADMIN_USERNAME="$ADMIN_USERNAME" \
 MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+MOP_MES_FIXTURE_JSON="$FIXTURE_FILE" \
 node "$ROOT/infrastructure/scripts/mes-browser-smoke.mjs"
 
 RATE_LIMITED=0
