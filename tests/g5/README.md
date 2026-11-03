@@ -25,3 +25,15 @@ G5.2 adds coverage for:
 - idempotent replay of identical execution actions;
 - conflict on attempts to rewrite completed quantity/evidence;
 - continued exclusion of pause/setup/scrap/actual-resource authority.
+
+
+G5.3 adds coverage for:
+- optional setup start/finish before execution START;
+- blocking operation START while setup remains open;
+- RUNNING ↔ PAUSED lifecycle;
+- repeatable interruption history with required reason codes;
+- one-open-interruption database invariant;
+- blocking COMPLETE while PAUSED;
+- explicit actual-resource capture and mandatory deviation reason for alternate resource;
+- observational start/finish/quantity/resource/setup/interruption deltas;
+- continued exclusion of maintenance/workforce/material causal authority.
