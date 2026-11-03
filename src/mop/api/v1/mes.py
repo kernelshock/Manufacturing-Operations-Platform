@@ -16,11 +16,16 @@ from mop.mes.schemas import (
     ExecutionDeviationRead,
     ExecutionDispatchCreate,
     ExecutionDispatchRead,
+    ExecutionHandoffRead,
     ExecutionInterruptionRead,
     ExecutionOperationEventRead,
     ExecutionOperationRead,
     ExecutionSetupRead,
     ExecutionStartCreate,
+    ExecutionWIPTraceRead,
+    HandoffActionResult,
+    HandoffReceiveCreate,
+    HandoffTransferCreate,
     InterruptionActionResult,
     InterruptionResumeCreate,
     InterruptionStartCreate,
@@ -464,3 +469,94 @@ def get_deviation(
     _: User = Depends(require_global_permission("mes.read")),
 ):
     return _translate(lambda: app.get_deviation(operation_id))
+
+
+
+@router.get(
+    "/operations/{operation_id}/handoffs",
+    response_model=list[ExecutionHandoffRead],
+)
+def list_handoffs(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.list_handoffs(operation_id))
+
+
+@router.post(
+    "/operations/{operation_id}/handoffs/transfer",
+    response_model=HandoffActionResult,
+)
+def transfer_wip(
+    operation_id: UUID,
+    payload: HandoffTransferCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    handoff, replay = _translate(
+        lambda: app.transfer_wip(operation_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.handoff.transfer",
+        object_type="execution_handoff",
+        object_id=handoff.id,
+        details={
+            "from_operation_id": str(handoff.from_execution_operation_id),
+            "to_operation_id": str(handoff.to_execution_operation_id),
+            "quantity": str(handoff.quantity),
+            "sequence_no": handoff.sequence_no,
+            "idempotent_replay": replay,
+        },
+    )
+    return HandoffActionResult(handoff=handoff, idempotent_replay=replay)
+
+
+@router.post(
+    "/handoffs/{handoff_id}/receive",
+    response_model=HandoffActionResult,
+)
+def receive_handoff(
+    handoff_id: UUID,
+    payload: HandoffReceiveCreate,
+    request: Request,
+    app: MESService = Depends(service),
+    actor: User = Depends(require_global_permission("mes.edit")),
+    session: Session = Depends(get_session),
+):
+    handoff, replay = _translate(
+        lambda: app.receive_handoff(handoff_id, payload, actor.id)
+    )
+    _audit(
+        session=session,
+        request=request,
+        actor=actor,
+        action="mes.handoff.receive",
+        object_type="execution_handoff",
+        object_id=handoff.id,
+        details={
+            "from_operation_id": str(handoff.from_execution_operation_id),
+            "to_operation_id": str(handoff.to_execution_operation_id),
+            "quantity": str(handoff.quantity),
+            "sequence_no": handoff.sequence_no,
+            "idempotent_replay": replay,
+        },
+    )
+    return HandoffActionResult(handoff=handoff, idempotent_replay=replay)
+
+
+@router.get(
+    "/operations/{operation_id}/wip-trace",
+    response_model=ExecutionWIPTraceRead,
+)
+def get_wip_trace(
+    operation_id: UUID,
+    app: MESService = Depends(service),
+    _: User = Depends(require_global_permission("mes.read")),
+):
+    return _translate(lambda: app.get_wip_trace(operation_id))
