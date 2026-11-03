@@ -71,7 +71,7 @@ G5 may reference maintenance/workforce/material context once those later gates e
 - **G5.1 — Execution Domain & Dispatch Foundation — COMPLETED:** canonical dispatch/execution-operation identities, CURRENT-publication materialization, lifecycle, RBAC, audit and API baseline.
 - **G5.2 — Operation Start / Finish & Quantity Capture — COMPLETED:** explicit START/COMPLETE events, actual timestamps, produced quantity, idempotent lifecycle and audit.
 - **G5.3 — Setup / Pause / Interruption / Deviation — COMPLETED:** optional setup, repeatable pause/resume interruptions, actual-resource evidence and observational plan-vs-actual deviations.
-- **G5.4 — Transfer / Handoff & WIP Traceability:** predecessor/successor handoff, WIP movement and operation-to-operation traceability.
+- **G5.4 — Transfer / Handoff & WIP Traceability — COMPLETED:** adjacent-operation WIP transfer/receive, partial quantities, successor eligibility and execution trace projection.
 - **G5.5 — Rework & Alternative Execution Path:** explicit repair/rework loops and governed deviation from nominal routing without rewriting G2/G3 history.
 - **G5.6 — APS Feedback & Completion Classification:** actual-vs-planned timing, delay classification and feedback to replanning without mutating published G4 schedules.
 - **G5.7 — Shop-floor Frontend & Rapid Tracking:** operator-first start/finish/quantity interaction plus leader/manager execution projection.
@@ -136,6 +136,19 @@ G5.3 is **COMPLETED**.
 - deviation projection derives start/finish/quantity/resource/setup/interruption deltas without automatic causal classification;
 - G5.3 still excludes G8 maintenance authority, G9 workforce authority and G5.4 WIP handoff.
 
+G5.4 is **COMPLETED**.
+
+- validated implementation head: `0649d3eb6b57b57a0c153105beb88278e49c5e6d`;
+- Alembic head: `0028_g5_4`;
+- G5 MES PR run #89: **SUCCESS**;
+- explicit TRANSFERRED → RECEIVED WIP handoffs between adjacent execution operations;
+- partial transfers are supported but cumulative quantity cannot exceed predecessor produced quantity;
+- successor START requires received WIP from its immediate predecessor;
+- first route operation remains exempt because it has no predecessor;
+- WIP trace exposes incoming/outgoing transferred/received quantities and remaining transferable quantity;
+- G5.4 remains execution traceability only and does not create G6 inventory truth;
+- backend is now coherent enough for an optional read-only technical preview before the production frontend in G5.7.
+
 The next slice is:
 
-**G5.4 — Transfer / Handoff & WIP Traceability**
+**G5.5 — Rework & Alternative Execution Path**
