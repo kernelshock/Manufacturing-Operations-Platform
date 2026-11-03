@@ -95,5 +95,10 @@ try {
 } finally {
   ws?.close();
   chrome.kill("SIGTERM");
-  await rm(dir, {recursive:true, force:true});
+  // Chrome may still be writing its profile after the parent is signalled.
+  await Promise.race([
+    new Promise(resolve => chrome.once("exit", resolve)),
+    sleep(2000)
+  ]);
+  await rm(dir, {recursive:true, force:true, maxRetries:15, retryDelay:200});
 }
