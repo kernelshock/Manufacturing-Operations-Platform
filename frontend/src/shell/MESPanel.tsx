@@ -9,7 +9,7 @@ type ResourceOption = { id: string; code: string; name: string; work_center_id: 
 type Dispatch = { id: string; dispatch_code: string; plan_id: string; status: string; operation_count: number };
 type Operation = {
   id: string; dispatch_id: string; taquilla_id: string; product_line_id: string;
-  operation_code: string; operation_description: string; status: string;
+  operation_code: string; operation_description: string; routing_operation_id: string; status: string;
   routing_sequence_no: number; product_sequence_no: number; requested_quantity: string;
   produced_quantity: string | null; planned_start: string; planned_finish: string;
   actual_start: string | null; actual_finish: string | null;
