@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ExecutionDispatchCreate(BaseModel):
@@ -57,10 +57,60 @@ class ExecutionOperationRead(BaseModel):
     planned_start: datetime
     planned_finish: datetime
     status: str
+    actual_start: datetime | None
+    actual_finish: datetime | None
+    produced_quantity: Decimal | None
+    started_by: UUID | None
+    completed_by: UUID | None
     created_at: datetime
 
 
 class DispatchMaterializationResult(BaseModel):
     dispatch: ExecutionDispatchRead
     operation_count: int
+    idempotent_replay: bool
+
+
+
+class ExecutionStartCreate(BaseModel):
+    occurred_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class ExecutionCompleteCreate(BaseModel):
+    produced_quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
+    occurred_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class ExecutionOperationEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    execution_operation_id: UUID
+    event_type: str
+    occurred_at: datetime
+    produced_quantity: Decimal | None
+    note: str | None
+    actor_user_id: UUID | None
+    created_at: datetime
+
+
+class ExecutionActionResult(BaseModel):
+    operation: ExecutionOperationRead
+    event: ExecutionOperationEventRead
     idempotent_replay: bool
