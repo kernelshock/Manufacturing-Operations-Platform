@@ -62,6 +62,8 @@ class ExecutionOperationRead(BaseModel):
     produced_quantity: Decimal | None
     started_by: UUID | None
     completed_by: UUID | None
+    actual_resource_id: UUID | None
+    resource_deviation_reason: str | None
     created_at: datetime
 
 
@@ -75,6 +77,8 @@ class DispatchMaterializationResult(BaseModel):
 class ExecutionStartCreate(BaseModel):
     occurred_at: datetime | None = None
     note: str | None = Field(default=None, max_length=1000)
+    actual_resource_id: UUID | None = None
+    resource_deviation_reason: str | None = Field(default=None, max_length=1000)
 
     @field_validator("occurred_at")
     @classmethod
@@ -114,3 +118,109 @@ class ExecutionActionResult(BaseModel):
     operation: ExecutionOperationRead
     event: ExecutionOperationEventRead
     idempotent_replay: bool
+
+
+
+class SetupStartCreate(BaseModel):
+    occurred_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class SetupFinishCreate(BaseModel):
+    occurred_at: datetime | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class InterruptionStartCreate(BaseModel):
+    reason_code: str = Field(min_length=1, max_length=80)
+    reason_note: str | None = Field(default=None, max_length=1000)
+    occurred_at: datetime | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class InterruptionResumeCreate(BaseModel):
+    occurred_at: datetime | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def validate_occurred_at(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.utcoffset() is None:
+            raise ValueError("occurred_at must be timezone-aware")
+        return value
+
+
+class ExecutionSetupRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    execution_operation_id: UUID
+    started_at: datetime
+    finished_at: datetime | None
+    note: str | None
+    started_by: UUID | None
+    finished_by: UUID | None
+    created_at: datetime
+
+
+class ExecutionInterruptionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    execution_operation_id: UUID
+    started_at: datetime
+    ended_at: datetime | None
+    reason_code: str
+    reason_note: str | None
+    started_by: UUID | None
+    ended_by: UUID | None
+    created_at: datetime
+
+
+class SetupActionResult(BaseModel):
+    operation: ExecutionOperationRead
+    setup: ExecutionSetupRead
+    idempotent_replay: bool
+
+
+class InterruptionActionResult(BaseModel):
+    operation: ExecutionOperationRead
+    interruption: ExecutionInterruptionRead
+    idempotent_replay: bool
+
+
+class ExecutionDeviationRead(BaseModel):
+    operation_id: UUID
+    planned_start: datetime
+    actual_start: datetime | None
+    start_delta_seconds: Decimal | None
+    planned_finish: datetime
+    actual_finish: datetime | None
+    finish_delta_seconds: Decimal | None
+    requested_quantity: Decimal
+    produced_quantity: Decimal | None
+    quantity_delta: Decimal | None
+    planned_resource_id: UUID
+    actual_resource_id: UUID | None
+    resource_deviation: bool | None
+    setup_seconds: Decimal | None
+    interruption_seconds: Decimal
+    open_interruption: bool
