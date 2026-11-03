@@ -16,7 +16,10 @@ class WarehouseCreate(BaseModel):
     @field_validator("code")
     @classmethod
     def code_format(cls, value: str) -> str:
-        return value.strip().upper()
+        code = value.strip().upper()
+        if not code:
+            raise ValueError("code must not be blank")
+        return code
 
 
 class WarehouseRead(WarehouseCreate):
@@ -33,7 +36,10 @@ class LocationCreate(BaseModel):
     @field_validator("code")
     @classmethod
     def code_format(cls, value: str) -> str:
-        return value.strip().upper()
+        code = value.strip().upper()
+        if not code:
+            raise ValueError("code must not be blank")
+        return code
 
 
 class LocationRead(LocationCreate):
@@ -53,6 +59,13 @@ class MovementCreate(BaseModel):
     idempotency_key: str = Field(min_length=1, max_length=128)
     occurred_at: datetime | None = None
 
+    @field_validator("quantity", mode="before")
+    @classmethod
+    def exact_quantity(cls, value):
+        if isinstance(value, (float, bool)):
+            raise ValueError("quantities must be decimal strings, not binary floats")
+        return value
+
     @field_validator("source_system", "source_reference", "idempotency_key")
     @classmethod
     def nonempty(cls, value: str) -> str:
@@ -66,6 +79,14 @@ class MovementReverse(BaseModel):
     source_system: str = Field(min_length=1, max_length=64)
     source_reference: str = Field(min_length=1, max_length=128)
     idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @field_validator("source_system", "source_reference", "idempotency_key")
+    @classmethod
+    def nonempty(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("source evidence cannot be blank")
+        return trimmed
 
 
 class MovementRead(BaseModel):
