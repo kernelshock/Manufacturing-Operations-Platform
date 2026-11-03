@@ -1007,3 +1007,22 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+/* G5.7 shop-floor: touch-friendly actions, clear pending/completed evidence */
+.mes-operation-grid { display: grid; grid-template-columns: minmax(270px, 1.25fr) minmax(300px, 1fr); gap: 1.2rem; }
+.mes-operation-list { display: grid; gap: 0.55rem; align-content: start; max-height: 680px; overflow: auto; }
+.mes-group-label { font-size: 0.8rem; margin: 1.1rem 0 0.35rem; overflow-wrap: anywhere; }
+.mes-operation-row { width: 100%; text-align: left; display: grid; gap: 0.45rem; padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: #f8fafc; }
+.mes-operation-row span { color: var(--muted); font-size: 0.8rem; }
+.mes-operation-row.selected { border-color: var(--accent); background: var(--accent-soft); }
+.mes-capture-panel { border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem; background: white; }
+.mes-capture-panel h3 { margin-top: 0; }
+.mes-facts { display: grid; gap: 0.6rem; }
+.mes-facts div { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); padding: 0.45rem 0; }
+.mes-facts dt { color: var(--muted); }
+.mes-facts dd { margin: 0; text-align: right; font-weight: 600; }
+.mes-form { display: grid; gap: 0.75rem; margin-top: 1.25rem; }
+.mes-form label { display: grid; gap: 0.35rem; font-weight: 650; font-size: 0.82rem; }
+.mes-form input { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 0.85rem; }
+.mes-form button, .mes-capture-panel > button { min-height: 46px; }
+@media (max-width: 900px) { .mes-operation-grid { grid-template-columns: minmax(0,1fr); } .mes-operation-list { max-height: none; } }
