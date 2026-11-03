@@ -72,7 +72,7 @@ G5 may reference maintenance/workforce/material context once those later gates e
 - **G5.2 — Operation Start / Finish & Quantity Capture — COMPLETED:** explicit START/COMPLETE events, actual timestamps, produced quantity, idempotent lifecycle and audit.
 - **G5.3 — Setup / Pause / Interruption / Deviation — COMPLETED:** optional setup, repeatable pause/resume interruptions, actual-resource evidence and observational plan-vs-actual deviations.
 - **G5.4 — Transfer / Handoff & WIP Traceability — COMPLETED:** adjacent-operation WIP transfer/receive, partial quantities, successor eligibility and execution trace projection.
-- **G5.5 — Rework & Alternative Execution Path:** explicit repair/rework loops and governed deviation from nominal routing without rewriting G2/G3 history.
+- **G5.5 — Rework & Alternative Execution Path — COMPLETED:** governed rework cases, ordered actual repair steps, explicit return and WIP budget reconciliation without rewriting nominal routing.
 - **G5.6 — APS Feedback & Completion Classification:** actual-vs-planned timing, delay classification and feedback to replanning without mutating published G4 schedules.
 - **G5.7 — Shop-floor Frontend & Rapid Tracking:** operator-first start/finish/quantity interaction plus leader/manager execution projection.
 - **G5.8 — Gate Hardening:** migration integrity, execution invariants, RBAC/audit, regressions, frontend, security and runtime evidence.
@@ -149,6 +149,19 @@ G5.4 is **COMPLETED**.
 - G5.4 remains execution traceability only and does not create G6 inventory truth;
 - backend is now coherent enough for an optional read-only technical preview before the production frontend in G5.7.
 
+G5.5 is **COMPLETED**.
+
+- validated implementation head: `c951b0ff385ee86012dd2a6124d6740233bec0c6`;
+- Alembic head: `0029_g5_5`;
+- G5 MES PR run #122: **SUCCESS**;
+- a ReworkCase records source, return target, affected quantity, reason and lifecycle;
+- ordered ReworkSteps preserve routing-operation/resource provenance with actual start, finish and output;
+- routing operations may repeat to represent repair loops without modifying the G2 master;
+- normal WIP transfers and rework quantities share the same produced-quantity budget;
+- returned rework can explicitly authorize a successor without fabricating nominal handoffs;
+- a three-step repair loop and WIP split (8.0 nominal / 1.5 rework) passed PostgreSQL integration;
+- G5 remains **IN PROGRESS** and PR #13 remains DRAFT.
+
 The next slice is:
 
-**G5.5 — Rework & Alternative Execution Path**
+**G5.6 — APS Feedback & Completion Classification**
