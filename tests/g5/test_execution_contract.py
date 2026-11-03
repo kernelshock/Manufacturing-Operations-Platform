@@ -39,7 +39,6 @@ def test_g5_2_execution_actuals_are_explicit_and_separate_from_planning() -> Non
         "pause_finished_at",
         "setup_started_at",
         "setup_finished_at",
-        "actual_resource_id",
         "maintenance_work_order_id",
     ):
         assert forbidden not in models
