@@ -21,6 +21,10 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$ROOT"
+# Fail quickly on malformed Chrome test scripts before provisioning Docker.
+for browser_script in "$ROOT"/infrastructure/scripts/mes-*.mjs; do
+  node --check "$browser_script"
+done
 docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config -q
 docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build postgres migrate api frontend
 
