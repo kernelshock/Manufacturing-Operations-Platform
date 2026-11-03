@@ -18,6 +18,23 @@ concurrency:
 jobs:
   g6-domain:
     runs-on: ubuntu-latest
+    env:
+      MOP_ENVIRONMENT: test
+      MOP_DATABASE_URL: postgresql+psycopg://mop_test:mop_test@127.0.0.1:5432/mop_test
+    services:
+      postgres:
+        image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
+        env:
+          POSTGRES_DB: mop_test
+          POSTGRES_USER: mop_test
+          POSTGRES_PASSWORD: mop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mop_test -d mop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -37,7 +54,16 @@ jobs:
           python -m pip check
       - name: Compile Materials domain
         run: python -m compileall -q src/mop/materials
-      - name: Run G6 materials contracts
+      - name: Verify G6 migration and schema
+        run: |
+          python -m alembic heads | tee /tmp/g6-heads
+          test "$(grep -c '(head)' /tmp/g6-heads)" -eq 1
+          python -m alembic upgrade head
+          python -m alembic check
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+          python -m alembic check
+      - name: Run G6 materials contracts and PostgreSQL ledger tests
         run: python -m pytest tests/g6 -q
       - name: Verify tracked secrets and supply-chain pins
         run: |
@@ -49,6 +75,6 @@ jobs:
     needs: [g6-domain]
     steps:
       - run: |
-          echo "G6.1 domain contracts passed."
-          echo "G6 remains IN PROGRESS and no stock movements are posted."
+          echo "G6.1 domain and G6.2 PostgreSQL stock ledger contracts passed."
+          echo "G6 remains IN PROGRESS; CI uses only disposable test inventory and no production data."
           echo "This workflow does not authorize release or production deployment."
