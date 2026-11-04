@@ -11,7 +11,7 @@ type Location = {
   unallocated: string | null; state: "KNOWN" | "UNKNOWN";
 };
 type MaterialRow = {
-  article_id: string; article_code: string; article_description: string;
+  source_basis: "BOM" | "MEASURED_WITHOUT_BOM"; article_id: string; article_code: string; article_description: string;
   uom_code: string; theoretical_plan_quantity: string;
   actual_net_measured_consumption: string; theoretical_minus_measured: string;
   physical_on_hand: string | null; reserved_all_plans: string;
@@ -25,7 +25,8 @@ type Projection = {
   plant_id: string; plant_code: string; effective_at: string;
   generated_at: string; source_taquillas: number;
   excluded_cancelled_taquillas: string[];
-  material_count: number; unknown_stock_materials: number;
+  material_count: number; bom_material_count: number;
+  unplanned_consumption_materials: number; unknown_stock_materials: number;
   indicative_gap_materials: number; items: MaterialRow[]; warnings: string[];
 };
 type ProcurementRow = {
@@ -39,7 +40,7 @@ type Procurement = {
   no_verified_records_means: "UNKNOWN_NOT_ZERO";
   items: ProcurementRow[];
 };
-type Filter = "all" | "gap" | "unknown";
+type Filter = "all" | "gap" | "unknown" | "unplanned";
 const base = "/api/v1/materials/projection";
 const dateToday = () => {
   const now = new Date();
@@ -114,6 +115,7 @@ export function MaterialsProjectionPanel({
       .includes(search.trim().toLowerCase());
     if (!matching) return false;
     if (filter === "unknown") return row.stock_state === "UNKNOWN";
+    if (filter === "unplanned") return row.source_basis === "MEASURED_WITHOUT_BOM";
     if (filter === "gap") return nonzero(row.provisional_gross_gap);
     return true;
   }), [data, search, filter]);
@@ -175,7 +177,8 @@ export function MaterialsProjectionPanel({
       {data && (
         <>
           <div className="g67-stats">
-            <article><span>Materiales BOM</span><strong>{data.material_count}</strong><small>{data.source_taquillas} taquillas incluidas</small></article>
+            <article><span>Materiales BOM</span><strong>{data.bom_material_count}</strong><small>{data.source_taquillas} taquillas incluidas</small></article>
+            <article><span>Fuera de BOM</span><strong>{data.unplanned_consumption_materials}</strong><small>Consumos medidos sin componente BOM</small></article>
             <article><span>Stock desconocido</span><strong>{data.unknown_stock_materials}</strong><small>No equivale a cero</small></article>
             <article><span>Brecha indicativa</span><strong>{data.indicative_gap_materials}</strong><small>Artículos con diferencia, no ATP</small></article>
             <article><span>Taquillas canceladas</span><strong>{data.excluded_cancelled_taquillas.length}</strong><small>Excluidas de la demanda BOM</small></article>
@@ -195,6 +198,7 @@ export function MaterialsProjectionPanel({
                 <option value="all">Todos</option>
                 <option value="gap">Con brecha indicativa</option>
                 <option value="unknown">Stock desconocido</option>
+                <option value="unplanned">Consumido fuera de BOM</option>
               </select>
             </label>
             <button type="button" onClick={exportCSV}>Exportar CSV</button>
@@ -218,7 +222,7 @@ export function MaterialsProjectionPanel({
               <tbody>
                 {rows.map(row => (
                   <tr key={row.article_id}>
-                    <td><strong>{row.article_code}</strong><small>{row.article_description}</small><small>Unidad: {row.uom_code}</small></td>
+                    <td><strong>{row.article_code}</strong><small>{row.article_description}</small><small>Unidad: {row.uom_code}</small>{row.source_basis === "MEASURED_WITHOUT_BOM" && <small className="g67-unplanned">Consumo fuera de BOM</small>}</td>
                     <td>{fmt(row.theoretical_plan_quantity)}</td>
                     <td>{fmt(row.actual_net_measured_consumption)}</td>
                     <td>{fmt(row.physical_on_hand)}</td>
@@ -242,7 +246,7 @@ export function MaterialsProjectionPanel({
           {rows.filter(row => row.article_id === opened).map(row => (
             <section className="g67-detail" key={row.article_id}>
               <h3>{row.article_code} · Detalle por ubicación</h3>
-              <p>{row.source_path_count} rutas de componentes BOM y {row.distinct_taquillas} taquillas de origen.</p>
+              <p>{row.source_basis === "BOM" ? `${row.source_path_count} rutas de componentes BOM y ${row.distinct_taquillas} taquillas de origen.` : "Artículo consumido en MES pero no contemplado en la BOM vigente. Requiere revisión de desvío, sustitución o reparación."}</p>
               <table>
                 <thead><tr><th>Depósito</th><th>Ubicación</th><th>Físico</th><th>Reserva</th><th>Sin asignar</th><th>Estado</th></tr></thead>
                 <tbody>{row.location_breakdown.map(loc => (
@@ -277,7 +281,7 @@ export function MaterialsProjectionPanel({
             </section>
           ))}
           <footer className="g67-footnote">
-            <strong>Alcance del informe.</strong> Las cantidades corresponden a unidades distintas y no deben totalizarse entre artículos. Si alguna ubicación de la planta carece de apertura, el stock del artículo es desconocido. Las brechas comparan demanda bruta del plan con reservas de sus taquillas y stock físico no asignado; no ajustan automáticamente producción ya ejecutada, fechas ni calidad. La evidencia Prolowin es manual, parcial y no se incorpora al inventario.
+            <strong>Alcance del informe.</strong> Las cantidades corresponden a unidades distintas y no deben totalizarse entre artículos. Si alguna ubicación de la planta carece de apertura, el stock del artículo es desconocido. Se incluyen consumos MES sin material previsto en la BOM. Las brechas comparan demanda bruta del plan con reservas de sus taquillas y stock físico no asignado; no ajustan automáticamente producción ya ejecutada, fechas ni calidad. La evidencia Prolowin es manual, parcial y no se incorpora al inventario.
           </footer>
         </>
       )}
