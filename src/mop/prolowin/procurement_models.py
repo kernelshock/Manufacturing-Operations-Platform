@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index,
-    Integer, JSON, LargeBinary, Numeric, String, Text, UniqueConstraint, func
+    Integer, JSON, LargeBinary, Numeric, String, Text, UniqueConstraint, func, text
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from mop.persistence.base import Base
@@ -40,7 +40,7 @@ class ProcurementEvidenceEvent(Base):
             name="ck_proc_event_review",
         ),
         UniqueConstraint("source_event_key", name="uq_proc_event_source_key"),
-        UniqueConstraint("po_number", "line_number", "kind", "source_reference", name="uq_proc_event_business_key"),
+        Index("uq_proc_event_verified_business_key", "po_number", "line_number", "kind", "source_reference", unique=True, postgresql_where=text("review_status = 'VERIFIED'")),
         Index("ix_proc_event_order_line", "po_number", "line_number", "review_status"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
