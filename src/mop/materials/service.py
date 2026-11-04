@@ -164,6 +164,11 @@ class MaterialsService:
         signed = qty * sign
         if current.initialized and (current.on_hand or Decimal("0")) + signed < 0:
             raise MaterialsRule("insufficient stock; negative stock is not authorized")
+        if signed < 0:
+            from mop.materials.reservation_service import reserved_quantity
+            committed = reserved_quantity(self.session, data.article_id, data.location_id)
+            if (current.on_hand or Decimal("0")) + signed < committed:
+                raise MaterialsRule("stock ISSUE would consume material reserved for a taquilla; release first")
         entity = MaterialMovement(
             id=uuid4(), article_id=data.article_id, location_id=data.location_id, uom_id=data.uom_id,
             kind=data.kind, quantity=qty, signed_quantity=signed,
@@ -202,6 +207,11 @@ class MaterialsService:
         signed = -original.signed_quantity
         if current.on_hand is None or current.on_hand + signed < 0:
             raise MaterialsRule("reversal would create negative stock")
+        if signed < 0:
+            from mop.materials.reservation_service import reserved_quantity
+            committed = reserved_quantity(self.session, original.article_id, original.location_id)
+            if current.on_hand + signed < committed:
+                raise MaterialsRule("receipt reversal would consume stock reserved for a taquilla")
         entity = MaterialMovement(
             id=uuid4(), article_id=original.article_id, location_id=original.location_id,
             uom_id=original.uom_id, kind="REVERSAL", quantity=original.quantity,
