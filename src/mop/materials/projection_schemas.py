@@ -31,6 +31,7 @@ class MaterialLocationProjection(BaseModel):
 
 
 class MaterialItemProjection(BaseModel):
+    source_basis: Literal["BOM", "MEASURED_WITHOUT_BOM"]
     article_id: UUID
     article_code: str
     article_description: str
@@ -66,6 +67,8 @@ class MaterialPlanOverview(BaseModel):
     source_taquillas: int
     excluded_cancelled_taquillas: list[UUID]
     material_count: int
+    bom_material_count: int
+    unplanned_consumption_materials: int
     unknown_stock_materials: int
     indicative_gap_materials: int
     items: list[MaterialItemProjection]
