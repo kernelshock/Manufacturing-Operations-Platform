@@ -28,7 +28,9 @@ const init: FormData = {
   event_date: "", original_promise_date: "", revised_promise_date: "",
   reason: "", source_reference: "", continuity_safe: false,
 };
-// Prolowin typically supplies calendar dates, not exact timestamps. Noon UTC is\n// an explicit date-only transport convention, never a claimed receipt time.\nconst asIso = (date: string) => date ? `${date}T12:00:00Z` : null;
+// Prolowin typically supplies calendar dates, not exact timestamps. Noon UTC is
+// an explicit date-only transport convention, never a claimed receipt time.
+const asIso = (date: string) => date ? `${date}T12:00:00Z` : null;
 const eText = (error: unknown) => error instanceof Error ? error.message : "Error de operación";
 const fields: { key: keyof FormData; title: string; hint?: string }[] = [
   { key: "po_number", title: "Orden de compra" },
