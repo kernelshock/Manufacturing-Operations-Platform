@@ -126,7 +126,8 @@ def test_manual_screenshot_verified_partial_receipts_and_original_promise():
             original_promise_date=original.isoformat(),
             source_event_key="OTHER-KEY-"+suffix,
         ))
-        assert duplicate_document.status_code==409
+        assert duplicate_document.status_code==201
+        duplicate_document=duplicate_document.json()
 
         rescheduled=post(client,root+"/events",event(
             pic["id"],po,suffix,article,supplier,uom,receipt_one,
@@ -172,6 +173,15 @@ def test_manual_screenshot_verified_partial_receipts_and_original_promise():
             "decision":"VERIFIED","note":"Compared order to original Prolowin PO screen"
         })
         assert approved.status_code==200,approved.text
+        conflict=client.post(root+f"/events/{duplicate_document['id']}/review",json={
+            "decision":"VERIFIED","note":"Duplicate document must not double count"
+        })
+        assert conflict.status_code==409
+        # The rejected duplicate remains in history for audit and may be corrected
+        # without changing the independently verified original.
+        assert client.post(root+f"/events/{duplicate_document['id']}/review",json={
+            "decision":"REJECTED","note":"Duplicate of already verified Prolowin document"
+        }).status_code==200
         for item in (rescheduled,receipt1,receipt2,claim,escalated):
             reviewed=client.post(root+f"/events/{item['id']}/review",json={
                 "decision":"VERIFIED","note":"Independent source screen verification"
