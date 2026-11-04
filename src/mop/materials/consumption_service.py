@@ -141,6 +141,10 @@ class MaterialConsumptionService:
             raise MaterialsRule("cannot consume material from UNKNOWN inventory")
         if balance.on_hand < data.quantity:
             raise MaterialsRule("insufficient physical stock for measured consumption")
+        from mop.materials.reservation_service import reserved_quantity
+        reserved = reserved_quantity(self.session, data.article_id, data.location_id)
+        if balance.on_hand - reserved < data.quantity:
+            raise MaterialsRule("material is reserved for a taquilla; release allocation before consumption")
 
         # Reserved source namespace prevents bypass of MES consumption bookkeeping.
         if self.session.scalar(select(MaterialMovement.id).where(
