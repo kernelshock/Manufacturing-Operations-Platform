@@ -57,6 +57,7 @@ export function MaterialsProjectionPanel({
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plantId, setPlantId] = useState(contextPlantId ?? "");
   const [planId, setPlanId] = useState("");
+  const [planSearch, setPlanSearch] = useState("");
   const [effectiveDate, setEffectiveDate] = useState(dateToday);
   const [refresh, setRefresh] = useState(0);
   const [data, setData] = useState<Projection | null>(null);
@@ -70,17 +71,27 @@ export function MaterialsProjectionPanel({
 
   useEffect(() => {
     let current = true;
-    Promise.all([
-      apiFetch<Plant[]>(base + "/plants?limit=500"),
-      apiFetch<Plan[]>(base + "/plans?limit=500"),
-    ]).then(([sites, jobs]) => {
+    void apiFetch<Plant[]>(base + "/plants?limit=500").then(sites => {
       if (!current) return;
-      setPlants(sites); setPlans(jobs);
+      setPlants(sites);
       setPlantId(old => sites.some(p => p.id === old) ? old : (sites[0]?.id ?? ""));
-      setPlanId(old => jobs.some(p => p.id === old) ? old : (jobs[0]?.id ?? ""));
     }).catch(e => { if (current) setError(msg(e)); });
     return () => { current = false; };
   }, []);
+
+  useEffect(() => {
+    let current = true;
+    const timer = window.setTimeout(() => {
+      const query = new URLSearchParams({ limit: "200" });
+      if (planSearch.trim()) query.set("search", planSearch.trim());
+      void apiFetch<Plan[]>(base + "/plans?" + query.toString()).then(jobs => {
+        if (!current) return;
+        setPlans(jobs);
+        setPlanId(old => jobs.some(p => p.id === old) ? old : (jobs[0]?.id ?? ""));
+      }).catch(e => { if (current) setError(msg(e)); });
+    }, 220);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [planSearch]);
 
   useEffect(() => {
     if (contextPlantId && plants.some(p => p.id === contextPlantId)) setPlantId(contextPlantId);
@@ -127,11 +138,12 @@ export function MaterialsProjectionPanel({
     const lines = [
       ["Artículo", "Descripción", "Ud", "BOM teórica", "Consumo real neto",
        "Stock físico", "Reservas totales", "Reservado plan", "No asignado",
-       "Brecha bruta indicativa", "Estado stock"].map(csv).join(","),
+       "Brecha bruta indicativa", "Estado stock", "Base de origen"].map(csv).join(","),
       ...rows.map(r => [
         r.article_code, r.article_description, r.uom_code, r.theoretical_plan_quantity,
         r.actual_net_measured_consumption, r.physical_on_hand, r.reserved_all_plans,
         r.reserved_this_plan, r.unallocated_physical, r.provisional_gross_gap, r.stock_state,
+        r.source_basis,
       ].map(csv).join(",")),
     ];
     const blob = new Blob(["\uFEFF", lines.join("\r\n")], {
@@ -156,6 +168,9 @@ export function MaterialsProjectionPanel({
           <select value={plantId} onChange={e => setPlantId(e.target.value)} disabled={!plants.length}>
             {plants.map(p => <option key={p.id} value={p.id}>{p.code} · {p.name}</option>)}
           </select>
+        </label>
+        <label>Buscar plan (si no aparece entre los primeros 200)
+          <input value={planSearch} onChange={e => setPlanSearch(e.target.value)} placeholder="Número de plan" />
         </label>
         <label>Plan
           <select value={planId} onChange={e => setPlanId(e.target.value)} disabled={!plans.length}>
@@ -185,7 +200,7 @@ export function MaterialsProjectionPanel({
           </div>
           <div className="g67-caption">
             <strong>{data.plan_number} · Planta {data.plant_code}</strong>
-            <span>Consulta al {dateLabel(data.effective_at)} · {dateLabel(data.generated_at)}</span>
+            <span>BOM vigente al {dateLabel(data.effective_at)} · existencias actuales consultadas el {dateLabel(data.generated_at)}</span>
             <span>El consumo MES ya está descontado del stock físico. No se vuelve a restar.</span>
           </div>
           <div className="g67-toolbar g67-print-controls">
