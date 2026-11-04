@@ -15,6 +15,10 @@ from mop.materials.schemas import (
 from mop.materials.service import MaterialsConflict, MaterialsNotFound, MaterialsRule, MaterialsService
 from mop.materials.requirement_schemas import MaterialDemandProjection
 from mop.materials.requirements import MaterialRequirementsService
+from mop.materials.consumption_service import MaterialConsumptionService
+from mop.materials.consumption_schemas import (
+    ConsumptionCreate, ConsumptionRead, ConsumptionReverse, ConsumptionResult,
+)
 from mop.persistence.dependencies import get_session
 
 router = APIRouter(prefix="/materials", tags=["materials"])
@@ -129,3 +133,48 @@ def taquilla_material_requirements(
     _: User = Depends(require_global_permission("materials.read")),
 ):
     return checked(lambda: MaterialRequirementsService(session).project_taquilla(taquilla_id, effective_at))
+
+
+@router.post(
+    "/operations/{operation_id}/consumptions",
+    response_model=ConsumptionResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_actual_material_consumption(
+    operation_id: UUID,
+    payload: ConsumptionCreate,
+    session: Session = Depends(get_session),
+    actor: User = Depends(require_global_permission("materials.edit")),
+):
+    """Explicit measured material use; atomic stock ISSUE and audit (not a MES automation)."""
+    return checked(lambda: MaterialConsumptionService(session).record(
+        operation_id, payload, actor.id, actor.username,
+    ))
+
+
+@router.get(
+    "/operations/{operation_id}/consumptions", response_model=list[ConsumptionRead]
+)
+def list_actual_material_consumptions(
+    operation_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    return checked(lambda: MaterialConsumptionService(session).list(operation_id))
+
+
+@router.post(
+    "/consumptions/{consumption_id}/reverse",
+    response_model=ConsumptionResult,
+    status_code=status.HTTP_201_CREATED,
+)
+def reverse_actual_material_consumption(
+    consumption_id: UUID,
+    payload: ConsumptionReverse,
+    session: Session = Depends(get_session),
+    actor: User = Depends(require_global_permission("materials.edit")),
+):
+    """Append-only evidence correction and linked stock reversal; never edits MES."""
+    return checked(lambda: MaterialConsumptionService(session).reverse(
+        consumption_id, payload, actor.id, actor.username,
+    ))
