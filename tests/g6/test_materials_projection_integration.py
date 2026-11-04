@@ -84,6 +84,8 @@ def test_plan_projection_isolated_by_plant_no_double_consumption_and_unknown():
         assert len(steel["location_breakdown"])==1
         assert steel["location_breakdown"][0]["location_id"]==loc
         fabric=row_by_article(result,data["material_y"])
+        # Both BOM materials have no MES events: absence must report measured zero.
+        assert Decimal(fabric["actual_net_measured_consumption"]) == 0
         assert fabric["physical_on_hand"] is None
         assert fabric["provisional_gross_gap"] is None
         assert fabric["stock_state"]=="UNKNOWN"
