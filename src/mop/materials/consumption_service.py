@@ -165,7 +165,11 @@ class MaterialConsumptionService:
             evidence_reference=data.evidence_reference,
             observed_at=data.observed_at, recorded_by=actor_id,
         )
-        self.session.add_all([movement, item])
+        # The consumption FK references an already-inserted movement. Flush under
+        # the SAME uncommitted transaction so SQLAlchemy cannot reorder its INSERT.
+        self.session.add(movement)
+        self.session.flush()
+        self.session.add(item)
         self.materials._audit(actor_id, username, "materials.movement.post", movement)
         self._audit(item, actor_id, username)
         return self._commit(item)
@@ -224,7 +228,11 @@ class MaterialConsumptionService:
             reason_code=data.reason_code,
             observed_at=data.observed_at, recorded_by=actor_id,
         )
-        self.session.add_all([movement, item])
+        # The consumption FK references an already-inserted movement. Flush under
+        # the SAME uncommitted transaction so SQLAlchemy cannot reorder its INSERT.
+        self.session.add(movement)
+        self.session.flush()
+        self.session.add(item)
         self.materials._audit(actor_id, username, "materials.movement.post", movement)
         self._audit(item, actor_id, username)
         return self._commit(item)
