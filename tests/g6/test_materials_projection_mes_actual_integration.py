@@ -68,7 +68,7 @@ def test_measured_bom_and_unplanned_consumption_are_visible_without_double_issue
         })
         assert response.status_code==200,response.text
         at=datetime.now(timezone.utc)-timedelta(minutes=3)
-        g63.bom(client,rev_id,at,[
+        g63.bom(client,str(rev_id),at,[
             (str(ids["article_id"]),"2",str(ids["uom_id"]),None,None),
         ])
         effect=at+timedelta(minutes=2)
