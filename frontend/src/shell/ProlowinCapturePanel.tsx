@@ -28,7 +28,7 @@ const init: FormData = {
   event_date: "", original_promise_date: "", revised_promise_date: "",
   reason: "", source_reference: "", continuity_safe: false,
 };
-const asIso = (date: string) => date ? new Date(date).toISOString() : null;
+// Prolowin typically supplies calendar dates, not exact timestamps. Noon UTC is\n// an explicit date-only transport convention, never a claimed receipt time.\nconst asIso = (date: string) => date ? `${date}T12:00:00Z` : null;
 const eText = (error: unknown) => error instanceof Error ? error.message : "Error de operación";
 const fields: { key: keyof FormData; title: string; hint?: string }[] = [
   { key: "po_number", title: "Orden de compra" },
@@ -205,8 +205,8 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
                     onChange={e => update(key, e.target.value)} />
                 </label>
               ))}
-              <label>Fecha del evento
-                <input required type="datetime-local" value={form.event_date}
+              <label>Fecha del evento (día calendario)
+                <input required type="date" value={form.event_date}
                   onChange={e => update("event_date", e.target.value)} />
               </label>
               {(form.kind === "ORDER" || form.kind === "RECEIPT") && (
@@ -222,14 +222,14 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
                 </label>
               )}
               {form.kind === "ORDER" && (
-                <label>Fecha prometida originalmente
-                  <input required type="datetime-local" value={form.original_promise_date}
+                <label>Fecha prometida originalmente (día)
+                  <input required type="date" value={form.original_promise_date}
                     onChange={e => update("original_promise_date", e.target.value)} />
                 </label>
               )}
               {form.kind === "RESCHEDULE" && (
-                <label>Nueva fecha prometida
-                  <input required type="datetime-local" value={form.revised_promise_date}
+                <label>Nueva fecha prometida (día)
+                  <input required type="date" value={form.revised_promise_date}
                     onChange={e => update("revised_promise_date", e.target.value)} />
                 </label>
               )}
