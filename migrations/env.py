@@ -21,6 +21,7 @@ from mop.materials import reservation_models as materials_reservation_models  # 
 from mop.mes import models as mes_models  # noqa: F401
 from mop.mes import rework_models as mes_rework_models  # noqa: F401
 from mop.prolowin import models as prolowin_models  # noqa: F401
+from mop.prolowin import procurement_models as prolowin_procurement_models  # noqa: F401
 from mop.persistence.base import Base
 
 config = context.config
