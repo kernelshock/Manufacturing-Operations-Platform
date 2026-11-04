@@ -52,8 +52,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -c requirements-dev.lock.txt -e ".[dev]"
           python -m pip check
-      - name: Compile Materials domain
-        run: python -m compileall -q src/mop/materials
+      - name: Compile Materials, Prolowin and versioned API
+        run: python -m compileall -q src/mop/materials src/mop/prolowin src/mop/api/v1
       - name: Verify G6 migration and schema
         run: |
           python -m alembic heads | tee /tmp/g6-heads
@@ -70,11 +70,34 @@ jobs:
           ./infrastructure/scripts/repository-secret-scan.sh
           ./infrastructure/scripts/supply-chain-pin-check.sh
 
+  g6-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Node.js 26 LTS
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "26.13.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --no-fund
+      - name: Typecheck G6.7 frontend
+        run: npm run typecheck
+      - name: Test G6.7 and frontend regressions
+        run: npm test
+      - name: Build frontend
+        run: npm run build
+
   g6-gate:
     runs-on: ubuntu-latest
-    needs: [g6-domain]
+    needs: [g6-domain, g6-frontend]
     steps:
       - run: |
-          echo "G6.1 domain and G6.2 PostgreSQL stock ledger contracts passed."
+          echo "G6.1–G6.7 domain, API, PostgreSQL and frontend contracts passed."
           echo "G6 remains IN PROGRESS; CI uses only disposable test inventory and no production data."
           echo "This workflow does not authorize release or production deployment."
