@@ -52,6 +52,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -c requirements-dev.lock.txt -e ".[dev]"
           python -m pip check
+      - name: Validate safe zrtserver G6.8 gate script syntax
+        run: bash -n infrastructure/scripts/g68-local-gate.sh
       - name: Compile Materials, Prolowin and versioned API
         run: python -m compileall -q src/mop/materials src/mop/prolowin src/mop/api/v1
       - name: Verify G6 migration and schema
