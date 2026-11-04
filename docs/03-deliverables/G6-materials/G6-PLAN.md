@@ -76,3 +76,35 @@ The technical design supports Prolowin as a separate upstream source. Before G6.
 
 **Delivery milestones:** G6.3 only produces source-traceable **theoretical** material requirements; G6.4 links actual consumption; G6.5 incorporates reservations and usable stock; G6.6 stages Prolowin purchase/receipt/supplier data with traceable identity and no automatic overwrite. **G7** computes safety stock, P.P., C.R. and purchasing recommendations under the policy above. No purchases or inventory movement are authorized by demand calculations alone.
 
+## Confirmed FAIC Prolowin procurement workflow — source-of-record clarification (2026-11-03)
+
+**Confirmed by FAIC for G6.6 Prolowin Assimilation and G7 Kanban/Purchasing** (functional behavior, not yet a verified API/schema specification):
+
+1. **Prolowin is the primary transactional record.** Purchase orders contain the order date, promised delivery date, actual receipt dates and **partial supplier deliveries**. It also records supplier claims after delivery noncompliance and delivery rescheduling/reprogramming.
+2. **Reprogramming is conditional on production continuity.** When delivery can be rescheduled without placing production at risk, an agreed new date is recorded. When the situation threatens production, purchasing begins searching for **alternative suppliers**. This is an escalation workflow, not an automatic authorization to place a substitute purchase order or to replace an approved supplier.
+3. **A weekly Excel export is only a secondary historical snapshot/log** of operations, claims or pending deliveries from that week. It is *not* a competing system of record, nor a full transaction source. Preserve file date, export provenance and snapshot relationship to Prolowin; do not sum snapshots as new receipts, new orders or new claims.
+
+### Minimum conceptual mapping (verify actual Prolowin identifiers and column names before integration)
+
+- **Purchase-order header:** unique Prolowin PO ID/number, supplier ID/code, order date, buyer/status.
+- **PO line:** unique line ID, canonical G2 article/supplier-article code, unit, quantity ordered, original promised date, active revised promised date, line status.
+- **Delivery/receipt events:** stable receipt or delivery-note ID and PO-line linkage, actual timestamp/date, received quantity, accepted/rejected quantity when available, partial receipt number, cumulative received and outstanding quantity. Do not mistake a delivery note for verified physically accepted stock.
+- **Reprogramming history:** PO/line association, old promised date, new promised date, date of change, documented reason, approving user when available, and whether production continuity was assessed as safe. **Never overwrite original promised date:** retain *original commitment*, each accepted revision and actual receipt separately.
+- **Claims and noncompliance:** claim ID, PO/line and supplier linkage, opened/closed timestamps, reason and severity, corrective follow-up, resolution. Claims are evidence of supplier service quality, not physical receipts or new purchase orders.
+- **Production-risk and alternate-source escalation:** affected materials/subassemblies, dated G3/G4 needs, usable G6 inventory and outstanding orders, predicted stockout date, risk classification, supplier-alternative evaluation and approval state. Respect PG-10, supplier quality requirements and authorized purchasing decisions.
+
+### Lead-time and risk calculation semantics
+
+- Calculate **actual lead time** by PO line and receipt event from *order date* to the respective accepted receipt date using a documented **business-day calendar**. For partial receipts, also calculate quantity-weighted service and **date of full fulfillment**, not just first delivery.
+- Calculate **lateness against the original promised date** and, separately, **lateness against the latest approved revised date**. A reprogramming must **never erase the original missed commitment** from supplier reliability metrics. The accepted revised date may be used for near-term coverage forecasts, identified as a revised assumption with its revision history.
+- For open orders, classify outstanding quantity and **current overdue days**, but do not infer an actual arrival date or count open deliveries as received. Missing dates remain UNKNOWN and are flagged for data quality.
+- Account for multiple simultaneous open PO lines, partial receipts, goods blocked by Quality, calendars, supplier-specific actual delay distributions and internal lead times for manufactured subassemblies.
+- Compute production disruption risk from **dated BOM-derived needs, usable stock, reservations, expected receipts, and coverage** rather than from the fact that a supplier is late alone. Generate an escalation/alternative-supplier evaluation when continuity is threatened; the engine must not automatically switch supplier, amend orders or bypass purchasing approvals.
+- Supplier scorecards must show on-time complete delivery, original-vs-revised commitment performance, quantity-weighted partial-delivery performance, claim frequency and aging, lead-time variance and production-risk incidents. Keep the evaluation traceable to immutable IDs and dates.
+
+### Integration acceptance and remaining discovery
+
+G6.6 will use a read-only, staged ingestion with original Prolowin IDs, source hashes, incremental history, duplicate detection and reconciliation. The weekly Excel files may provide corroboration or historical backfill with explicitly marked confidence, **not independent stock posting or supplier-delay events**. Before implementation, inspect the actual Prolowin export schema or interface and confirm that original promised dates and reprogramming versions remain retrievable, how claims and partial receipts are keyed, and how accepted stock differs from delivered stock. The confirmed functional capabilities do not establish the exact database structure or authorize direct access.
+
+**Scope:** G6.3 remains a read-only BOM theoretical-demand projection, G6.4 will capture actual material consumption, G6.5 usable/reserved stock, G6.6 Prolowin purchase/receipt/claim/reprogram evidence, and G7 governed safety stock, P.P., C.R., supplier delay analytics and alternative-source recommendations. No production access or purchasing action is authorized by this clarification.
+
