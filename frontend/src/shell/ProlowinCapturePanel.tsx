@@ -287,6 +287,7 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
       </section>
       <section className="content-section">
         <h3>4. Historial de pedido verificado</h3>
+        <p>Los totales reflejan únicamente las transcripciones revisadas. No prueban que se haya capturado todo el historial de Prolowin ni que el material haya ingresado al stock.</p>
         <label>Orden de compra
           <input value={summaryPo} onChange={e => setSummaryPo(e.target.value)} />
         </label>
@@ -299,7 +300,7 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
             <p>Pedido: <strong>{summary.ordered_quantity}</strong></p>
             <p>Entregado: <strong>{summary.delivered_quantity}</strong></p>
             <p>Aceptado: <strong>{summary.accepted_quantity ?? "Sin evidencia"}</strong></p>
-            <p>Pendiente de entrega: <strong>{summary.outstanding_delivered_quantity}</strong></p>
+            <p>Pendiente según registros capturados: <strong>{summary.outstanding_delivered_quantity}</strong></p>
             <p>Recepciones: <strong>{summary.partial_receipt_count}</strong></p>
             <p>Reclamos: <strong>{summary.claim_count}</strong></p>
             <p>Alertas de continuidad: <strong>{summary.production_risk_escalations}</strong></p>
