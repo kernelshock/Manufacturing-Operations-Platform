@@ -74,8 +74,8 @@ class ProcurementEvidenceService:
             raise EvidenceRule("screenshot source reference is required (max 150 characters)")
         if len(content) == 0 or len(content) > 4 * 1024 * 1024:
             raise EvidenceRule("screenshot must be 1 byte to 4 MiB")
-        valid_png = content.startswith(b"\\x89PNG\\r\\n\\x1a\\n") and content_type == "image/png"
-        valid_jpeg = content.startswith(b"\\xff\\xd8\\xff") and content_type == "image/jpeg"
+        valid_png = content.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10))) and content_type == "image/png"
+        valid_jpeg = content.startswith(bytes((255, 216, 255))) and content_type == "image/jpeg"
         if not (valid_png or valid_jpeg):
             raise EvidenceRule("only actual PNG or JPEG screenshot bytes are accepted")
         digest = sha256(content).hexdigest()
