@@ -63,8 +63,14 @@ jobs:
           python -m alembic downgrade base
           python -m alembic upgrade head
           python -m alembic check
-      - name: Run G6 materials contracts and PostgreSQL ledger tests
-        run: python -m pytest tests/g6 -q
+      - name: Run complete G0–G6 backend regression against one migrated database
+        run: python -m pytest tests/g0 tests/g1 tests/g2 tests/g3 tests/g4 tests/g5 tests/g6 -q
+      - name: Verify G4 historical gate regressions
+        run: python -m pytest tests/g4/test_gate_hardening.py -q
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install pip-audit==2.10.1
+          python -m pip_audit --local --skip-editable
       - name: Verify tracked secrets and supply-chain pins
         run: |
           ./infrastructure/scripts/repository-secret-scan.sh
@@ -86,6 +92,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install locked frontend dependencies
         run: npm ci --no-fund
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
       - name: Typecheck G6.7 frontend
         run: npm run typecheck
       - name: Test G6.7 and frontend regressions
@@ -93,11 +101,52 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-  g6-gate:
+  g6-runtime:
     runs-on: ubuntu-latest
     needs: [g6-domain, g6-frontend]
+    env:
+      MOP_WEB_HOST_PORT: "18080"
+      MOP_ADMIN_USERNAME: smoke-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Node.js for Chrome DevTools browser flow
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "26.13.0"
+      - name: Check headless Chrome
+        run: command -v google-chrome
+      - name: Generate ephemeral credentials
+        run: |
+          python - <<'PY'
+          import os, secrets
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"MOP_POSTGRES_PASSWORD={secrets.token_urlsafe(32)}\n")
+              f.write(f"MOP_BOOTSTRAP_ADMIN_PASSWORD={secrets.token_urlsafe(32)}\n")
+          PY
+      - name: Configure disposable runtime
+        run: |
+          cat > .env.runtime-ci <<EOF
+          MOP_ENVIRONMENT=test
+          MOP_POSTGRES_DB=mop_smoke
+          MOP_POSTGRES_USER=mop_smoke
+          MOP_POSTGRES_PASSWORD=${MOP_POSTGRES_PASSWORD}
+          MOP_WEB_HOST_PORT=18080
+          MOP_SESSION_TTL_MINUTES=30
+          MOP_SESSION_COOKIE_SECURE=false
+          MOP_LOGIN_MAX_FAILURES=5
+          MOP_LOGIN_LOCKOUT_MINUTES=15
+          MOP_ADMIN_USERNAME=smoke-admin
+          MOP_ADMIN_DISPLAY_NAME=MOP Smoke Administrator
+          EOF
+      - name: Run real Chrome / FastAPI / PostgreSQL runtime acceptance
+        run: ./infrastructure/scripts/runtime-smoke.sh .env.runtime-ci
+
+  g6-gate:
+    runs-on: ubuntu-latest
+    needs: [g6-domain, g6-frontend, g6-runtime]
     steps:
       - run: |
-          echo "G6.1–G6.7 domain, API, PostgreSQL and frontend contracts passed."
+          echo "G0–G6 regression, G6 domain/API, PostgreSQL, audited frontend and Chrome runtime checks passed on this commit."
           echo "G6 remains IN PROGRESS; CI uses only disposable test inventory and no production data."
           echo "This workflow does not authorize release or production deployment."
