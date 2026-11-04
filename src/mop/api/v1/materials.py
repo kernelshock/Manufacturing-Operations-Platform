@@ -16,6 +16,8 @@ from mop.materials.service import MaterialsConflict, MaterialsNotFound, Material
 from mop.materials.requirement_schemas import MaterialDemandProjection
 from mop.materials.requirements import MaterialRequirementsService
 from mop.materials.consumption_service import MaterialConsumptionService
+from mop.materials.reservation_service import ReservationService
+from mop.materials.reservation_schemas import (ReservationCreate, ReservationRelease, ReservationResult, ReservationEventRead, LocationAvailability, TaquillaCoverage)
 from mop.materials.consumption_schemas import (
     ConsumptionCreate, ConsumptionRead, ConsumptionReverse, ConsumptionResult,
 )
@@ -177,4 +179,63 @@ def reverse_actual_material_consumption(
     """Append-only evidence correction and linked stock reversal; never edits MES."""
     return checked(lambda: MaterialConsumptionService(session).reverse(
         consumption_id, payload, actor.id, actor.username,
+    ))
+
+
+@router.post("/reservations", response_model=ReservationResult, status_code=status.HTTP_201_CREATED)
+def reserve_for_taquilla(
+    payload: ReservationCreate,
+    session: Session = Depends(get_session),
+    actor: User = Depends(require_global_permission("materials.edit")),
+):
+    """Commit physical quantity to one taquilla; no inventory movement or PO."""
+    return checked(lambda: ReservationService(session).hold(payload, actor.id, actor.username))
+
+
+@router.post("/reservations/{hold_id}/release", response_model=ReservationResult,
+             status_code=status.HTTP_201_CREATED)
+def release_material_reservation(
+    hold_id: UUID,
+    payload: ReservationRelease,
+    session: Session = Depends(get_session),
+    actor: User = Depends(require_global_permission("materials.edit")),
+):
+    """Release whole or partial reservation; retain append-only provenance."""
+    return checked(lambda: ReservationService(session).release(
+        hold_id, payload, actor.id, actor.username,
+    ))
+
+
+@router.get("/taquillas/{taquilla_id}/reservations", response_model=list[ReservationEventRead])
+def list_taquilla_reservations(
+    taquilla_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    return ReservationService(session).events(taquilla_id)
+
+
+@router.get("/availability", response_model=LocationAvailability)
+def material_location_availability(
+    article_id: UUID,
+    location_id: UUID,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    """Unallocated physical on-hand: quality release and ATP are NOT inferred."""
+    return ReservationService(session).availability(article_id, location_id)
+
+
+@router.get("/taquillas/{taquilla_id}/coverage", response_model=TaquillaCoverage)
+def taquilla_material_coverage(
+    taquilla_id: UUID,
+    article_id: UUID,
+    location_id: UUID,
+    effective_at: datetime = Query(..., description="Timezone-aware effective BOM timestamp"),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    """Shortfall after reservations + unallocated physical stock, not a purchasing order."""
+    return checked(lambda: ReservationService(session).coverage(
+        taquilla_id, article_id, location_id, effective_at,
     ))
