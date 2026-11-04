@@ -47,7 +47,8 @@ const dateToday = () => {
   return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"),
     String(now.getDate()).padStart(2, "0")].join("-");
 };
-const forBOM = (day: string) => `${day}T12:00:00Z`;
+// Today uses the actual observation timestamp; historical dates use UTC end-of-day.
+const forBOM = (day: string) => day === dateToday() ? new Date().toISOString() : `${day}T23:59:59Z`;
 const msg = (e: unknown) => e instanceof Error ? e.message : "No fue posible consultar los materiales.";
 const dateLabel = (s: string) => new Date(s).toLocaleDateString("es-AR");
 export function MaterialsProjectionPanel({
