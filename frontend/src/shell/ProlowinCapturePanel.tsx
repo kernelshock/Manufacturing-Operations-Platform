@@ -44,6 +44,8 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
 }) {
   const [captureRef, setCaptureRef] = useState("");
   const [capture, setCapture] = useState<Capture | null>(null);
+  const [captureKind, setCaptureKind] = useState<"MANUAL" | "WEEKLY_SNAPSHOT">("MANUAL");
+  const [reviewSource, setReviewSource] = useState<Capture | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState<FormData>(init);
   const [items, setItems] = useState<Evidence[]>([]);
@@ -60,6 +62,16 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
     void apiFetch<Evidence[]>(base + "/events").then(setItems).catch(e => setError(eText(e)));
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    if (!selectedReview) { setReviewSource(null); return; }
+    const record = items.find(item => item.id === selectedReview);
+    if (!record) { setReviewSource(null); return; }
+    let active = true;
+    void apiFetch<Capture>(base + "/captures/" + encodeURIComponent(record.capture_id))
+      .then(source => { if (active) setReviewSource(source); })
+      .catch(e => { if (active) setError(eText(e)); });
+    return () => { active = false; };
+  }, [selectedReview, items]);
 
   const submit = async (action: () => Promise<void>) => {
     setBusy(true); setError(""); setFeedback("");
@@ -79,7 +91,7 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
           })
         : await apiFetch<Capture>(base + "/captures/manual", {
             method: "POST", body: JSON.stringify({
-              source_type: "MANUAL", source_reference: captureRef,
+              source_type: captureKind, source_reference: captureRef,
             }),
           });
       setCapture(item);
@@ -161,12 +173,18 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
                 onChange={e => setCaptureRef(e.target.value)}
                 placeholder="PO 26-145 · Renglón 3 · Captura Prolowin"/>
             </label>
+            <label>Fuente cuando no hay imagen
+              <select value={captureKind} onChange={e => setCaptureKind(e.target.value as "MANUAL" | "WEEKLY_SNAPSHOT")}>
+                <option value="MANUAL">Transcripción desde pantalla de Prolowin</option>
+                <option value="WEEKLY_SNAPSHOT">Registro semanal Excel (solo apoyo, no verificable solo)</option>
+              </select>
+            </label>
             <label>Captura PNG/JPEG (opcional, hasta 4 MiB)
               <input type="file" accept="image/png,image/jpeg"
                 onChange={e => setFile(e.target.files?.[0] ?? null)} />
             </label>
             <button type="submit" disabled={busy}>Registrar fuente</button>
-            {capture && <p>Fuente activa: {capture.source_type} · {capture.source_reference} · ID {capture.id}</p>}
+            {capture && <p>Fuente activa: {capture.source_type} · {capture.source_reference} · ID {capture.id} {capture.source_type === "SCREENSHOT" && <a href={base + "/captures/" + encodeURIComponent(capture.id) + "/image"}>Ver captura adjunta</a>}</p>}
           </form>
 
           <form onSubmit={transcribe} className="content-section">
@@ -258,6 +276,7 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
                 ))}
               </select>
             </label>
+            {reviewSource && <p>Origen: {reviewSource.source_type} · {reviewSource.source_reference} {reviewSource.source_type === "SCREENSHOT" ? <a href={base + "/captures/" + encodeURIComponent(reviewSource.id) + "/image"} target="_blank" rel="noreferrer">Examinar imagen de origen</a> : <span>(transcripción sin imagen)</span>}</p>}
             <label>Nota de revisión
               <textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} />
             </label>
