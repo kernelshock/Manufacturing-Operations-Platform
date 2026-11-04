@@ -14,7 +14,7 @@ Extend the canonical G2 material/BOM records with operational materials manageme
 | **G6.2 — Stock Locations & Balances** | **IMPLEMENTED / CI verification pending final SHA:** warehouse/location, immutable PostgreSQL ledger, zero/unknown opening, posted movements, reversals, on-hand projection, idempotency, audit and RBAC REST endpoints |
 | G6.3 — Material Demand / BOM Explosion | Approved BOM revision + effectivity + G3 plan/taquilla quantities; theoretical demand by source and date; no inferred consumption |
 | **G6.4 — Actual Material Consumption** | **IMPLEMENTED — CI acceptance pending final HEAD:** explicit G5 operation-bound material use, atomic stock ISSUE, append-only reversal/correction, Decimal/UoM, actor/time/source evidence, IAM and idempotency |
-| G6.5 — Reservations / Availability | Reservations, release, shortage and availability checks; no invisible inventory deduction from APS schedule |
+| **G6.5 — Reservations / Availability** | **IMPLEMENTED, final SHA CI pending:** immutable HOLD/RELEASE by taquilla and BOM leaf, stock and demand limits, concurrency locks, unallocated stock and shortage projection; no automatic stock issue |
 | G6.6 — Prolowin Inventory Assimilation | Staging, mappings, deduplication, reconciliation and discrepancy approval; accounting ERP data remains its own source of record |
 | G6.7 — Materials Projection & Frontend | Material cards, consumption vs theoretical, location ledger and variance with permissions; printable/report-ready summaries |
 | G6.8 — Gate Hardening | One-SHA G0–G6 CI, migrations/rollback, domain invariants, RBAC, real browser E2E and explicit release decision |
@@ -120,3 +120,28 @@ G6.6 will use a read-only, staged ingestion with original Prolowin IDs, source h
 - G6 #78 on the implementation commit verified **29 tests passed**, clean PostgreSQL 18 Alembic migration upgrade/downgrade/replay/schema comparison and security checks. Full same-SHA G0–G6 regression and final documentation HEAD verification remain required for technical acceptance.
 - **Boundary:** the link to G6.3 BOM and G3 taquilla is via the canonical G5 operation/product_line/plan foreign keys. Planned BOM quantity and actual consumption remain separate. Material/BOM variance projections and presentation belong to G6.7; reservations and available-to-promise to G6.5; Prolowin receipt/PO synchronization to G6.6. G7 owns safety stock/P.P./C.R., inclusive of actual supplier delays and reprogramming evidence.
 - **Governance:** G6 remains IN PROGRESS. No PR #14 merge, G6 RELEASED, automatic FAIC inventory import or production deployment is authorized.
+
+## G6.5 — Reservation / Availability acceptance contract
+
+**Implementation:** `migrations/versions/0032_g6_5_reservations.py`, `src/mop/materials/reservation_models.py`, `reservation_schemas.py`, `reservation_service.py`, `src/mop/api/v1/materials.py`, `tests/g6/test_reservations_integration.py`. **Development only**, PR #14 stays DRAFT.
+
+- A G6.5 `HOLD` is an explicit, audited physical allocation to one G3 taquilla, for a terminal purchased/consumable material present in the effective G6.3 BOM explosion. It records plan, taquilla, article, location, canonical UoM, exact quantity, BOM effective timestamp, actor, source reference and idempotency key. It is **not** an inventory ISSUE, purchase commitment, MES consumption or automatic reserve from APS.
+- The total still-held quantity for each taquilla/article across locations **cannot exceed its effective BOM need**. Multiple taquillas that share one material compete for the same physically counted stock: reservations serialize using PostgreSQL advisory locks. Holds cannot exceed unallocated physical on-hand at the specific location. Unknown inventory is not assumed to be zero or sufficient.
+- Each `RELEASE` is an append-only, reason-coded event linked to the original hold, with independently idempotent evidence. Partial release is supported; a release above the remaining allocated quantity is rejected. Original reservations and release history cannot be directly updated/deleted, enforced by PostgreSQL trigger and positive/negative signed constraints.
+- Location `availability` reports **on_hand**, **reserved**, and **unallocated_on_hand = on_hand − reserved** (or UNKNOWN). It is explicitly labeled `PHYSICAL_UNALLOCATED_NOT_QUALITY_CERTIFIED`. The operation does not infer quality-released, available-to-promise, in-transit, booked receipt, or incoming Prolowin quantities. **Never present unallocated physical stock as certified usable stock.**
+- Taquilla `coverage` relates a dated G6.3 theoretical material requirement to that taquilla's commitments and a requested location's unallocated physical quantity. It reports a provisional shortage, or UNKNOWN when physical inventory has not been initialized. **Location-scoped coverage cannot be summed across locations or multiple taquillas** without an allocation/coverage aggregation engine; one unallocated physical quantity cannot satisfy multiple independent taquillas twice.
+- Generic stock `ISSUE`, reduction by receipt reversal and G6.4 actual consumption respect all active location holds. Consumption **requires an explicit reservation release first**: no implicit commitment fulfillment, hidden stock deduction or bypass of another taquilla's reservation. Retain the reason and source for the release and the distinct G6.4 measured consumption.
+- Cancelling a taquilla or plan does **not silently erase existing holds**: the responsible Materials actor must perform an explicit, audited release. New holds to cancelled plans/taquillas are prohibited. If BOM or product quantities change after a hold, previous evidence is immutable and commitments must be reviewed/released and, where appropriate, re-allocated against the effective revision.
+- Reservations of internally manufactured *intermediate assemblies* are **not automatically inferred** from terminal material BOM explosion; manufactured assemblies need a distinct confirmed stock/netting policy before safe multi-level supply allocation. G7 also requires explicit Quality stock status and inbound Prolowin PO/partial receipts before true available-to-promise and lead-time risk projections.
+
+### G6.5 API contract and validation
+
+- `POST /api/v1/materials/reservations` — create a measured `HOLD`, `materials.edit`.
+- `POST /api/v1/materials/reservations/{hold_id}/release` — release part/all, `materials.edit`.
+- `GET /api/v1/materials/taquillas/{id}/reservations` — append-only evidence history, `materials.read`.
+- `GET /api/v1/materials/availability?article_id=...&location_id=...` — physical unallocated, `materials.read`.
+- `GET /api/v1/materials/taquillas/{id}/coverage?article_id=...&location_id=...&effective_at=...` — provisional BOM/coverage and shortage, `materials.read`.
+- Required acceptance: Alembic single head `0032_g6_5`, upgrade/check/downgrade/reinstall/check, PostgreSQL immutable-event protection and forged-sign checks, simultaneous allocations, replay/conflict, partial release, known/unknown stock, cancellation, negative/over-reservation guards, stock ISSUE protection, authenticated HTTP RBAC; G0–G6 **all SUCCESS on final identical branch SHA**.
+
+**Procurement linkage:** the original and revised delivery commitments, partial receipts, claims, actual lateness and alternate sourcing decisions confirmed for Prolowin remain requirements for G6.6 and G7. They are not hidden inside G6.5 physical stock availability; no safety-stock calculation or purchase execution is introduced at this stage.
+
