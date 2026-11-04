@@ -16,6 +16,7 @@ from mop.demand import models as demand_models  # noqa: F401
 from mop.iam import models as iam_models  # noqa: F401
 from mop.master_data import models as master_data_models  # noqa: F401
 from mop.materials import models as materials_models  # noqa: F401
+from mop.materials import consumption_models as materials_consumption_models  # noqa: F401
 from mop.mes import models as mes_models  # noqa: F401
 from mop.mes import rework_models as mes_rework_models  # noqa: F401
 from mop.prolowin import models as prolowin_models  # noqa: F401
