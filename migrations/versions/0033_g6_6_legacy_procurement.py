@@ -70,9 +70,10 @@ def upgrade():
             name="ck_proc_event_review"
         ),
         sa.UniqueConstraint("source_event_key", name="uq_proc_event_source_key"),
-        sa.UniqueConstraint("po_number", "line_number", "kind", "source_reference", name="uq_proc_event_business_key"),
+
     )
     op.create_index("ix_proc_event_order_line", "int_proc_evidence_event", ["po_number", "line_number", "review_status"])
+    op.create_index("uq_proc_event_verified_business_key", "int_proc_evidence_event", ["po_number", "line_number", "kind", "source_reference"], unique=True, postgresql_where=sa.text("review_status = 'VERIFIED'"))
     op.execute("""
         CREATE FUNCTION mop_procurement_evidence_guard()
         RETURNS trigger LANGUAGE plpgsql AS $$
@@ -139,6 +140,7 @@ def downgrade():
     op.execute("DROP FUNCTION IF EXISTS mop_procurement_evidence_guard()")
     op.execute("DROP TRIGGER IF EXISTS trg_procurement_capture_append_only ON int_proc_capture")
     op.execute("DROP FUNCTION IF EXISTS mop_procurement_capture_reject_mutation()")
+    op.drop_index("uq_proc_event_verified_business_key", table_name="int_proc_evidence_event")
     op.drop_index("ix_proc_event_order_line", table_name="int_proc_evidence_event")
     op.drop_table("int_proc_evidence_event")
     op.drop_table("int_proc_capture")
