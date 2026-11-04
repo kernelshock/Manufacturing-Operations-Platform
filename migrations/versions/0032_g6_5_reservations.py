@@ -33,6 +33,7 @@ def upgrade():
         sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.CheckConstraint("kind IN ('HOLD', 'RELEASE')", name="ck_mat_res_kind"),
         sa.CheckConstraint("quantity > 0", name="ck_mat_res_positive"),
+        sa.CheckConstraint("(kind = 'HOLD' AND signed_quantity = quantity) OR (kind = 'RELEASE' AND signed_quantity = -quantity)", name="ck_mat_res_signed"),
         sa.CheckConstraint(
             "(kind = 'HOLD' AND release_of_id IS NULL AND reason_code IS NULL) OR "
             "(kind = 'RELEASE' AND release_of_id IS NOT NULL AND reason_code IS NOT NULL)",
