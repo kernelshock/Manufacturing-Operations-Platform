@@ -41,6 +41,7 @@ cleanup() {
   unset MOP_DATABASE_URL
 }
 trap cleanup EXIT
+trap 'rc=$?; echo "ERROR G6.8 line=$LINENO command=$BASH_COMMAND exit=$rc" | tee -a "$OUT/summary.txt" >&2' ERR
 fail() {
   local status=$?
   printf 'FAIL %s exit=%s\n' "$1" "$status" | tee -a "$OUT/summary.txt" >&2
@@ -65,13 +66,30 @@ docker run -d --rm --name "$CONTAINER" -e POSTGRES_DB=mop_g68 -e POSTGRES_USER=m
   'postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4' > "$OUT/postgres-container.txt" 2> "$OUT/postgres-start.err" || {
   echo "FAIL postgres setup; see $OUT/postgres-start.err" >&2; exit 1;
 }
-PORT="$(docker port "$CONTAINER" 5432/tcp | awk -F: 'NR==1{print $NF}')"
-[[ "$PORT" =~ ^[0-9]+$ ]] || { echo "ERROR: cannot determine isolated PostgreSQL port" >&2; exit 1; }
+# docker run --detach returns before bridge port mapping and initdb are ready.
+# Retry both observables. On failure preserve diagnostics before EXIT cleanup.
+echo "RUN postgres_ready" | tee -a "$OUT/summary.txt"
+PORT=""
+READY=0
 for _ in $(seq 1 60); do
-  if docker exec "$CONTAINER" pg_isready -U mop_g68 -d mop_g68 >/dev/null 2>&1; then break; fi
+  mapping="$(docker port "$CONTAINER" 5432/tcp 2>> "$OUT/postgres-port.err" || true)"
+  PORT="$(printf '%s\n' "$mapping" | awk -F: 'NR==1 && NF>=2 {print $NF}')"
+  if [[ "$PORT" =~ ^[0-9]+$ ]] &&
+      docker exec "$CONTAINER" pg_isready -U mop_g68 -d mop_g68 >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
   sleep 1
 done
-docker exec "$CONTAINER" pg_isready -U mop_g68 -d mop_g68 >/dev/null
+if [[ "$READY" -ne 1 ]]; then
+  echo "FAIL postgres_ready: missing port or pg_isready timed out" | tee -a "$OUT/summary.txt" >&2
+  docker inspect "$CONTAINER" > "$OUT/postgres-inspect.json" 2>&1 || true
+  docker logs "$CONTAINER" > "$OUT/postgres.log" 2>&1 || true
+  docker port "$CONTAINER" 5432/tcp > "$OUT/postgres-ports.txt" 2>&1 || true
+  tail -n 35 "$OUT/postgres.log" >&2 || true
+  exit 1
+fi
+echo "PASS postgres_ready (loopback port allocated)" | tee -a "$OUT/summary.txt"
 export MOP_DATABASE_URL="postgresql+psycopg://mop_g68:$DB_PASSWORD@127.0.0.1:$PORT/mop_g68"
 run_stage migration_upgrade "$PYTHON_BIN" -m alembic upgrade head
 run_stage migration_check "$PYTHON_BIN" -m alembic check
