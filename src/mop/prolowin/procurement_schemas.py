@@ -103,6 +103,14 @@ class EvidenceReview(BaseModel):
     decision: Literal["VERIFIED", "REJECTED"]
     note: str = Field(min_length=4, max_length=1200)
 
+    @field_validator("note")
+    @classmethod
+    def real_note(cls, value):
+        value = nonempty(value)
+        if len(value) < 4:
+            raise ValueError("review note needs at least four meaningful characters")
+        return value
+
 
 class EvidenceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
