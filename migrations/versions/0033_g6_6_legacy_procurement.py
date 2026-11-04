@@ -70,6 +70,7 @@ def upgrade():
             name="ck_proc_event_review"
         ),
         sa.UniqueConstraint("source_event_key", name="uq_proc_event_source_key"),
+        sa.UniqueConstraint("po_number", "line_number", "kind", "source_reference", name="uq_proc_event_business_key"),
     )
     op.create_index("ix_proc_event_order_line", "int_proc_evidence_event", ["po_number", "line_number", "review_status"])
     op.execute("""
