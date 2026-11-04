@@ -11,6 +11,7 @@ from mop.audit.models import AuditEntry
 from mop.core.models import Plant
 from mop.master_data.models import Article, UnitOfMeasure
 from mop.materials.models import MaterialLocation, MaterialMovement, MaterialWarehouse
+from mop.materials.consumption_models import MaterialConsumption
 from mop.materials.schemas import (
     BalanceRead, LocationCreate, MovementCreate, MovementReverse, WarehouseCreate,
 )
@@ -131,6 +132,8 @@ class MaterialsService:
 
     def post(self, data: MovementCreate, actor_id: UUID, username: str):
         from mop.materials.schemas import PostingResult
+        if data.source_system == "MOP_G6_CONSUMPTION":
+            raise MaterialsRule("MES consumption source is reserved for governed measured consumption")
         qty = decimal_quantity(data.quantity, allow_zero=data.kind == "OPENING_ZERO")
         if qty > Decimal("9999999999999999.99999999"):
             raise MaterialsRule("stock quantity exceeds Numeric(24,8)")
@@ -186,6 +189,10 @@ class MaterialsService:
         original = self.session.get(MaterialMovement, movement_id)
         if original is None:
             raise MaterialsNotFound("movement not found")
+        if original.source_system == "MOP_G6_CONSUMPTION" or self.session.scalar(
+            select(MaterialConsumption.id).where(MaterialConsumption.stock_movement_id == movement_id)
+        ) is not None:
+            raise MaterialsRule("MES consumption must be reversed through its consumption evidence API")
         if original.kind in ("REVERSAL", "OPENING_ZERO"):
             raise MaterialsRule("cannot reverse a reversal")
         self._advisory_lock(f"balance:{original.article_id}:{original.location_id}")
