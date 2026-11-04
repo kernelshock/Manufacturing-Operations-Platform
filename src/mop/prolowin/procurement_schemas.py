@@ -160,4 +160,5 @@ class OrderLineSummary(BaseModel):
     production_risk_escalations: int
     partial_receipt_count: int
     source: Literal["VERIFIED_PROLOWIN_EVIDENCE"] = "VERIFIED_PROLOWIN_EVIDENCE"
+    completeness: Literal["PARTIAL_MANUAL_CAPTURE_NOT_ERP_SYNC"] = "PARTIAL_MANUAL_CAPTURE_NOT_ERP_SYNC"
     physical_inventory_effect: Literal["NONE"] = "NONE"
