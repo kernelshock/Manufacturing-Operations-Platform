@@ -271,6 +271,13 @@ class ProcurementEvidenceService:
             accepted_quantity=accepted,
             outstanding_delivered_quantity=o.quantity - delivered,
             overdue_against_original=overdue, delayed_days_calendar=days,
+            delayed_days_revised_calendar=(
+                max(0, (reference_at.date() - latest.date()).days) if latest else None
+            ),
+            actual_lead_time_calendar_days=(
+                (max(r.event_date for r in deliveries).date() - o.event_date.date()).days
+                if deliveries and delivered >= o.quantity else None
+            ),
             claim_count=sum(r.kind == "CLAIM" for r in rows),
             production_risk_escalations=sum(r.kind == "ESCALATION" for r in rows),
             partial_receipt_count=len(deliveries),
