@@ -17,6 +17,8 @@ from mop.materials.requirement_schemas import MaterialDemandProjection
 from mop.materials.requirements import MaterialRequirementsService
 from mop.materials.consumption_service import MaterialConsumptionService
 from mop.materials.reservation_service import ReservationService
+from mop.materials.projection_service import MaterialProjectionService
+from mop.materials.projection_schemas import (MaterialPlantOption, MaterialPlanOption, MaterialPlanOverview, MaterialPurchaseEvidenceOverview)
 from mop.materials.reservation_schemas import (ReservationCreate, ReservationRelease, ReservationResult, ReservationEventRead, LocationAvailability, TaquillaCoverage)
 from mop.materials.consumption_schemas import (
     ConsumptionCreate, ConsumptionRead, ConsumptionReverse, ConsumptionResult,
@@ -238,4 +240,54 @@ def taquilla_material_coverage(
     """Shortfall after reservations + unallocated physical stock, not a purchasing order."""
     return checked(lambda: ReservationService(session).coverage(
         taquilla_id, article_id, location_id, effective_at,
+    ))
+
+
+@router.get("/projection/plants", response_model=list[MaterialPlantOption])
+def materials_projection_plants(
+    search: str | None = Query(default=None, max_length=80),
+    limit: int = Query(default=200, ge=1, le=500),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    """Limited plant choices without requiring core master-data privileges."""
+    return MaterialProjectionService(session).plants(search=search, limit=limit)
+
+
+@router.get("/projection/plans", response_model=list[MaterialPlanOption])
+def materials_projection_plans(
+    search: str | None = Query(default=None, max_length=80),
+    limit: int = Query(default=200, ge=1, le=500),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    """Plan numbers scoped by global materials permission, no full G3 exposure."""
+    return MaterialProjectionService(session).plans(search=search, limit=limit)
+
+
+@router.get("/projection/plans/{plan_id}", response_model=MaterialPlanOverview)
+def materials_plan_projection(
+    plan_id: UUID,
+    plant_id: UUID,
+    effective_at: datetime = Query(..., description="Explicit timezone-aware G2 BOM effectivity"),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+):
+    """Read-only; no stock posting, reservation, PO inference or Quality release."""
+    return checked(lambda: MaterialProjectionService(session).overview(
+        plan_id, plant_id, effective_at,
+    ))
+
+
+@router.get("/projection/plans/{plan_id}/procurement", response_model=MaterialPurchaseEvidenceOverview)
+def materials_plan_procurement(
+    plan_id: UUID,
+    effective_at: datetime = Query(..., description="Explicit timezone-aware G2 BOM effectivity"),
+    session: Session = Depends(get_session),
+    _: User = Depends(require_global_permission("materials.read")),
+    __: User = Depends(require_global_permission("prolowin.procurement.read")),
+):
+    """Verified manual sample counts ONLY. Never expose this to materials-only users."""
+    return checked(lambda: MaterialProjectionService(session).purchase_evidence(
+        plan_id, effective_at,
     ))
