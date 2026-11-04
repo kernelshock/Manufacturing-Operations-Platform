@@ -5,6 +5,7 @@ export type ModuleId =
   | "demand"
   | "aps"
   | "mes"
+  | "prolowin-procurement"
   | "audit"
   | "admin";
 
@@ -56,6 +57,12 @@ export const navigationModules: NavigationModule[] = [
     label: "MES / Planta",
     description: "Ejecución real y seguimiento",
     requiredAny: ["mes.read", "mes.edit"]
+  },
+  {
+    id: "prolowin-procurement",
+    label: "Compras · Prolowin",
+    description: "Carga manual, capturas y verificación",
+    requiredAny: ["prolowin.procurement.read", "prolowin.procurement.capture", "prolowin.procurement.verify"]
   },
   {
     id: "audit",
