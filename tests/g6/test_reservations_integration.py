@@ -181,6 +181,22 @@ def test_reserve_partial_release_availability_bom_risk_and_rbac():
                 session.execute(text("UPDATE mat_reservation_event SET quantity=9 WHERE id=:id"),
                                 {"id":UUID(held["reservation"]["id"])})
             session.rollback()
+            # PostgreSQL must also reject a forged HOLD bearing a negative sign.
+            with pytest.raises(DBAPIError,match="ck_mat_res_signed"):
+                session.execute(text("""
+                    INSERT INTO mat_reservation_event
+                    (id, kind, plan_id, taquilla_id, article_id, location_id,
+                     uom_id, quantity, signed_quantity, bom_effective_at,
+                     idempotency_key, source_reference, recorded_by)
+                    SELECT :id, 'HOLD', plan_id, taquilla_id, article_id, location_id,
+                           uom_id, quantity, -quantity, bom_effective_at,
+                           :key, 'FORGED', recorded_by
+                    FROM mat_reservation_event WHERE id = :hold_id
+                """), {
+                    "id":uuid4(), "key":"FORGED-"+suffix,
+                    "hold_id":UUID(held["reservation"]["id"]),
+                })
+            session.rollback()
 
         # materials.read has no edit permission or inherited demand/master rights.
         viewer_name="g65-viewer-"+suffix.lower()
