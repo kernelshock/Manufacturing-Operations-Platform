@@ -106,6 +106,20 @@ try {
   await type("input[autocomplete=current-password]",process.env.MOP_BOOTSTRAP_ADMIN_PASSWORD);
   await evaluate('document.querySelector("form").requestSubmit()');
   await poll(async()=>evaluate('Boolean(document.querySelector("nav"))'),"Admin audit authentication failed");
+  // G6.8: exercise the actual authenticated materials React screen in Chrome.
+  // The runtime fixture does not invent stock, BOM or Prolowin evidence.
+  const adminNav = await evaluate('Array.from(document.querySelectorAll("nav button")).map(item=>item.textContent)');
+  if (!adminNav.some(item => item.includes("Materiales / Abastecimiento"))) {
+    throw new Error("G6 materials navigation is unavailable to the bootstrap admin");
+  }
+  await evaluate('Array.from(document.querySelectorAll("nav button")).find(item=>item.textContent.includes("Materiales / Abastecimiento")).click()');
+  await poll(async () => await evaluate('Boolean(document.querySelector(".g67-hero h2"))'),
+    "G6 materials React panel did not mount in a real browser");
+  const materialsUI = await evaluate('({title:document.querySelector(".g67-hero h2")?.textContent, plant:document.querySelector(".g67-toolbar select") !== null, date:document.querySelector(".g67-toolbar input[type=date]") !== null, error:document.querySelector(".g67 [role=alert]")?.textContent ?? null})');
+  if (!materialsUI.title?.includes("Abastecimiento y disponibilidad física") || !materialsUI.plant || !materialsUI.date) {
+    throw new Error("G6 materials DOM contract failed: " + JSON.stringify(materialsUI));
+  }
+  console.log("G6.8 Chrome materials-navigation smoke PASSED (DOM only; no synthetic stock assertion)");
   await verifyOperatorAuditAsAdmin({evaluate,fixture,operatorUser:accounts.operator});
 } finally {
   ws?.close();
