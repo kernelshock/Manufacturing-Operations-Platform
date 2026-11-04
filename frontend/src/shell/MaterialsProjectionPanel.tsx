@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
 import "./MaterialsProjectionPanel.css";
+import { exactDecimalText as fmt, nonzeroDecimal as nonzero, csvField as csv } from "./materialsProjectionFormatting";
 
 type Plant = { id: string; code: string; name: string };
 type Plan = { id: string; plan_number: string; status: string };
@@ -40,19 +41,14 @@ type Procurement = {
 };
 type Filter = "all" | "gap" | "unknown";
 const base = "/api/v1/materials/projection";
-const dateToday = () => new Date().toISOString().slice(0, 10);
-const forBOM = (day: string) => `${day}T12:00:00Z`;
-const fmt = (value: string | null) =>
-  value === null ? "Desconocido" : value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-const msg = (e: unknown) => e instanceof Error ? e.message : "No fue posible consultar los materiales.";
-const nonzero = (value: string | null) => value !== null && !/^[-+]?0+(?:\.0+)?$/.test(value);
-const dateLabel = (s: string) => new Date(s).toLocaleDateString("es-AR");
-const csv = (value: unknown) => {
-  let cell = String(value ?? "Desconocido").replace(/[\r\n]+/g, " ");
-  if (/^[=+@-]/.test(cell)) cell = "'" + cell;
-  return '"' + cell.replace(/"/g, '""') + '"';
+const dateToday = () => {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0")].join("-");
 };
-
+const forBOM = (day: string) => `${day}T12:00:00Z`;
+const msg = (e: unknown) => e instanceof Error ? e.message : "No fue posible consultar los materiales.";
+const dateLabel = (s: string) => new Date(s).toLocaleDateString("es-AR");
 export function MaterialsProjectionPanel({
   contextPlantId, canReadProcurement,
 }: { contextPlantId?: string | null; canReadProcurement: boolean }) {
