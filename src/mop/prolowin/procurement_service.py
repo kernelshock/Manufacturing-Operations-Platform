@@ -252,13 +252,16 @@ class ProcurementEvidenceService:
         deliveries = [r for r in rows if r.kind == "RECEIPT"]
         delivered = sum((r.quantity for r in deliveries), Decimal("0"))
         accepted = (sum((r.accepted_quantity for r in deliveries), Decimal("0"))
-                    if all(r.accepted_quantity is not None for r in deliveries) else None)
+                    if deliveries and all(r.accepted_quantity is not None for r in deliveries) else None)
         latest = next((r.revised_promise_date for r in reversed(rows)
                        if r.kind == "RESCHEDULE"), None)
         # Calendar days are explicitly NOT business-day lead-time metrics.
-        last = max((r.event_date for r in deliveries), default=today)
-        overdue = delivered < o.quantity and last > o.original_promise_date
-        days = ((last.date() - o.original_promise_date.date()).days if overdue else 0)
+        # Full delivery can itself be late. Open lines use the as-of date,
+        # not the latest partial receipt (which might be weeks earlier).
+        reference_at = (max(r.event_date for r in deliveries)
+                        if deliveries and delivered >= o.quantity else today)
+        days = max(0, (reference_at.date() - o.original_promise_date.date()).days)
+        overdue = days > 0
         return OrderLineSummary(
             po_number=po_number, line_number=line_number,
             supplier_code=o.supplier_code, article_code=o.article_code,
