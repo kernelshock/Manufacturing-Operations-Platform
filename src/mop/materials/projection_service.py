@@ -180,7 +180,9 @@ class MaterialProjectionService:
             gross_gap = (max(ZERO, req.theoretical_quantity - total_plan_held -
                              max(ZERO, unallocated))
                          if unallocated is not None else None)
-            measured = consumption[(req.material_article_id, req.uom_id)]
+            # No measured MES event means zero recorded consumption, not unknown physical stock.
+            # The query above produces a plain dict, so indexing would raise KeyError.
+            measured = consumption.get((req.material_article_id, req.uom_id), ZERO)
             paths = paths_by_material[(req.material_article_id, req.uom_id)]
             warnings = []
             if not paths:
