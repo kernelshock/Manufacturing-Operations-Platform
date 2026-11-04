@@ -120,6 +120,14 @@ def test_manual_screenshot_verified_partial_receipts_and_original_promise():
             "ORDER","ORDER-1",quantity="10",original_promise_date=original.isoformat(),
         )).status_code==409
 
+        duplicate_document=client.post(root+"/events",json=event(
+            manual["id"],po,suffix,article,supplier,uom,order_date,
+            "ORDER","ORDER-1",quantity="10",
+            original_promise_date=original.isoformat(),
+            source_event_key="OTHER-KEY-"+suffix,
+        ))
+        assert duplicate_document.status_code==409
+
         rescheduled=post(client,root+"/events",event(
             pic["id"],po,suffix,article,supplier,uom,receipt_one,
             "RESCHEDULE","REV-1",revised_promise_date=(original+timedelta(days=5)).isoformat(),
