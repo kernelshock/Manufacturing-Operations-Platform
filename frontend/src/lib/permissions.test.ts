@@ -51,6 +51,13 @@ describe("permission-driven navigation", () => {
     expect(visibleModules(["materials.read"]).map(x => x.id)).not.toContain("prolowin-procurement");
   });
 
+  it("exposes G6.7 materials projections only with materials.read", () => {
+    expect(visibleModules([]).map(m => m.id)).not.toContain("materials");
+    expect(visibleModules(["materials.read"]).map(m => m.id)).toContain("materials");
+    expect(visibleModules(["prolowin.procurement.read"]).map(m => m.id)).not.toContain("materials");
+    expect(visibleModules(["materials.edit"]).map(m => m.id)).not.toContain("materials");
+  });
+
   it("exposes administration with either administrative capability", () => {
     expect(
       visibleModules(["admin.users"]).map((item) => item.id)
