@@ -13,6 +13,7 @@ class MaterialReservationEvent(Base):
     __table_args__ = (
         CheckConstraint("kind IN ('HOLD', 'RELEASE')", name="ck_mat_res_kind"),
         CheckConstraint("quantity > 0", name="ck_mat_res_positive"),
+        CheckConstraint("(kind = 'HOLD' AND signed_quantity = quantity) OR (kind = 'RELEASE' AND signed_quantity = -quantity)", name="ck_mat_res_signed"),
         CheckConstraint(
             "(kind = 'HOLD' AND release_of_id IS NULL AND reason_code IS NULL) OR "
             "(kind = 'RELEASE' AND release_of_id IS NOT NULL AND reason_code IS NOT NULL)",
