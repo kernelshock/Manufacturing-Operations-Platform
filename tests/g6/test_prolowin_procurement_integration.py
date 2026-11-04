@@ -181,6 +181,10 @@ def test_manual_screenshot_verified_partial_receipts_and_original_promise():
         assert value["original_promise_date"]==original.isoformat().replace("+00:00","Z")
         assert value["latest_revised_promise_date"]==(original+timedelta(days=5)).isoformat().replace("+00:00","Z")
         assert value["partial_receipt_count"]==2
+        assert value["delayed_days_calendar"]==4
+        assert value["delayed_days_revised_calendar"]==0
+        assert value["actual_lead_time_calendar_days"]==11
+        assert value["completeness"]=="PARTIAL_MANUAL_CAPTURE_NOT_ERP_SYNC"
         assert value["claim_count"]==1
         assert value["production_risk_escalations"]==1
         assert value["physical_inventory_effect"]=="NONE"
