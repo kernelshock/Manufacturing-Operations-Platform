@@ -156,6 +156,8 @@ class OrderLineSummary(BaseModel):
     outstanding_delivered_quantity: Decimal
     overdue_against_original: bool
     delayed_days_calendar: int | None
+    delayed_days_revised_calendar: int | None
+    actual_lead_time_calendar_days: int | None
     claim_count: int
     production_risk_escalations: int
     partial_receipt_count: int
