@@ -104,7 +104,7 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
     void submit(async () => {
       if (!capture) throw new Error("Primero registrá la pantalla o la fuente manual.");
       if (!form.event_date) throw new Error("La fecha del evento es obligatoria.");
-      const eventKey = [form.po_number,form.line_number,form.kind,form.source_reference].join(":");
+      const eventKey = [form.po_number, form.line_number, form.kind, crypto.randomUUID()].join(":");
       const payload = {
         capture_id: capture.id, source_event_key: eventKey,
         kind: form.kind, po_number: form.po_number, line_number: Number(form.line_number),
