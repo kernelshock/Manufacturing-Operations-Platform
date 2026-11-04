@@ -155,7 +155,7 @@ def test_atomic_consumption_and_reversal_preserve_mes_and_aps():
             svc.record(ids["operation_id"],payload(ids,started,qty="4.5",key=data.idempotency_key),ids["admin_id"],ids["username"])
         with pytest.raises(MaterialsRule,match="insufficient"):
             svc.record(ids["operation_id"],payload(ids,started,qty="6.0"),ids["admin_id"],ids["username"])
-        with pytest.raises(MaterialsRule,match="reserved"):
+        with pytest.raises(MaterialsRule,match="MES consumption"):
             MaterialsService(session).reverse(
                 stock.id,MovementReverse(source_system="G64_TEST",source_reference="BYPASS",idempotency_key=uuid4().hex),
                 ids["admin_id"],ids["username"],
