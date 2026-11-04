@@ -16,7 +16,7 @@ Extend the canonical G2 material/BOM records with operational materials manageme
 | **G6.4 — Actual Material Consumption** | **IMPLEMENTED — CI acceptance pending final HEAD:** explicit G5 operation-bound material use, atomic stock ISSUE, append-only reversal/correction, Decimal/UoM, actor/time/source evidence, IAM and idempotency |
 | **G6.5 — Reservations / Availability** | **IMPLEMENTED, final SHA CI pending:** immutable HOLD/RELEASE by taquilla and BOM leaf, stock and demand limits, concurrency locks, unallocated stock and shortage projection; no automatic stock issue |
 | **G6.6 — Prolowin Assimilation (legacy/manual-first)** | **IMPLEMENTED / CI pending:** screenshot PNG/JPEG + manual transcript, original-source fingerprint, two-person verification, PO / partial receipts / claims / reschedules / supplier-risk escalation, reconciliation without API or export dependence |
-| G6.7 — Materials Projection & Frontend | Material cards, consumption vs theoretical, location ledger and variance with permissions; printable/report-ready summaries |
+| **G6.7 — Materials Projection & Frontend** | **IMPLEMENTED / FINAL SHA CI PENDING:** plant/plan/effective BOM projection, stock UNKNOWN versus zero, location ledger, reservations, measured & off-BOM consumption, provisional gross gap, verified manual Prolowin signals behind separate IAM, responsive printable/CSV dashboard and PostgreSQL/frontend tests |
 | G6.8 — Gate Hardening | One-SHA G0–G6 CI, migrations/rollback, domain invariants, RBAC, real browser E2E and explicit release decision |
 
 ## Data ownership
@@ -179,3 +179,33 @@ G6.6 will use a read-only, staged ingestion with original Prolowin IDs, source h
 ### Future use
 
 G7 may calculate supplier delivery reliability, safety stock, PP/CR and supply-risk alerts only from sufficiently complete, high-confidence history, annotated with coverage and missing-data caveats. Do not equate absent claim/receipt records with none having occurred. Business-day calendar and internal manufactured-subassembly replenishment paths stay explicit.
+
+## G6.7 — Materials Projection & Frontend: decision contract
+
+**Status:** IMPLEMENTED IN FEATURE BRANCH / FINAL SAME-SHA CI PENDING. G6 still IN PROGRESS. `main` remains released G5 and must not be updated without a separate, explicit G6 release authorization.
+
+### Data sources and projections
+
+- Demand comes only from G6.3's **effective published G2 BOM** for G3 plan and non-cancelled taquillas, including recursive leaf paths and scrap. Material quantities are grouped by immutable G2 article and canonical unit, not by ad hoc names. An explicitly selected G1 plant determines the physical inventory pool.
+- Physical stock comes only from G6.2 signed ledger in **active locations of active warehouses in that plant**. All locations must have an initialized balance for the material before the plant-wide amount is considered KNOWN; `OPENING_ZERO` is known zero, whereas an absent material/location ledger is UNKNOWN. Locations in another plant must never be pooled. Inactive warehouses/locations are not counted as allocatable physical stock.
+- Holds come from G6.5 append-only HOLD/RELEASE evidence for the same material, plant and location. `reserved_all_plans` includes commitments from other plans and still-unreleased cancelled taquillas; `reserved_this_plan` includes only currently projected taquillas of the selected plan. `unallocated_physical = physical_on_hand - reserved_all_plans` is not quality-released available stock.
+- Net actual measured consumption comes only from G6.4's explicit MES-linked `CONSUME` minus `REVERSE` for operations in the same plan and selected plant. **It is already reflected in physical stock**; NEVER subtract it from physical stock a second time. The arithmetic `BOM - measured` is not a performance or scrap KPI until the completed production scope is reconciled. Actual-only materials not in the effective BOM are displayed explicitly as `MEASURED_WITHOUT_BOM`, not discarded.
+- Indicative gross exposure, **not a purchasing authorization**: `max(0, theoretical_plan_quantity - reserved_this_plan - max(0, unallocated_physical))`, and only when all active plant locations for that article have KNOWN physical stock. This compares gross plan demand with present unallocated stock + commitments, does not net dated remaining production or outstanding incoming goods, and **must not be called ATP, confirmed shortage or reorder point**.
+- Verified Prolowin purchasing evidence is shown in a **separate endpoint guarded by both** `materials.read` and `prolowin.procurement.read`. Counts refer only to manually captured and independently VERIFIED PO, receipts, claims and escalations for BOM articles, never to the full Prolowin register. Missing history is UNKNOWN, not zero. No receipt or confirmed in-transit supply is added to physical on-hand.
+
+### Implemented read-only API and frontend
+
+- `GET /api/v1/materials/projection/plants` — minimally disclosed plant choices, `materials.read`.
+- `GET /api/v1/materials/projection/plans?search=...` — plan number/status search (not full G3 master), `materials.read`.
+- `GET /api/v1/materials/projection/plans/{plan_id}?plant_id=...&effective_at=...` — plant-specific Materials overview including BOM, stock, allocations, observed MES usage, off-BOM signals, known/unknown status and provisional gap.
+- `GET /api/v1/materials/projection/plans/{plan_id}/procurement?effective_at=...` — verified manual source evidence counts only, dual IAM `materials.read` and `prolowin.procurement.read`.
+- `frontend/src/shell/MaterialsProjectionPanel.tsx` and `.css`: permission-filtered **Materiales / Abastecimiento** module, plant/plan search, BOM date, stock/material counts, unknowns, off-BOM use, provisional gap, location breakdown, evidence counts, filtering, CSV (formula-injection-safe) and print-friendly HTML report. UI does not round Decimal quantities through binary floating point.
+- `tests/g6/test_materials_projection_integration.py` exercises disposable PostgreSQL and FastAPI: taquilla BOM aggregate, multiple reservations, unknown active location, cross-plant isolation, cancelled taquilla, no inventory side effect, verified-only supplier signals and IAM segregation. `frontend/src/shell/materialsProjectionFormatting.test.ts` and `frontend/src/lib/permissions.test.ts` cover exact Decimal display/CSV and navigation.
+- `.github/workflows/g6-materials.yml` now includes independent G6 frontend npm ci, typecheck, tests, build, plus G6 PostgreSQL migration/rollback and API tests. These workflow definitions are **not proof of execution**.
+
+### Outstanding before technical acceptance
+
+1. Obtain SUCCESS from the final SHA in G0–G6 independent CI, including PostgreSQL migrations forward/backward, G6.5/G6.6 regressions, backend tests, TypeScript/tests/build and controlled runtime/browser E2E in G6.8.
+2. Reconcile or explicitly qualify any unverified/manual Prolowin source history; **no mock values** may be promoted to real FAIC inventory/POs.
+3. Validate real FAIC G2 BOM effectivity, canonical units, plant/warehouse initialization and Quality status before operational supply decisions.
+4. G6.7 is read-only. It does not reserve, consume, change MES operations, modify Prolowin, issue POs, assign alternative suppliers, compute safety stock, or publish production changes. G7 owns replenishment policy with contractual versus actual lead-time variability and partial delivery evidence.
