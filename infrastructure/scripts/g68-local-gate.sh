@@ -128,7 +128,13 @@ fi
 if (echo > /dev/tcp/127.0.0.1/18080) >/dev/null 2>&1; then
   echo "ERROR: port 18080 already listening; refusing runtime launch" >&2; exit 2
 fi
-run_stage chrome_runtime env MOP_COMPOSE_PROJECT="$PROJECT" MOP_WEB_HOST_PORT=18080 \
+# The runtime smoke invokes `python` on the WSL host. Propagate the selected
+# Python 3.14 environment instead of relying on a system `python` symlink.
+# Resolve the venv bin directory without dereferencing the Python symlink.
+PYTHON_EXEC="$(command -v "$PYTHON_BIN")"
+PYTHON_HOST_BIN="$(cd "$(dirname "$PYTHON_EXEC")" && pwd)"
+run_stage chrome_runtime env PATH="$PYTHON_HOST_BIN:$PATH" \
+  MOP_COMPOSE_PROJECT="$PROJECT" MOP_WEB_HOST_PORT=18080 \
   MOP_ADMIN_USERNAME=smoke-admin MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   bash infrastructure/scripts/runtime-smoke.sh "$ENV_FILE"
 echo "ALL CONFIGURED LOCAL G6.8 CHECKS PASSED" | tee -a "$OUT/summary.txt"
