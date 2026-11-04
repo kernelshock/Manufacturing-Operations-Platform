@@ -45,6 +45,12 @@ describe("permission-driven navigation", () => {
     expect(visibleModules([]).map((item) => item.id)).not.toContain("aps");
   });
 
+  it("exposes legacy Prolowin intake only to procurement evidence roles", () => {
+    expect(visibleModules(["prolowin.procurement.capture"]).map(x => x.id)).toContain("prolowin-procurement");
+    expect(visibleModules(["prolowin.procurement.read"]).map(x => x.id)).toContain("prolowin-procurement");
+    expect(visibleModules(["materials.read"]).map(x => x.id)).not.toContain("prolowin-procurement");
+  });
+
   it("exposes administration with either administrative capability", () => {
     expect(
       visibleModules(["admin.users"]).map((item) => item.id)
