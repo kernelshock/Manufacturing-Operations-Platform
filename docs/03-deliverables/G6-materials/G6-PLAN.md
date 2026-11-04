@@ -15,7 +15,7 @@ Extend the canonical G2 material/BOM records with operational materials manageme
 | G6.3 — Material Demand / BOM Explosion | Approved BOM revision + effectivity + G3 plan/taquilla quantities; theoretical demand by source and date; no inferred consumption |
 | **G6.4 — Actual Material Consumption** | **IMPLEMENTED — CI acceptance pending final HEAD:** explicit G5 operation-bound material use, atomic stock ISSUE, append-only reversal/correction, Decimal/UoM, actor/time/source evidence, IAM and idempotency |
 | **G6.5 — Reservations / Availability** | **IMPLEMENTED, final SHA CI pending:** immutable HOLD/RELEASE by taquilla and BOM leaf, stock and demand limits, concurrency locks, unallocated stock and shortage projection; no automatic stock issue |
-| G6.6 — Prolowin Inventory Assimilation | Staging, mappings, deduplication, reconciliation and discrepancy approval; accounting ERP data remains its own source of record |
+| **G6.6 — Prolowin Assimilation (legacy/manual-first)** | **IMPLEMENTED / CI pending:** screenshot PNG/JPEG + manual transcript, original-source fingerprint, two-person verification, PO / partial receipts / claims / reschedules / supplier-risk escalation, reconciliation without API or export dependence |
 | G6.7 — Materials Projection & Frontend | Material cards, consumption vs theoretical, location ledger and variance with permissions; printable/report-ready summaries |
 | G6.8 — Gate Hardening | One-SHA G0–G6 CI, migrations/rollback, domain invariants, RBAC, real browser E2E and explicit release decision |
 
@@ -145,3 +145,37 @@ G6.6 will use a read-only, staged ingestion with original Prolowin IDs, source h
 
 **Procurement linkage:** the original and revised delivery commitments, partial receipts, claims, actual lateness and alternate sourcing decisions confirmed for Prolowin remain requirements for G6.6 and G7. They are not hidden inside G6.5 physical stock availability; no safety-stock calculation or purchase execution is introduced at this stage.
 
+
+## G6.6 — Legacy Prolowin / Manual-First Procurement Assimilation
+
+**User-confirmed constraint (2026-11-04):** Prolowin is old and closed. Do **not** assume a REST API, database connector, stable Excel/CSV exports, screen scraping or OCR. Primary viable source is **operator-entered transactions from screens**, with optional **original screenshot attachments** for independent verification. A thin weekly Excel log is only secondary supporting evidence and can have incomplete transaction history.
+
+### Workflow and roles
+
+1. **Identify source.** Operator creates a MANUAL evidence source with a screen/reference label, or uploads an original PNG/JPEG screenshot (4 MiB maximum). The screenshot is stored in the application DB, inaccessible without `prolowin.procurement.read`, with immutable SHA-256 fingerprint and read-only binary. No automatic OCR or data extraction is assumed. Weekly Excel snapshot may be registered only as secondary evidence.
+2. **Transcribe and stage.** Operator with `prolowin.procurement.capture` enters original PO line, receipt/delivery note (including partial), original promise/reprogramming history, claims, and production-risk escalations. Each entry is `PENDING`, references the capture and records precise unique source key, supplier and article codes, quantity, unit, date, source document/reference and author. Duplicated source keys reject rather than duplicate open receipts.
+3. **Verify independently.** A *different user* with `prolowin.procurement.verify` verifies or rejects by comparing with original Prolowin screen/source. Verification requires an active unambiguous G2 supplier/article/canonical UoM mapping and a previously verified original order for subsequent events; receipts cannot exceed ordered quantity. Weekly snapshot alone cannot establish a verified procurement transaction. The decision and reviewer identity are audited. No production or purchasing side effects.
+4. **Read trusted history.** `prolowin.procurement.read` can consult original promises, latest accepted reprogramming, partial receipt count, delivered quantity, accepted quantity when explicitly recorded, open delivery quantity, claims and alternate-supplier escalation indicators, all derived **only from verified records**. For fully delivered orders, lateness is assessed against the last actual receipt; for open orders, against the as-of date. Calendar-day figures are explicitly provisional and **not business-day lead-time** until G7 calendar policy is applied.
+
+### Data boundaries and controls
+
+- No API, direct database access, credentials, privileged integration with Prolowin or reliable Excel structure required.
+- Original PO promises are immutable; accepted reschedule requires explicit no-risk-for-production confirmation and reason. If production is at risk, capture an ESCALATION to evaluate alternative suppliers; do not silently reprogram, change supplier, or create PO.
+- Delivery `quantity` is not automatically `accepted_quantity`: Quality accepted quantity is NULL/UNKNOWN unless evidenced. A delivery note or screenshot **does not post G6 physical inventory**, reconcile accounting stock or imply receipt acceptance.
+- All supplier and article values retain source codes; only independently verified mapped records contribute to operational procurement summaries. Unmapped items stay PENDING or REJECTED, not silently discarded.
+- Manual snapshots are **incomplete by nature**; no claim of an exhaustive PO register, global outstanding liabilities or real-time ERP synchronization. The summary is a verified sample with explicit provenance, not authoritative completeness or ATP.
+- Payload and screenshot source are immutable in PostgreSQL (review status transitions only, with author/reviewer attribution and audit). Corrections require new evidence and documented disposition; no deletion of underlying original screen/capture. Passwords or unrelated personal records should be excluded/redacted from screenshot before upload under approved FAIC evidence policy.
+- Excel/CSV ingestion may be added later *only if a feasible export is identified*, with semantic mapping, source hashes and cross-snapshot deduplication; it is **not** a prerequisite to G6.6 technical acceptance. G2 BOM structure assimilation remains separate.
+- Data quality: missing original promises/line identity, missing or duplicate receipt reference, mismatched supplier/article/UoM, over-receipt, missing source reference or unknown Quality acceptance must fail closed for verified analytics.
+
+### Implementation and planned acceptance
+
+- `src/mop/prolowin/procurement_models.py`, `procurement_schemas.py`, `procurement_service.py`, `src/mop/api/v1/prolowin_procurement.py`.
+- Alembic `migrations/versions/0033_g6_6_legacy_procurement.py` adds captures and source-evidenced immutable transcriptions, independent IAM and full rollback.
+- `frontend/src/shell/ProlowinCapturePanel.tsx` presents source upload/manual entry, transaction type, order-line fields, review controls and verified history. Navigation via `Compras · Prolowin` (not G7 purchasing).
+- `tests/g6/test_prolowin_procurement_integration.py` covers no-API round trip, original screenshot magic/size, SHA duplicate, independent verification and self-review denial, PO and two partial receipts, explicit accepted quantity, original/revised promise preservation, claims, risk escalation, duplicate evidence, unmapped IDs, over-receipt, weekly-secondary refusal and **no G6 stock movements**.
+- G6.6 is **IN VERIFICATION** until final same-SHA G0–G6 workflow successes and frontend typecheck/browser testing. No G6 RELEASED, no main merge, no production deployment or live FAIC data loaded.
+
+### Future use
+
+G7 may calculate supplier delivery reliability, safety stock, PP/CR and supply-risk alerts only from sufficiently complete, high-confidence history, annotated with coverage and missing-data caveats. Do not equate absent claim/receipt records with none having occurred. Business-day calendar and internal manufactured-subassembly replenishment paths stay explicit.
