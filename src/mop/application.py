@@ -53,6 +53,7 @@ def create_app(
             f"{runtime_settings.api_prefix}/iam",
             f"{runtime_settings.api_prefix}/audit",
             f"{runtime_settings.api_prefix}/materials",
+            f"{runtime_settings.api_prefix}/prolowin/procurement",
         )
         if request.url.path.startswith(sensitive_prefixes):
             response.headers["Cache-Control"] = "no-store"
