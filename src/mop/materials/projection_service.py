@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from mop.core.models import Plant
 from mop.demand.models import ProductionPlan
-from mop.master_data.models import Article
+from mop.master_data.models import Article, UnitOfMeasure
+from mop.materials.requirement_schemas import MaterialRequirementAggregate
 from mop.materials.models import MaterialLocation, MaterialMovement, MaterialWarehouse
 from mop.materials.reservation_models import MaterialReservationEvent
 from mop.materials.consumption_models import MaterialConsumption
@@ -60,7 +61,7 @@ class MaterialProjectionService:
         if not plant.active:
             raise MaterialsRule("selected plant inactive; choose an active plant")
         projection = self.requirements.project(plan_id, effective_at)
-        article_ids = [item.material_article_id for item in projection.aggregate]
+        requirements = list(projection.aggregate)
         taquilla_ids = list({path.taquilla_id for path in projection.paths})
         rows = self.session.execute(
             select(MaterialLocation, MaterialWarehouse.code)
@@ -72,12 +73,45 @@ class MaterialProjectionService:
         locations = [(loc, wh_code) for loc, wh_code in rows]
         location_ids = [loc.id for loc, _ in locations]
 
+        # MES consumption may use substitutes or unplanned articles. Keep those
+        # visible rather than silently discarding recorded real material use.
+        consumption: dict[tuple[UUID, UUID], Decimal] = defaultdict(lambda: ZERO)
+        if location_ids:
+            observed = self.session.execute(
+                select(
+                    MaterialConsumption.article_id, MaterialConsumption.uom_id,
+                    func.sum(case(
+                        (MaterialConsumption.kind == "CONSUME", MaterialConsumption.quantity),
+                        else_=-MaterialConsumption.quantity,
+                    )),
+                )
+                .join(ExecutionOperation, ExecutionOperation.id == MaterialConsumption.execution_operation_id)
+                .where(
+                    ExecutionOperation.plan_id == plan_id,
+                    MaterialConsumption.location_id.in_(location_ids),
+                )
+                .group_by(MaterialConsumption.article_id, MaterialConsumption.uom_id)
+            ).all()
+            consumption = {(a, u): Decimal(q) for a, u, q in observed}
+        expected_keys = {(r.material_article_id, r.uom_id) for r in requirements}
+        for (article_id, uom_id), observed_qty in consumption.items():
+            if (article_id, uom_id) in expected_keys:
+                continue
+            article = self.session.get(Article, article_id)
+            uom = self.session.get(UnitOfMeasure, uom_id)
+            if article is None or uom is None:
+                raise MaterialsRule("measured material lacks canonical article/UoM")
+            requirements.append(MaterialRequirementAggregate(
+                material_article_id=article_id, material_article_code=article.external_code,
+                uom_id=uom_id, uom_code=uom.code, theoretical_quantity=ZERO,
+            ))
+        requirements.sort(key=lambda item: (item.material_article_code, item.uom_code))
+        article_ids = list({item.material_article_id for item in requirements})
+
         # Only stock belonging to the selected plant can satisfy its projection.
         quantities: dict[tuple[UUID, UUID], Decimal] = {}
         holds: dict[tuple[UUID, UUID], Decimal] = defaultdict(lambda: ZERO)
         plan_holds: dict[tuple[UUID, UUID], Decimal] = defaultdict(lambda: ZERO)
-        consumption: dict[tuple[UUID, UUID], Decimal] = defaultdict(lambda: ZERO)
-
         if article_ids and location_ids:
             inventory = self.session.execute(
                 select(MaterialMovement.article_id, MaterialMovement.location_id,
@@ -105,23 +139,6 @@ class MaterialProjectionService:
                 holds[(article, location)] = Decimal(total)
                 plan_holds[(article, location)] = Decimal(selected)
 
-            consumption_rows = self.session.execute(
-                select(
-                    MaterialConsumption.article_id, MaterialConsumption.uom_id,
-                    func.sum(case(
-                        (MaterialConsumption.kind == "CONSUME", MaterialConsumption.quantity),
-                        else_=-MaterialConsumption.quantity,
-                    )),
-                )
-                .join(ExecutionOperation, ExecutionOperation.id == MaterialConsumption.execution_operation_id)
-                .where(
-                    ExecutionOperation.plan_id == plan_id,
-                    MaterialConsumption.article_id.in_(article_ids),
-                    MaterialConsumption.location_id.in_(location_ids),
-                )
-                .group_by(MaterialConsumption.article_id, MaterialConsumption.uom_id)
-            ).all()
-            consumption = {(a, u): Decimal(q) for a, u, q in consumption_rows}
 
         # The presentation reports a gross exposure only; measured use is already
         # reflected in physical stock and may cover a different production horizon.
@@ -130,7 +147,7 @@ class MaterialProjectionService:
             paths_by_material[(path.material_article_id, path.uom_id)].append(path)
 
         items: list[MaterialItemProjection] = []
-        for req in projection.aggregate:
+        for req in requirements:
             article = self.session.get(Article, req.material_article_id)
             if article is None:
                 raise MaterialsRule("BOM article no longer exists")
@@ -166,12 +183,15 @@ class MaterialProjectionService:
             measured = consumption[(req.material_article_id, req.uom_id)]
             paths = paths_by_material[(req.material_article_id, req.uom_id)]
             warnings = []
+            if not paths:
+                warnings.append("MEASURED_MATERIAL_NOT_IN_EFFECTIVE_BOM")
             if not all_initialized:
                 warnings.append("UNKNOWN_STOCK_IN_AT_LEAST_ONE_ACTIVE_LOCATION")
             if any(p.taquilla_status != "COMPLETED" for p in paths):
                 warnings.append("THEORETICAL_AND_MEASURED_ARE_DIFFERENT_LIFECYCLE_BASES")
             warnings.append("QUALITY_RELEASE_AND_INBOUND_SUPPLY_NOT_INFERRED")
             items.append(MaterialItemProjection(
+                source_basis="BOM" if paths else "MEASURED_WITHOUT_BOM",
                 article_id=req.material_article_id,
                 article_code=req.material_article_code,
                 article_description=article.canonical_description,
@@ -199,6 +219,8 @@ class MaterialProjectionService:
             source_taquillas=len(taquilla_ids),
             excluded_cancelled_taquillas=projection.excluded_cancelled_taquillas,
             material_count=len(items),
+            bom_material_count=len(projection.aggregate),
+            unplanned_consumption_materials=sum(not paths_by_material[(i.article_id, i.uom_id)] for i in items),
             unknown_stock_materials=sum(item.stock_state == "UNKNOWN" for item in items),
             indicative_gap_materials=sum(
                 item.provisional_gross_gap is not None and item.provisional_gross_gap > ZERO
