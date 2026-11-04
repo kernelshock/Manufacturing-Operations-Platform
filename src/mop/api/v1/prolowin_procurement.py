@@ -49,10 +49,13 @@ async def screenshot(request: Request,
     content_type = request.headers.get("content-type", "").split(";")[0].strip()
     if content_type not in ("image/png", "image/jpeg"):
         raise HTTPException(422, detail="only image/png or image/jpeg screenshots")
-    if request.headers.get("content-length") and int(request.headers["content-length"]) > 4194304:
-        raise HTTPException(413, detail="maximum screenshot size 4 MiB")
-    content = await request.body()
-    return checked(lambda: svc.screenshot(content, content_type, x_evidence_label,
+    # Enforce the cap DURING ingestion, not after buffering untrusted input.
+    content = bytearray()
+    async for chunk in request.stream():
+        content.extend(chunk)
+        if len(content) > 4 * 1024 * 1024:
+            raise HTTPException(413, detail="maximum screenshot size 4 MiB")
+    return checked(lambda: svc.screenshot(bytes(content), content_type, x_evidence_label,
                                           actor.id, actor.username))
 
 
