@@ -113,6 +113,7 @@ MATERIALS_SEED_LOG="$(docker compose --project-name "$PROJECT" --env-file "$ENV_
 printf '%s\n' "$MATERIALS_SEED_LOG" | sed -n 's/^G68_MATERIALS_FIXTURE=//p' > "$MATERIALS_FIXTURE_FILE"
 [[ -s "$MATERIALS_FIXTURE_FILE" ]] || { echo "G6.8 materials fixture missing" >&2; exit 1; }
 echo "G6.8 mixed-taquilla/materials synthetic fixture seeded in isolated PostgreSQL"
+docker cp "$MATERIALS_FIXTURE_FILE" "$API_CONTAINER:/tmp/g68_fixture/manifest.json"
 
 # Exercise the actual React application through headless Chrome while FastAPI and
 # PostgreSQL containers are alive; this complements the HTTP/runtime checks.
@@ -124,6 +125,9 @@ MOP_MES_RBAC_USERS_JSON="$RBAC_USERS_FILE" \
 MOP_MES_FIXTURE_JSON="$FIXTURE_FILE" \
 MOP_G68_MATERIALS_FIXTURE_JSON="$MATERIALS_FIXTURE_FILE" \
 node "$ROOT/infrastructure/scripts/mes-browser-smoke.mjs"
+
+# Confirm browser projection GETs did not post physical ISSUE, HOLD or RELEASE.
+docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api python - < "$ROOT/infrastructure/scripts/g68-materials-verify.py"
 
 RATE_LIMITED=0
 for _ in $(seq 1 20); do
