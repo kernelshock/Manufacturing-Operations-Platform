@@ -136,6 +136,7 @@ PYTHON_HOST_BIN="$(cd "$(dirname "$PYTHON_EXEC")" && pwd)"
 run_stage chrome_runtime env PATH="$PYTHON_HOST_BIN:$PATH" \
   MOP_COMPOSE_PROJECT="$PROJECT" MOP_WEB_HOST_PORT=18080 \
   MOP_ADMIN_USERNAME=smoke-admin MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  MOP_G68_SCREENSHOT_FILE="$OUT/materials-browser.png" \
   bash infrastructure/scripts/runtime-smoke.sh "$ENV_FILE"
 echo "ALL CONFIGURED LOCAL G6.8 CHECKS PASSED" | tee -a "$OUT/summary.txt"
 echo "Evidence saved: $OUT (check logs, skips and evidence scope before release)"
