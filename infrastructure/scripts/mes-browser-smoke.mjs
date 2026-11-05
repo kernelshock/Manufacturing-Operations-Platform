@@ -1,6 +1,6 @@
 /** Actual Chrome/React/FastAPI/PostgreSQL browser smoke. Runs inside runtime-smoke.sh. */
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runNominalBrowserFlow } from "./mes-browser-flow.mjs";
@@ -150,6 +150,12 @@ try {
     if (api.status!==200 || api.data.source_taquillas!==2 ||
         api.data.unknown_stock_materials!==1 || api.data.indicative_gap_materials!==1 ||
         api.data.items.length!==2) throw new Error("G6 synthetic API projection mismatch");
+    if (process.env.MOP_G68_SCREENSHOT_FILE) {
+      const capture = await command("Page.captureScreenshot", {format:"png", captureBeyondViewport:true});
+      if (!capture?.data) throw new Error("G6.8 Chrome screenshot capture failed");
+      await writeFile(process.env.MOP_G68_SCREENSHOT_FILE, Buffer.from(capture.data, "base64"));
+      console.log("G6.8 materials screenshot saved to local evidence directory");
+    }
     console.log("G6.8 Chrome materials-data acceptance PASSED (BOM mix, holds, unknown stock, plan/site isolation)");
   } else {
     console.log("G6.8 Chrome materials-navigation smoke PASSED (DOM only)");
