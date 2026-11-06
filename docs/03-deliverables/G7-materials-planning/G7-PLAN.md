@@ -1,7 +1,7 @@
 # G7 — Materials Planning & Procurement Intelligence
 
 **Initiation:** 2026-11-06 UTC.  
-**Status:** OPEN / PLANNING ONLY; no operational purchasing or production deployment.  
+**Status:** G7.1 TECHNICALLY ACCEPTED (code SHA `4ea706f1534e2002b87e2fc1fa2243b86cd4777b`, CI `42147034029`); G7 overall OPEN, no operational purchasing or production deployment.  
 **Branch:** `feat/G7-materials-planning`.  
 **Baseline:** Released G6 on `main`, PR #14 merged at `b52b3b9e748f4e4b846df16199510733338f2046`; code-release evidence in `docs/03-deliverables/G6-materials/G6-RELEASE-RECORD.md`.
 
@@ -48,4 +48,4 @@ This ordering is an initiation proposal and is not permission to implement or de
 
 ## Status at opening
 
-**G7 OPEN (documentation and architecture planning).** No executable G7 materials planning code, migrations or automatic purchasing functions are claimed. G6 `main` stays governed. Next concrete increment: G7.1 policy/contract specification and synthetic deterministic cases before implementation.
+**G7.1 DONE (technical acceptance).** The pure executable `mop.planning.policy_contracts` contracts and 225-test same-SHA G0–G7 CI passed. G7 has no new migrations, inventory postings, PP/CR calculations or purchasing endpoints. Evidence: `G7.1-POLICY-CONTRACTS.md`. **Next increment: G7.2 — Supply & Inventory Position**; G6 `main` remains governed and production deployment is not authorized.
