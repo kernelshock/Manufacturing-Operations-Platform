@@ -7,7 +7,6 @@ inferred from the source records.
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
-from statistics import mean, pstdev
 
 from mop.planning.policy_contracts import PolicyError
 
@@ -94,7 +93,8 @@ def sample_reliability(calendar: BusinessCalendar, lines: list[CompletedLine]) -
     def decimal_average(values):
         return sum((Decimal(v) for v in values), Decimal(0)) / Decimal(len(values))
     avg = decimal_average(actual)
-    std = Decimal(str(pstdev(actual))) if len(actual) > 1 else None
+    std = ((sum(((Decimal(v) - avg) ** 2 for v in actual), Decimal(0))
+           / Decimal(len(actual))).sqrt() if len(actual) > 1 else None)
     return SupplierSampleStats(
         completed=len(lines),
         late_original=sum(v > 0 for v in late_original),
