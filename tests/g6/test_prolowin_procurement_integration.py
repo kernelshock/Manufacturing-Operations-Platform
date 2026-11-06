@@ -206,6 +206,23 @@ def test_manual_screenshot_verified_partial_receipts_and_original_promise():
         assert value["claim_count"]==1
         assert value["production_risk_escalations"]==1
         assert value["physical_inventory_effect"]=="NONE"
+        # Historical as_of must not include the later second receipt or escalation.
+        historical=client.get(root+f"/orders/{po}/lines/1",params={
+            "as_of":(receipt_one+timedelta(hours=1)).isoformat()
+        })
+        assert historical.status_code==200,historical.text
+        h=historical.json()
+        assert Decimal(h["delivered_quantity"])==6
+        assert Decimal(h["accepted_quantity"])==5
+        assert Decimal(h["outstanding_delivered_quantity"])==4
+        assert h["partial_receipt_count"]==1
+        assert h["production_risk_escalations"]==0
+        # Before the original purchase order, there is no verified order to summarize.
+        before_order=client.get(root+f"/orders/{po}/lines/1",params={
+            "as_of":(order_date-timedelta(seconds=1)).isoformat()
+        })
+        assert before_order.status_code==404
+
 
         assert client.post(root+f"/events/{receipt1['id']}/review",json={
             "decision":"REJECTED","note":"second review forbidden"
