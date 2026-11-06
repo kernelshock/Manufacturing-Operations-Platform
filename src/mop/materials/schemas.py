@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 StockKind = Literal["OPENING", "OPENING_ZERO", "RECEIPT", "ISSUE", "ADJUSTMENT_IN", "ADJUSTMENT_OUT"]
 
@@ -65,6 +65,15 @@ class MovementCreate(BaseModel):
         if isinstance(value, (float, bool)):
             raise ValueError("quantities must be decimal strings, not binary floats")
         return value
+
+    @model_validator(mode="after")
+    def validate_zero_opening(self):
+        if self.kind == "OPENING_ZERO":
+            if self.quantity != 0:
+                raise ValueError("OPENING_ZERO requires exactly zero quantity")
+        elif self.quantity == 0:
+            raise ValueError("non-opening-zero movements require a positive quantity")
+        return self
 
     @field_validator("source_system", "source_reference", "idempotency_key")
     @classmethod
