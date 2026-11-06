@@ -3,18 +3,30 @@
 **Project:** FAIC Manufacturing Operations Platform (MOP)  
 **Gate:** G6 Materials (G6.1–G6.8)  
 **Prepared:** 2026-11-06 UTC  
-**Governance status:** **READY FOR RELEASE DECISION — NOT RELEASED**  
+**Governance status:** **CODE-ONLY RELEASE PATH SELECTED; PEER REVIEW PENDING — NOT RELEASED**  
 **Release candidate code SHA:** `8056dcc287b27c1cf19b39395198740d6cc8ce7f`  
-**PR:** [#14 — feat/G6-materials](https://github.com/kernelshock/Manufacturing-Operations-Platform/pull/14), currently OPEN / DRAFT / UNMERGED  
+**PR:** [#14 — feat/G6-materials](https://github.com/kernelshock/Manufacturing-Operations-Platform/pull/14), currently OPEN / READY FOR REVIEW / UNMERGED  
 **Evidence:** [G6.8-EVIDENCE.md](G6.8-EVIDENCE.md) and [GitHub Actions run 42136591321](https://github.com/kernelshock/Manufacturing-Operations-Platform/actions/runs/42136591321)
 
 ## 1. Proposed resolution
 
-> **Proposed resolution G6-RC-01:** Accept G6.8 as technically completed for the configured acceptance scope on code SHA `8056dcc`. Recommend formal release of G6 to the governed code baseline **subject to the release sign-offs below**. Do not interpret technical acceptance as production-data readiness, approval to post physical stock, authorization to purchase, or permission to deploy to FAIC production. PR #14 stays DRAFT until explicit authorization to mark ready and merge.
+> **Proposed resolution G6-RC-01:** Accept G6.8 as technically completed for the configured acceptance scope on code SHA `8056dcc`. Recommend formal release of G6 to the governed code baseline **subject to the release sign-offs below**. Do not interpret technical acceptance as production-data readiness, approval to post physical stock, authorization to purchase, or permission to deploy to FAIC production. PR #14 was moved to READY FOR REVIEW; it remains unmerged pending technical review and final integration decision.
 
-**Current decision:** NOT SIGNED. **Merge:** NOT AUTHORIZED. **Production deployment:** NOT AUTHORIZED.
+**Current decision:** Code-only integration path selected by the user on 2026-11-05 local time, subject to the independent technical review and controlled merge prerequisites below. **Merge:** NOT YET PERFORMED. **Production deployment:** NOT AUTHORIZED.
 
 The user has authorized use of **an isolated validation deployment** for continuation of testing. This is not an authorization for production rollout or an explicit merge instruction.
+
+## 1A. Controlled integration decision — 2026-11-05
+
+The user instructed moving forward with a controlled PR #14 integration decision while explicitly separating **G6 code release** from **FAIC operational production enablement**. The permitted target for this phase is the canonical repository's `main` **after** required technical review. There is no authorization to migrate or populate a production database, activate warehouse/inventory roles, expose the service on FAIC's LAN, or enable automated procurement.
+
+**Action performed:** Changed PR #14 from DRAFT to READY FOR REVIEW. The PR remains OPEN and UNMERGED. Verified head `9faadd3c6df5a431d7823b43ef9b828fb4537ed7`; the GitHub Actions `G6 Materials` run `42142556848` for that exact documentation head completed SUCCESS, with all four checks (`g6-domain`, `g6-frontend`, `g6-runtime`, `g6-gate`) SUCCESS. The underlying G6 code was accepted on `8056dcc287b27c1cf19b39395198740d6cc8ce7f`.
+
+**Open stop condition:** GitHub currently shows **zero submitted PR reviews**. Mergeability returned `unknown` during the API check. Therefore **no merge** was attempted. Require a qualified technical review and a fresh check of mergeability/current head before merging.
+
+**Recommended merge strategy:** one ordinary **merge commit** preserving chronological G6.1–G6.8 commits and audit history (no force-push). Capture the resulting `main` SHA, tag only when separately agreed and run a post-merge smoke. Preserve `mop-dev` and live data unchanged.
+
+---
 
 ## 2. Technical acceptance already verified
 
@@ -57,12 +69,12 @@ The user has authorized use of **an isolated validation deployment** for continu
 | --- | --- | --- |
 | G6.8 technical validation | Engineering / G6.8-EVIDENCE.md | **ACCEPTED (test scope)** |
 | Source freeze for release | Technical reviewer / tested SHA and PR diff | **PENDING** |
-| Peer review / security and interface assumptions | Technical reviewer / sign-off | **PENDING** |
+| Peer review / security and interface assumptions | Technical reviewer / sign-off; no submitted reviews found when checked | **PENDING** |
 | Review local screenshot and test logs | Engineering / attachment and checksum | **PENDING** |
 | Intended target defined (code baseline, local dev, staging or production) | Release authority / change record | **PENDING** |
 | Backups, migration dry-run and recovery test for intended environment | Infrastructure owner / evidence | **PENDING IF DEPLOYING** |
 | Actual FAIC role permissions, network and data-owner acceptance | FAIC owners / UAT | **PENDING IF DEPLOYING** |
-| Explicit PR #14 merge and release approval | Authorized decision maker / written instruction | **PENDING** |
+| Controlled PR #14 merge sign-off after independent review | Authorized decision maker / written instruction | **PENDING** |
 | Post-merge smoke, release tag and rollback reference | Engineering / release record | **NOT STARTED** |
 
 ## 6. Decision record to complete
@@ -70,7 +82,7 @@ The user has authorized use of **an isolated validation deployment** for continu
 - **Decision identifier:** G6-RC-01
 - **Decision maker / role:** [to be recorded]
 - **Decision date/time:** [to be recorded]
-- **Approved action:** [ ] Close technical gate only; [ ] Approve PR #14 merge into main; [ ] Approve staging deployment; [ ] Approve production deployment (separate production change record required).
+- **Selected release intent:** [x] Code-only G6 integration path; [ ] Perform approved merge after technical review; [ ] Staging deployment; [ ] Production deployment (separate production change record required).
 - **Approved code SHA:** `8056dcc287b27c1cf19b39395198740d6cc8ce7f` (or an explicitly revalidated newer code SHA)
 - **Target host / environment:** [to be recorded]
 - **Reviewed evidence and exceptions:** [to be recorded]
