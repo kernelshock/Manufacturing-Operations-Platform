@@ -22,6 +22,7 @@ from mop.api.v1.mes_feedback import router as mes_feedback_router
 from mop.api.v1.organization import router as organization_router
 from mop.api.v1.prolowin import router as prolowin_router
 from mop.api.v1.prolowin_procurement import router as prolowin_procurement_router
+from mop.api.v1.planning import router as planning_router
 
 router = APIRouter()
 router.include_router(auth_router)
@@ -44,3 +45,5 @@ router.include_router(mes_feedback_router)
 router.include_router(prolowin_router)
 router.include_router(prolowin_procurement_router)
 router.include_router(organization_router)
+
+router.include_router(planning_router)
