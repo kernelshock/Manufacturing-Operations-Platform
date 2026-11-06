@@ -1,0 +1,156 @@
+name: G6 Materials
+
+on:
+  push:
+    branches:
+      - feat/G6-materials
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g6-materials-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  g6-domain:
+    runs-on: ubuntu-latest
+    env:
+      MOP_ENVIRONMENT: test
+      MOP_DATABASE_URL: postgresql+psycopg://mop_test:mop_test@127.0.0.1:5432/mop_test
+    services:
+      postgres:
+        image: postgres:18@sha256:979bccfde35445db618c65107d27d08c6c21339d8dc3ad4c830c6633947be0e4
+        env:
+          POSTGRES_DB: mop_test
+          POSTGRES_USER: mop_test
+          POSTGRES_PASSWORD: mop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mop_test -d mop_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Configure Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock.txt
+            requirements-prod.lock.txt
+      - name: Install locked dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -c requirements-dev.lock.txt -e ".[dev]"
+          python -m pip check
+      - name: Validate safe zrtserver G6.8 gate script syntax
+        run: |
+          bash -n infrastructure/scripts/g68-local-gate.sh infrastructure/scripts/runtime-smoke.sh
+          python -m compileall -q infrastructure/scripts/g68-materials-fixture.py infrastructure/scripts/g68-materials-verify.py
+      - name: Compile Materials, Prolowin and versioned API
+        run: python -m compileall -q src/mop/materials src/mop/prolowin src/mop/api/v1
+      - name: Verify G6 migration and schema
+        run: |
+          python -m alembic heads | tee /tmp/g6-heads
+          test "$(grep -c '(head)' /tmp/g6-heads)" -eq 1
+          python -m alembic upgrade head
+          python -m alembic check
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+          python -m alembic check
+      - name: Run complete G0–G6 backend regression against one migrated database
+        run: python -m pytest tests/g0 tests/g1 tests/g2 tests/g3 tests/g4 tests/g5 tests/g6 -q
+      - name: Verify G4 historical gate regressions
+        run: python -m pytest tests/g4/test_gate_hardening.py -q
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install pip-audit==2.10.1
+          python -m pip_audit --local --skip-editable
+      - name: Verify tracked secrets and supply-chain pins
+        run: |
+          ./infrastructure/scripts/repository-secret-scan.sh
+          ./infrastructure/scripts/supply-chain-pin-check.sh
+
+  g6-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Node.js 26 LTS
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "26.13.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --no-fund
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+      - name: Typecheck G6.7 frontend
+        run: npm run typecheck
+      - name: Test G6.7 and frontend regressions
+        run: npm test
+      - name: Build frontend
+        run: npm run build
+
+  g6-runtime:
+    runs-on: ubuntu-latest
+    needs: [g6-domain, g6-frontend]
+    env:
+      MOP_WEB_HOST_PORT: "18080"
+      MOP_ADMIN_USERNAME: smoke-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Node.js for Chrome DevTools browser flow
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "26.13.0"
+      - name: Check headless Chrome
+        run: command -v google-chrome
+      - name: Generate ephemeral credentials
+        run: |
+          python - <<'PY'
+          import os, secrets
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"MOP_POSTGRES_PASSWORD={secrets.token_urlsafe(32)}\n")
+              f.write(f"MOP_BOOTSTRAP_ADMIN_PASSWORD={secrets.token_urlsafe(32)}\n")
+          PY
+      - name: Configure disposable runtime
+        run: |
+          cat > .env.runtime-ci <<EOF
+          MOP_ENVIRONMENT=test
+          MOP_POSTGRES_DB=mop_smoke
+          MOP_POSTGRES_USER=mop_smoke
+          MOP_POSTGRES_PASSWORD=${MOP_POSTGRES_PASSWORD}
+          MOP_WEB_HOST_PORT=18080
+          MOP_SESSION_TTL_MINUTES=30
+          MOP_SESSION_COOKIE_SECURE=false
+          MOP_LOGIN_MAX_FAILURES=5
+          MOP_LOGIN_LOCKOUT_MINUTES=15
+          MOP_ADMIN_USERNAME=smoke-admin
+          MOP_ADMIN_DISPLAY_NAME=MOP Smoke Administrator
+          EOF
+      - name: Run real Chrome / FastAPI / PostgreSQL runtime acceptance
+        run: ./infrastructure/scripts/runtime-smoke.sh .env.runtime-ci
+
+  g6-gate:
+    runs-on: ubuntu-latest
+    needs: [g6-domain, g6-frontend, g6-runtime]
+    steps:
+      - run: |
+          echo "G0–G6 regression, G6 domain/API, PostgreSQL, audited frontend and Chrome runtime checks passed on this commit."
+          echo "G6 remains IN PROGRESS; CI uses only disposable test inventory and no production data."
+          echo "This workflow does not authorize release or production deployment."

@@ -8,14 +8,24 @@ export async function runNominalBrowserFlow({evaluate, type, poll, fixture}) {
     return result.data;
   }
   async function expectState(id, state) {
-    return poll(async () => {
-      const result = await readOperation(id);
-      return result.status === state ? result : null;
-    }, "MES operation did not reach " + state);
+    try {
+      return await poll(async () => {
+        const result = await readOperation(id);
+        return result.status === state ? result : null;
+      }, "MES operation did not reach " + state);
+    } catch (error) {
+      // Diagnostics distinguish UI validation failure from slow server transitions.
+      const last = await readOperation(id);
+      const visible = await evaluate('({error:Array.from(document.querySelectorAll(".inline-error")).map(e=>e.textContent), message:document.querySelector(".status-pill")?.textContent, reason:document.querySelector(\'.mes-form input[placeholder="Código de causa"]\')?.value, runningButtons:Array.from(document.querySelectorAll(".mes-capture-panel button")).map(b=>({text:b.textContent,disabled:b.disabled}))})');
+      throw new Error(String(error) + " (server=" + last.status + ", UI=" + JSON.stringify(visible) + ")");
+    }
   }
   async function click(label) {
     const expression = 'Array.from(document.querySelectorAll(".mes-capture-panel button")).find(b=>b.textContent.includes(' + JSON.stringify(label) + '))';
-    await poll(async () => evaluate('Boolean(' + expression + ')'), "Missing MES button: " + label);
+    // A persisted backend transition can precede React's busy-state release.
+    // Wait until the actual DOM control is enabled before clicking; a click on
+    // a disabled button is a silent no-op and causes intermittent false E2E failures.
+    await poll(async () => evaluate('Boolean(' + expression + ' && !(' + expression + ').disabled)'), "MES button missing or disabled: " + label);
     await evaluate(expression + ".click()");
   }
   async function select(id) {
@@ -25,8 +35,14 @@ export async function runNominalBrowserFlow({evaluate, type, poll, fixture}) {
     await poll(async () => evaluate('Boolean(document.querySelector(".mes-capture-panel h3"))'), "MES operation detail missing");
   }
   async function fill(selector, value) {
-    await poll(async () => evaluate('Boolean(document.querySelector(' + JSON.stringify(selector) + '))'), "MES input missing");
+    const element = 'document.querySelector(' + JSON.stringify(selector) + ')';
+    await poll(async () => evaluate('Boolean(' + element + ')'), "MES input missing");
+    await evaluate(element + '.focus();' + element + '.select()');
     await type(selector, value);
+    await poll(async () => evaluate('Boolean(' + element + ' && ' + element + '.value === ' + JSON.stringify(value) + ')'), "MES input did not accept: " + selector);
+    // CDP returns after text insertion, but React may still be committing its onChange
+    // state update. Wait for browser frames before dispatching an action.
+    await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
   }
 
   await select(fixture.source_operation_id);

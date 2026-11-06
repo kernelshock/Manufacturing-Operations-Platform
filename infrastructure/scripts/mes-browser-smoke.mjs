@@ -1,6 +1,6 @@
 /** Actual Chrome/React/FastAPI/PostgreSQL browser smoke. Runs inside runtime-smoke.sh. */
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runNominalBrowserFlow } from "./mes-browser-flow.mjs";
@@ -106,6 +106,60 @@ try {
   await type("input[autocomplete=current-password]",process.env.MOP_BOOTSTRAP_ADMIN_PASSWORD);
   await evaluate('document.querySelector("form").requestSubmit()');
   await poll(async()=>evaluate('Boolean(document.querySelector("nav"))'),"Admin audit authentication failed");
+  // G6.8: exercise the actual authenticated materials React screen in Chrome.
+  // The runtime fixture does not invent stock, BOM or Prolowin evidence.
+  const adminNav = await evaluate('Array.from(document.querySelectorAll("nav button")).map(item=>item.textContent)');
+  if (!adminNav.some(item => item.includes("Materiales / Abastecimiento"))) {
+    throw new Error("G6 materials navigation is unavailable to the bootstrap admin");
+  }
+  await evaluate('Array.from(document.querySelectorAll("nav button")).find(item=>item.textContent.includes("Materiales / Abastecimiento")).click()');
+  await poll(async () => await evaluate('Boolean(document.querySelector(".g67-hero h2"))'),
+    "G6 materials React panel did not mount in a real browser");
+  const materialsUI = await evaluate('({title:document.querySelector(".g67-hero h2")?.textContent, plant:document.querySelector(".g67-toolbar select") !== null, date:document.querySelector(".g67-toolbar input[type=date]") !== null, error:document.querySelector(".g67 [role=alert]")?.textContent ?? null})');
+  if (!materialsUI.title?.includes("Abastecimiento y disponibilidad física") || !materialsUI.plant || !materialsUI.date) {
+    throw new Error("G6 materials DOM contract failed: " + JSON.stringify(materialsUI));
+  }
+  if (process.env.MOP_G68_MATERIALS_FIXTURE_JSON) {
+    const synthetic = JSON.parse(await readFile(process.env.MOP_G68_MATERIALS_FIXTURE_JSON, "utf8"));
+    const planSelector = '.g67-toolbar label select';
+    const planValue = synthetic.plan_id;
+    // Date is today (BOM effective minutes earlier), so the UI requests current effectivity.
+    await poll(async () => evaluate('Array.from(document.querySelectorAll(".g67-toolbar select")).some(s=>Array.from(s.options).some(o=>o.value===' + JSON.stringify(planValue) + '))'),
+      "G6 synthetic plan missing in authenticated React selector");
+    const selected = await evaluate('(()=>{const s=Array.from(document.querySelectorAll(".g67-toolbar select")).find(s=>Array.from(s.options).some(o=>o.value===' + JSON.stringify(planValue) + ')); if(!s)return false; s.value=' + JSON.stringify(planValue) + ';s.dispatchEvent(new Event("change",{bubbles:true}));return true})()');
+    if (!selected) throw new Error("G6 browser plan selection failed");
+    // A populated plant selector includes the isolated synthetic plant.
+    await poll(async () => evaluate('Array.from(document.querySelectorAll(".g67-toolbar select")).some(s=>Array.from(s.options).some(o=>o.value===' + JSON.stringify(synthetic.plant_id) + '))'),
+      "G6 synthetic plant missing");
+    await evaluate('(()=>{const s=Array.from(document.querySelectorAll(".g67-toolbar select")).find(s=>Array.from(s.options).some(o=>o.value===' + JSON.stringify(synthetic.plant_id) + '));s.value=' + JSON.stringify(synthetic.plant_id) + ';s.dispatchEvent(new Event("change",{bubbles:true}))})()');
+    await poll(async () => evaluate('document.querySelector(".g67-caption strong")?.textContent.includes(' + JSON.stringify(synthetic.plan_number) + ') && document.querySelectorAll(".g67-scroll tbody tr").length===2'),
+      "G6 materials synthetic live projection did not render");
+    const actual = await evaluate('({stats:Array.from(document.querySelectorAll(".g67-stats article strong")).map(x=>Number(x.textContent)),rows:Array.from(document.querySelectorAll(".g67-scroll tbody tr")).map(r=>({code:r.querySelector("td strong")?.textContent,values:Array.from(r.querySelectorAll("td")).map(t=>t.textContent.trim())})),warning:document.querySelector(".g67 [role=alert]")?.textContent??null})');
+    if (actual.warning || actual.stats[0] !== 2 || actual.stats[2] !== 1 || actual.stats[3] !== 1) {
+      throw new Error("G6 materials dashboard totals/unknown mismatch: " + JSON.stringify(actual));
+    }
+    const steel = actual.rows.find(r=>r.code===synthetic.steel_code);
+    const fabric = actual.rows.find(r=>r.code===synthetic.fabric_code);
+    if (!steel || !fabric || !steel.values.some(v=>v.includes("37")) ||
+        !steel.values.some(v=>v.includes("20")) || !steel.values.some(v=>v.includes("16")) ||
+        !steel.values.some(v=>v.includes("17")) || !fabric.values.some(v=>v.includes("—")||v.includes("Desconocido"))) {
+      throw new Error("G6 materials rendered BOM / reservation / gap / UNKNOWN mismatch: " + JSON.stringify(actual));
+    }
+    // Source-of-truth comparison: authenticated API, same plan and plant, and no writes.
+    const api = await evaluate('(async()=>{const q=new URLSearchParams({plant_id:' + JSON.stringify(synthetic.plant_id) + ',effective_at:new Date().toISOString()});const r=await fetch("/api/v1/materials/projection/plans/"+' + JSON.stringify(synthetic.plan_id) + '+"?"+q);return {status:r.status,data:await r.json()}})()');
+    if (api.status!==200 || api.data.source_taquillas!==2 ||
+        api.data.unknown_stock_materials!==1 || api.data.indicative_gap_materials!==1 ||
+        api.data.items.length!==2) throw new Error("G6 synthetic API projection mismatch");
+    if (process.env.MOP_G68_SCREENSHOT_FILE) {
+      const capture = await command("Page.captureScreenshot", {format:"png", captureBeyondViewport:true});
+      if (!capture?.data) throw new Error("G6.8 Chrome screenshot capture failed");
+      await writeFile(process.env.MOP_G68_SCREENSHOT_FILE, Buffer.from(capture.data, "base64"));
+      console.log("G6.8 materials screenshot saved to local evidence directory");
+    }
+    console.log("G6.8 Chrome materials-data acceptance PASSED (BOM mix, holds, unknown stock, plan/site isolation)");
+  } else {
+    console.log("G6.8 Chrome materials-navigation smoke PASSED (DOM only)");
+  }
   await verifyOperatorAuditAsAdmin({evaluate,fixture,operatorUser:accounts.operator});
 } finally {
   ws?.close();

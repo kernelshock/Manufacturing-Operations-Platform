@@ -12,10 +12,11 @@ COOKIE_JAR="$(mktemp)"
 HEADER_FILE="$(mktemp)"
 FIXTURE_FILE="$(mktemp)"
 RBAC_USERS_FILE="$(mktemp)"
+MATERIALS_FIXTURE_FILE="$(mktemp)"
 RBAC_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
 
 cleanup() {
-  rm -f "$COOKIE_JAR" "$HEADER_FILE" "$FIXTURE_FILE" "$RBAC_USERS_FILE"
+  rm -f "$COOKIE_JAR" "$HEADER_FILE" "$FIXTURE_FILE" "$RBAC_USERS_FILE" "$MATERIALS_FIXTURE_FILE"
   docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -100,6 +101,23 @@ MOP_MES_RBAC_USERS_JSON="$RBAC_USERS_FILE" \
 MOP_MES_FIXTURE_JSON="$FIXTURE_FILE" \
 node "$ROOT/infrastructure/scripts/mes-rbac-browser.mjs"
 
+# G6.8 synthetic material data for authenticated real-browser acceptance.
+# Only copy test helpers into the disposable compose API container; do not alter
+# the production image, existing mop-dev project, or any persistent FAIC data.
+API_CONTAINER="$(docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps -q api)"
+[[ -n "$API_CONTAINER" ]] || { echo "G6.8 disposable API container missing" >&2; exit 1; }
+docker exec "$API_CONTAINER" mkdir -p /tmp/g68_fixture
+docker cp "$ROOT/tests/g6/test_material_requirements_integration.py" "$API_CONTAINER:/tmp/g68_fixture/test_material_requirements_integration.py"
+docker cp "$ROOT/tests/g6/test_reservations_integration.py" "$API_CONTAINER:/tmp/g68_fixture/test_reservations_integration.py"
+MATERIALS_SEED_LOG="$(docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api python - < "$ROOT/infrastructure/scripts/g68-materials-fixture.py")"
+printf '%s\n' "$MATERIALS_SEED_LOG" | sed -n 's/^G68_MATERIALS_FIXTURE=//p' > "$MATERIALS_FIXTURE_FILE"
+[[ -s "$MATERIALS_FIXTURE_FILE" ]] || { echo "G6.8 materials fixture missing" >&2; exit 1; }
+echo "G6.8 mixed-taquilla/materials synthetic fixture seeded in isolated PostgreSQL"
+docker cp "$MATERIALS_FIXTURE_FILE" "$API_CONTAINER:/tmp/g68_fixture/manifest.json"
+# docker cp preserves the host mktemp file mode (0600); the API executes as a
+# non-root user. The manifest contains ONLY synthetic IDs and expected quantities.
+docker exec -u root "$API_CONTAINER" chmod 0644 /tmp/g68_fixture/manifest.json
+
 # Exercise the actual React application through headless Chrome while FastAPI and
 # PostgreSQL containers are alive; this complements the HTTP/runtime checks.
 MOP_BROWSER_ORIGIN="http://127.0.0.1:$WEB_PORT" \
@@ -108,7 +126,11 @@ MOP_BOOTSTRAP_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
 MOP_RBAC_TEST_PASSWORD="$RBAC_PASSWORD" \
 MOP_MES_RBAC_USERS_JSON="$RBAC_USERS_FILE" \
 MOP_MES_FIXTURE_JSON="$FIXTURE_FILE" \
+MOP_G68_MATERIALS_FIXTURE_JSON="$MATERIALS_FIXTURE_FILE" \
 node "$ROOT/infrastructure/scripts/mes-browser-smoke.mjs"
+
+# Confirm browser projection GETs did not post physical ISSUE, HOLD or RELEASE.
+docker compose --project-name "$PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T api python - < "$ROOT/infrastructure/scripts/g68-materials-verify.py"
 
 RATE_LIMITED=0
 for _ in $(seq 1 20); do

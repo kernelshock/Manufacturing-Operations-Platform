@@ -8,6 +8,8 @@ import { MasterDataPanel } from "./MasterDataPanel";
 import { DemandPanel } from "./DemandPanel";
 import { GanttPanel } from "./GanttPanel";
 import { MESPanel } from "./MESPanel";
+import { MaterialsProjectionPanel } from "./MaterialsProjectionPanel";
+import { ProlowinCapturePanel } from "./ProlowinCapturePanel";
 import {
   ContextSelector,
   type PlantContext
@@ -17,7 +19,7 @@ import { useSystemStatus } from "./useSystemStatus";
 const futureModules = [
   "Kanban",
   "Mantenimiento",
-  "Compras"
+  "Compras / Kanban (G7)"
 ];
 
 export function AppShell({ user }: { user: CurrentUser }) {
@@ -124,6 +126,8 @@ export function AppShell({ user }: { user: CurrentUser }) {
           ) : null}
           {activeModule.id === "aps" ? <GanttPanel canEdit={user.permissions.includes("aps.edit")} /> : null}
           {activeModule.id === "mes" ? <MESPanel canEdit={user.permissions.includes("mes.edit")} canReadDemand={user.permissions.includes("demand.read")} /> : null}
+          {activeModule.id === "prolowin-procurement" ? <ProlowinCapturePanel canCapture={user.permissions.includes("prolowin.procurement.capture")} canVerify={user.permissions.includes("prolowin.procurement.verify")} /> : null}
+          {activeModule.id === "materials" ? <MaterialsProjectionPanel contextPlantId={context.plant?.id} canReadProcurement={user.permissions.includes("prolowin.procurement.read")} /> : null}
           {activeModule.id === "audit" ? <AuditPanel /> : null}
           {activeModule.id === "admin" ? (
             <AdminPanel permissions={user.permissions} />
