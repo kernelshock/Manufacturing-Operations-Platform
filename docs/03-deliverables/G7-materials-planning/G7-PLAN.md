@@ -1,7 +1,7 @@
 # G7 — Materials Planning & Procurement Intelligence
 
 **Initiation:** 2026-11-06 UTC.  
-**Status:** G7.1 TECHNICALLY ACCEPTED (code SHA `4ea706f1534e2002b87e2fc1fa2243b86cd4777b`, CI `42147034029`); G7 overall OPEN, no operational purchasing or production deployment.  
+**Status:** G7.1 TECHNICALLY ACCEPTED. G7.2 current physical/reservation and legacy purchase sample TECHNICALLY VALIDATED (code SHA `0b484eb2713b44d88a5454732240157cc13f1c86`, CI `42148472379`, 227 passing tests), but broader time-phased availability remains OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
 **Branch:** `feat/G7-materials-planning`.  
 **Baseline:** Released G6 on `main`, PR #14 merged at `b52b3b9e748f4e4b846df16199510733338f2046`; code-release evidence in `docs/03-deliverables/G6-materials/G6-RELEASE-RECORD.md`.
 
@@ -49,3 +49,9 @@ This ordering is an initiation proposal and is not permission to implement or de
 ## Status at opening
 
 **G7.1 DONE (technical acceptance).** The pure executable `mop.planning.policy_contracts` contracts and 225-test same-SHA G0–G7 CI passed. G7 has no new migrations, inventory postings, PP/CR calculations or purchasing endpoints. Evidence: `G7.1-POLICY-CONTRACTS.md`. **Next increment: G7.2 — Supply & Inventory Position**; G6 `main` remains governed and production deployment is not authorized.
+
+## G7.2 — Current supply position validated; time-phased follow-up open
+
+Technical evidence: [G7.2-EVIDENCE.md](G7.2-EVIDENCE.md). `GET /api/v1/planning/supply-position` is dual-authorized and read-only, returns current G6 stock per active location/plant, holds, unknown Quality and transit, plus a separately labeled verified manual Prolowin PO sample with original/revised promises and partial receipts. CI `42148472379` passed 227 G0–G7.2 tests on the exact implementation SHA. It does not mutate the inventory ledger or create purchase orders.
+
+**G7.2 closure boundary:** True **time-phased** availability — a dated schedule combining G4 published dated demand, lot/Quality status, supplier-to-plant confirmed incoming receipts, working-day calendars and outstanding Prolowin orders — cannot be declared from present G6 evidence. Preserve it as an OPEN acceptance obligation before claiming an integrated replenishment projection. G7.3 supplies the lead-time and evidence coverage needed for that obligation. Do not describe current G7.2 as complete production-ready MRP or ATP.
