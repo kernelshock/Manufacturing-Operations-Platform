@@ -5,7 +5,10 @@ const base = "/api/v1/prolowin/procurement";
 type Capture = { id: string; source_type: string; source_reference: string; source_sha256: string | null };
 type Evidence = {
   id: string; kind: string; po_number: string; line_number: number; supplier_code: string;
-  article_code: string; quantity: string | null; source_reference: string; capture_id: string;
+  article_code: string; uom_code: string; quantity: string | null;
+  accepted_quantity: string | null; event_date: string; original_promise_date: string | null;
+  revised_promise_date: string | null; reason: string | null;
+  continuity_safe: boolean | null; source_reference: string; capture_id: string;
   review_status: string; entered_by: string;
 };
 type Summary = {
@@ -279,6 +282,23 @@ export function ProlowinCapturePanel({ canCapture, canVerify }: {
               </select>
             </label>
             {reviewSource && <p>Origen: {reviewSource.source_type} · {reviewSource.source_reference} {reviewSource.source_type === "SCREENSHOT" ? <a href={base + "/captures/" + encodeURIComponent(reviewSource.id) + "/image"} target="_blank" rel="noreferrer">Examinar imagen de origen</a> : <span>(transcripción sin imagen)</span>}</p>}
+            {items.filter(item => item.id === selectedReview).map(item => (
+              <section key={item.id} aria-label="Transcripción pendiente para comparar con fuente">
+                <h4>Transcripción registrada — comparar campo por campo antes de verificar</h4>
+                <dl>
+                  <dt>Tipo / orden / línea</dt><dd>{item.kind} · {item.po_number} / {item.line_number}</dd>
+                  <dt>Proveedor / artículo / unidad</dt><dd>{item.supplier_code} · {item.article_code} · {item.uom_code}</dd>
+                  <dt>Cantidad / aceptada</dt><dd>{item.quantity ?? "No aplica"} / {item.accepted_quantity ?? "Sin evidencia"}</dd>
+                  <dt>Fecha del evento</dt><dd>{item.event_date}</dd>
+                  <dt>Compromiso original</dt><dd>{item.original_promise_date ?? "No aplica"}</dd>
+                  <dt>Compromiso revisado</dt><dd>{item.revised_promise_date ?? "No aplica"}</dd>
+                  <dt>Motivo</dt><dd>{item.reason ?? "No aplica"}</dd>
+                  <dt>Continuidad de producción evaluada</dt><dd>{item.continuity_safe === null ? "No aplica" : item.continuity_safe ? "Sí" : "No"}</dd>
+                  <dt>Referencia de origen</dt><dd>{item.source_reference}</dd>
+                  <dt>Identificación del cargador</dt><dd>{item.entered_by}</dd>
+                </dl>
+              </section>
+            ))}
             <label>Nota de revisión
               <textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} />
             </label>
