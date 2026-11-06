@@ -67,6 +67,12 @@ def test_materials_api_permissions_and_atomic_audit():
             **params,"uom_id":ids["uom"],"kind":"RECEIPT","quantity":"4.5",
             "source_system":"G6_TEST","source_reference":"RECEIPT-1","idempotency_key":f"RX-{suffix}",
         }
+        for invalid_kind in ("RECEIPT", "ISSUE", "OPENING", "ADJUSTMENT_IN", "ADJUSTMENT_OUT"):
+            invalid = client.post(path+"/movements",json={
+                **movement, "kind": invalid_kind, "quantity": "0",
+                "idempotency_key": f"ZERO-{invalid_kind}-{suffix}",
+            })
+            assert invalid.status_code == 422, (invalid_kind, invalid.status_code, invalid.text)
         first=client.post(path+"/movements",json=movement)
         assert first.status_code==201,first.text
         assert first.json()["idempotent_replay"] is False
