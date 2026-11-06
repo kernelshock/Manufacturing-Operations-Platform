@@ -203,3 +203,21 @@ def test_zero_quality_unallocated_is_not_auto_purchase_trigger():
     assert result.reorder_point==Decimal("75")
     assert result.purchase_order_effect=="NONE"
     assert result.operational_purchase_trigger=="NOT_EVALUATED"
+
+def test_configured_sample_thresholds_can_be_stricter_not_weaker():
+    stricter=var(min_demand_observations=24, min_completed_supplier_orders=20)
+    result=project_reorder_point(policy(safety_method=SafetyMethod.VARIABILITY),
+            facts(),(rate(),),Decimal("5"),variability=stricter)
+    assert result.state==RecommendationState.BLOCKED
+    assert "DEMAND_SAMPLE_TOO_SMALL" in result.blockers
+    assert "LEAD_TIME_SAMPLE_TOO_SMALL" in result.blockers
+    with pytest.raises(PolicyError, match="guarded floor"):
+        var(min_demand_observations=2)
+
+
+def test_partial_demand_source_is_always_labeled_even_when_other_evidence_complete():
+    result=project_reorder_point(policy(),facts(),
+          (rate(evidence_state=EvidenceState.PARTIAL),),Decimal("8"))
+    assert result.state==RecommendationState.PROVISIONAL
+    assert result.reorder_point==Decimal("40")
+    assert "DEMAND_EVIDENCE_PARTIAL" in result.warnings
