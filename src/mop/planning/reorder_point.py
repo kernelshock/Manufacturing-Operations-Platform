@@ -5,8 +5,7 @@ inventory/ERP ingestion endpoint. G7.3 sampled Prolowin history is never
 automatically promoted to a statistically representative lead-time sample.
 """
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
-from enum import StrEnum
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -16,7 +15,7 @@ from mop.planning.policy_contracts import (
 )
 
 ZERO = Decimal("0")
-MIN_VARIABILITY_OBSERVATIONS = 12
+MIN_VARIABILITY_OBSERVATIONS = 12  # Hard lower floor; scenario thresholds may be higher.
 
 
 def _positive_decimal(name: str, value: Decimal, *, allow_zero: bool = False) -> Decimal:
@@ -58,12 +57,17 @@ class VariabilityEvidence:
     demand_observations: int
     completed_supplier_orders: int
     representative_coverage: EvidenceState
+    min_demand_observations: int = MIN_VARIABILITY_OBSERVATIONS
+    min_completed_supplier_orders: int = MIN_VARIABILITY_OBSERVATIONS
 
     def __post_init__(self):
         for name in ("demand_std_daily", "lead_time_std_business_days", "service_factor_z"):
             _positive_decimal(name, getattr(self, name), allow_zero=True)
         if self.demand_observations < 0 or self.completed_supplier_orders < 0:
             raise PolicyError("observation counts must be nonnegative")
+        if (self.min_demand_observations < MIN_VARIABILITY_OBSERVATIONS or
+                self.min_completed_supplier_orders < MIN_VARIABILITY_OBSERVATIONS):
+            raise PolicyError("statistical sample minima cannot fall below the guarded floor")
 
 
 @dataclass(frozen=True)
@@ -152,9 +156,9 @@ def project_reorder_point(
         else:
             if variability.representative_coverage != EvidenceState.VERIFIED:
                 blockers.append("VARIABILITY_COVERAGE_NOT_VERIFIED")
-            if variability.demand_observations < MIN_VARIABILITY_OBSERVATIONS:
+            if variability.demand_observations < variability.min_demand_observations:
                 blockers.append("DEMAND_SAMPLE_TOO_SMALL")
-            if variability.completed_supplier_orders < MIN_VARIABILITY_OBSERVATIONS:
+            if variability.completed_supplier_orders < variability.min_completed_supplier_orders:
                 blockers.append("LEAD_TIME_SAMPLE_TOO_SMALL")
             if variability.service_factor_z == ZERO:
                 blockers.append("SERVICE_FACTOR_NOT_SELECTED")
