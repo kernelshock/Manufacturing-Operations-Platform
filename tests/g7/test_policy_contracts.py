@@ -15,7 +15,9 @@ PLANT, OTHER_PLANT, ARTICLE, UOM = (uuid4() for _ in range(4))
 
 
 def policy(**kwargs):
-    return PlanningPolicy(plant_id=PLANT, calendar_code="FAIC-ROS-BUSINESS", **kwargs)
+    values = {"plant_id": PLANT, "calendar_code": "FAIC-ROS-BUSINESS"}
+    values.update(kwargs)
+    return PlanningPolicy(**values)
 
 
 def facts(**overrides):
