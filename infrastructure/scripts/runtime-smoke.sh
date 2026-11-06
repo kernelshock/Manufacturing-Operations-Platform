@@ -114,6 +114,9 @@ printf '%s\n' "$MATERIALS_SEED_LOG" | sed -n 's/^G68_MATERIALS_FIXTURE=//p' > "$
 [[ -s "$MATERIALS_FIXTURE_FILE" ]] || { echo "G6.8 materials fixture missing" >&2; exit 1; }
 echo "G6.8 mixed-taquilla/materials synthetic fixture seeded in isolated PostgreSQL"
 docker cp "$MATERIALS_FIXTURE_FILE" "$API_CONTAINER:/tmp/g68_fixture/manifest.json"
+# docker cp preserves the host mktemp file mode (0600); the API executes as a
+# non-root user. The manifest contains ONLY synthetic IDs and expected quantities.
+docker exec -u root "$API_CONTAINER" chmod 0644 /tmp/g68_fixture/manifest.json
 
 # Exercise the actual React application through headless Chrome while FastAPI and
 # PostgreSQL containers are alive; this complements the HTTP/runtime checks.
