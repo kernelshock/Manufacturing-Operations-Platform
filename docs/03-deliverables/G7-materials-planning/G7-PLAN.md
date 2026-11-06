@@ -1,7 +1,7 @@
 # G7 — Materials Planning & Procurement Intelligence
 
 **Initiation:** 2026-11-06 UTC.  
-**Status:** G7.1 and G7.2 limited-scope validation accepted; G7.3 verified-manual Prolowin supplier lead-time sample TECHNICALLY ACCEPTED (code SHA `83714d5401c70ab95ab8130c8a59a43e24e669fa`, CI `42149518253`, 238 passing tests). Complete historical coverage and time-phased availability remain OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
+**Status:** G7.1–G7.3 limited-scope technical acceptance recorded. G7.4 read-only P.P./safety-stock policy scenario engine TECHNICALLY ACCEPTED (code SHA `f7e216c07acba1798fc3d8cfb8a2fa42424c6a84`, CI `42209496111`, 267 passing tests). Historical consumption series, Quality availability, supplier lead-time completeness and time-phased position remain OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
 **Branch:** `feat/G7-materials-planning`.  
 **Baseline:** Released G6 on `main`, PR #14 merged at `b52b3b9e748f4e4b846df16199510733338f2046`; code-release evidence in `docs/03-deliverables/G6-materials/G6-RELEASE-RECORD.md`.
 
@@ -63,3 +63,11 @@ Technical evidence: [G7.2-EVIDENCE.md](G7.2-EVIDENCE.md). `GET /api/v1/planning/
 **Limits:** Samples derived from independently verified manual Prolowin captures cannot be assumed to represent every supplier order. Plant calendar is not supplier contractual calendar; missing Quality/plant inbound evidence remains UNKNOWN. No statistical safety stock may be inferred without adequate sample coverage. CI run `42149518253` passed 238 tests on code SHA `83714d540...`.
 
 **Next:** G7.4 — Reorder Point & Safety Stock Policy. The future time-phased supply/demand reconciliation from G7.2 remains an OPEN prerequisite before any real replenishment recommendation, and G7 code still must not be merged or deployed without a separate release decision.
+
+## G7.4 — Reorder Point & Safety Stock Policy technical acceptance
+
+[Full gate evidence and remaining risks](G7.4-EVIDENCE.md). The pure `src/mop/planning/reorder_point.py` calculates a **P.P. scenario** using a selected verified daily material demand rate and explicit lead time. Percentage SS defaults to 25% but remains configurable. A variance method uses explicit `z`, demand/lead-time standard deviations and at least 12 observations in each verified representative series; partial Prolowin history does not qualify. Rates per seat and per product are never added for the same underlying material consumption. G7.1 known/UNKNOWN stock, Quality and source readiness remain fail-closed.
+
+CI run `42209496111` succeeded with **267 passing tests on code SHA `f7e216c07ac...`**; no backend purchase action, data migration or physical stock changes. **The G7.4 mathematical engine is not yet connected to automatically normalized historical FAIC demand nor exposed via a user-facing API/dashboard.** It must not be used as a real purchasing trigger pending G7.2 time-phased inventory, Quality and inbound/plant mapping.
+
+**Next gate: G7.5 — Replenishment Quantity & Scenario Planning.** Introduce explicit fixed/calculated `C.R.`, verified supplier MOQ and packaging constraints, scenario comparisons and human review. Keep G7 code on `feat/G7-materials-planning`; do not modify `main` or FAIC production without a separate release authorization.
