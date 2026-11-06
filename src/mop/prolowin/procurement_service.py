@@ -244,6 +244,7 @@ class ProcurementEvidenceService:
             ProcurementEvidenceEvent.po_number == po_number,
             ProcurementEvidenceEvent.line_number == line_number,
             ProcurementEvidenceEvent.review_status == "VERIFIED",
+            ProcurementEvidenceEvent.event_date <= today,
         ).order_by(ProcurementEvidenceEvent.event_date, ProcurementEvidenceEvent.id)).all())
         orders = [r for r in rows if r.kind == "ORDER"]
         if len(orders) != 1:
