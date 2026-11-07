@@ -60,10 +60,17 @@ def alternative(**overrides):
 
 
 def case(*, partial=False,severity=Severity.SHORTAGE, alt=None, references=("G6:LEDGER", "PCP:TQ-2026-1")):
+    impact=ProductionRiskEvidence(
+        verified=EvidenceState.VERIFIED,
+        known_material_shortage=severity != Severity.WATCH,
+        threatened_published_operation=severity in (Severity.PRODUCTION_RISK,Severity.STOPPAGE),
+        active_production_stoppage=severity == Severity.STOPPAGE,
+        source_references=(references[0],),
+    )
     return open_exception(
         uuid4(),scenario(partial=partial),severity=severity,
         reason_code="SHORTAGE_OR_DELAY",creator_id=MAKER,
-        created_at=T,source_references=references,alternative=alt,
+        created_at=T,source_references=references,impact=impact,alternative=alt,
     )
 
 
@@ -287,3 +294,26 @@ def test_false_verified_impact_cannot_omit_required_facts():
             threatened_published_operation=None,active_production_stoppage=False,
             source_references=("PCP:PLAN-1",),
         )
+
+def test_exception_severity_cannot_be_spoofed_from_impact_evidence():
+    impact=ProductionRiskEvidence(
+        verified=EvidenceState.VERIFIED,known_material_shortage=True,
+        threatened_published_operation=False,active_production_stoppage=False,
+        source_references=("PCP:PLAN-1",),
+    )
+    with pytest.raises(PolicyError,match="severity conflicts"):
+        open_exception(uuid4(),scenario(),severity=Severity.STOPPAGE,
+            reason_code="FALSE-STOPPAGE",creator_id=MAKER,created_at=T,
+            source_references=("PCP:PLAN-1",),impact=impact)
+
+
+def test_exception_requires_verified_impact_not_partial_evidence():
+    impact=ProductionRiskEvidence(
+        verified=EvidenceState.PARTIAL,known_material_shortage=True,
+        threatened_published_operation=None,active_production_stoppage=None,
+        source_references=("PCP:PLAN-1",),
+    )
+    with pytest.raises(PolicyError,match="unverified production impact"):
+        open_exception(uuid4(),scenario(),severity=Severity.SHORTAGE,
+            reason_code="INCOMPLETE",creator_id=MAKER,created_at=T,
+            source_references=("PCP:PLAN-1",),impact=impact)
