@@ -1,7 +1,7 @@
 # G7 — Materials Planning & Procurement Intelligence
 
 **Initiation:** 2026-11-06 UTC.  
-**Status:** G7.1–G7.3 limited-scope technical acceptance recorded. G7.4 read-only P.P./safety-stock policy scenario engine TECHNICALLY ACCEPTED (code SHA `f7e216c07acba1798fc3d8cfb8a2fa42424c6a84`, CI `42209496111`, 267 passing tests). Historical consumption series, Quality availability, supplier lead-time completeness and time-phased position remain OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
+**Status:** G7.1–G7.4 limited-scope technical acceptance recorded. G7.5 FIXED/CALCULATED C.R. what-if scenarios TECHNICALLY ACCEPTED (code SHA `e17c975ea11270c4742826179492314ea8080cba`, CI `42333192319`, 297 passing tests). Real Quality and supplier terms, representative supplier history and time-phased stock planning remain OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
 **Branch:** `feat/G7-materials-planning`.  
 **Baseline:** Released G6 on `main`, PR #14 merged at `b52b3b9e748f4e4b846df16199510733338f2046`; code-release evidence in `docs/03-deliverables/G6-materials/G6-RELEASE-RECORD.md`.
 
@@ -71,3 +71,11 @@ Technical evidence: [G7.2-EVIDENCE.md](G7.2-EVIDENCE.md). `GET /api/v1/planning/
 CI run `42209496111` succeeded with **267 passing tests on code SHA `f7e216c07ac...`**; no backend purchase action, data migration or physical stock changes. **The G7.4 mathematical engine is not yet connected to automatically normalized historical FAIC demand nor exposed via a user-facing API/dashboard.** It must not be used as a real purchasing trigger pending G7.2 time-phased inventory, Quality and inbound/plant mapping.
 
 **Next gate: G7.5 — Replenishment Quantity & Scenario Planning.** Introduce explicit fixed/calculated `C.R.`, verified supplier MOQ and packaging constraints, scenario comparisons and human review. Keep G7 code on `feat/G7-materials-planning`; do not modify `main` or FAIC production without a separate release authorization.
+
+## G7.5 — Replenishment Quantity & Scenario Planning technical acceptance
+
+[Evidence and bounded-scope decision](G7.5-EVIDENCE.md). The new pure `mop.planning.replenishment` module calculates governed FIXED or CALCULATED C.R. based on a selected G7.4 daily rate, coverage horizon, Quality-unallocated inventory and separately **verified plant-specific inbound**. Supplier MOQ and pack multiples must have verified source identity. CALCULATED quantities are rounded up when needed and clearly labeled for human review; FIXED values are never silently rounded or rewritten. Missing Quality, incomplete supplier terms, unknown inbound, invalid plant/material/UoM or blocked PP policy prevent a numeric C.R.
+
+Multi-supplier what-if comparisons are stable and source-identified, with **no automatic supplier choice, price-based award, inventory change or purchase order**. CI run `42333192319` passed **297 tests on code SHA `e17c975...`** including prior gates and disposable PostgreSQL. G7.5 contains pure contracts and deterministic tests, not a new UI or a verified supplier-terms integration; data quality remains a prerequisite.
+
+**Next milestone: G7.6 — Exception Management / Governance.** Develop explicit human approval, issue severity and production-risk/alternate-supplier review with immutable audit records. The G7.2 full dated inventory/MRP projection remains OPEN before production procurement recommendations.
