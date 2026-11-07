@@ -8,7 +8,8 @@ import pytest
 
 from mop.planning.governance import (
     DecisionKind, ExceptionStatus, GovernanceEvent, GovernanceRole, Severity,
-    SourcingAlternative, open_exception, replay_governance,
+    SourcingAlternative, ProductionRiskEvidence, classify_severity,
+    open_exception, replay_governance,
 )
 from mop.planning.policy_contracts import (
     ConsumptionBasis, EvidenceState, PlanningFacts, PlanningPolicy, PolicyError,
@@ -252,3 +253,37 @@ def test_event_tuple_does_not_modify_original_case_or_supplier_state():
     assert p.case.alternative.supplier_code=="BACKUP"
     assert p.supplier_change_effect=="NONE"
     assert p.purchase_order_effect=="NONE"
+
+
+@pytest.mark.parametrize("shortage,risk,stoppage,expected",[
+    (False, False, False, Severity.WATCH),
+    (True, False, False, Severity.SHORTAGE),
+    (True, True, False, Severity.PRODUCTION_RISK),
+    (True, True, True, Severity.STOPPAGE),
+])
+def test_risk_severity_uses_verified_production_facts(shortage,risk,stoppage,expected):
+    evidence=ProductionRiskEvidence(
+        verified=EvidenceState.VERIFIED,known_material_shortage=shortage,
+        threatened_published_operation=risk,active_production_stoppage=stoppage,
+        source_references=("PCP:PLAN-1",),
+    )
+    assert classify_severity(evidence)==expected
+
+
+@pytest.mark.parametrize("state",[EvidenceState.PARTIAL,EvidenceState.UNKNOWN])
+def test_missing_impact_evidence_never_becomes_low_severity(state):
+    evidence=ProductionRiskEvidence(
+        verified=state,known_material_shortage=None,
+        threatened_published_operation=None,active_production_stoppage=None,
+        source_references=(),
+    )
+    assert classify_severity(evidence) is None
+
+
+def test_false_verified_impact_cannot_omit_required_facts():
+    with pytest.raises(PolicyError,match="complete factual"):
+        ProductionRiskEvidence(
+            verified=EvidenceState.VERIFIED,known_material_shortage=False,
+            threatened_published_operation=None,active_production_stoppage=False,
+            source_references=("PCP:PLAN-1",),
+        )
