@@ -109,6 +109,7 @@ class ExceptionCase:
     creator_id: UUID
     created_at: datetime
     source_references: tuple[str, ...]
+    impact: ProductionRiskEvidence
     alternative: SourcingAlternative | None = None
 
     def __post_init__(self):
@@ -171,8 +172,16 @@ def open_exception(
     creator_id: UUID,
     created_at: datetime,
     source_references: tuple[str, ...],
+    impact: ProductionRiskEvidence,
     alternative: SourcingAlternative | None = None,
 ) -> ExceptionCase:
+    observed = classify_severity(impact)
+    if observed is None:
+        raise PolicyError("unverified production impact cannot establish severity")
+    if severity != observed:
+        raise PolicyError("declared severity conflicts with verified production impact")
+    if not set(impact.source_references).issubset(source_references):
+        raise PolicyError("production impact references must be included in case provenance")
     if severity in (Severity.PRODUCTION_RISK, Severity.STOPPAGE) and not any(
         ref.startswith(("MES:", "G4:", "PRODUCTION:", "PCP:")) for ref in source_references
     ):
@@ -184,7 +193,7 @@ def open_exception(
         uom_id=scenario.uom_id, scenario_key=scenario.scenario_key,
         scenario_state=scenario.state, severity=severity, reason_code=reason_code,
         creator_id=creator_id, created_at=created_at,
-        source_references=source_references, alternative=alternative,
+        source_references=source_references, impact=impact, alternative=alternative,
     )
 
 
