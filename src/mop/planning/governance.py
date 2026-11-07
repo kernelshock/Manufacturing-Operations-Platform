@@ -230,8 +230,8 @@ def replay_governance(
             submitter_id = event.actor_id
             status = ExceptionStatus.UNDER_REVIEW
         elif event.kind == DecisionKind.ACKNOWLEDGE:
-            if status != ExceptionStatus.UNDER_REVIEW:
-                raise PolicyError("only submitted case can be acknowledged")
+            if status != ExceptionStatus.UNDER_REVIEW or reviewer_id is not None:
+                raise PolicyError("case can only be acknowledged once by an independent reviewer")
             if event.actor_id == submitter_id or event.actor_role not in (
                 GovernanceRole.PURCHASING, GovernanceRole.PRODUCTION_MANAGER,
                 GovernanceRole.QUALITY, GovernanceRole.DIRECTOR,
