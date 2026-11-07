@@ -317,3 +317,9 @@ def test_exception_requires_verified_impact_not_partial_evidence():
         open_exception(uuid4(),scenario(),severity=Severity.SHORTAGE,
             reason_code="INCOMPLETE",creator_id=MAKER,created_at=T,
             source_references=("PCP:PLAN-1",),impact=impact)
+
+def test_independent_acknowledgement_cannot_be_replaced_before_director_decision():
+    c=case()
+    with pytest.raises(PolicyError,match="only be acknowledged once"):
+        replay_governance(c,(submitted(c),acknowledged(c),
+            event(c,3,DecisionKind.ACKNOWLEDGE,OTHER,GovernanceRole.QUALITY)))
