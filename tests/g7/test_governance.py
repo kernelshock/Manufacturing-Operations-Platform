@@ -30,7 +30,7 @@ def scenario(*, partial=False):
     facts=PlanningFacts(
         plant_id=PLANT,article_id=ARTICLE,uom_id=UOM,
         physical_on_hand=Decimal("100"),active_holds=Decimal("20"),
-        quality_usable=Decimal("90"),
+        quality_usable=Decimal("85"),
         source_coverage=EvidenceState.PARTIAL if partial else EvidenceState.VERIFIED,
         supplier_lead_time=EvidenceState.VERIFIED,business_calendar_verified=True,
     )
