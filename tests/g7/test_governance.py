@@ -1,4 +1,5 @@
 """G7.6 synthetic governance cases — maker/checker and no ERP side effects."""
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
@@ -213,7 +214,7 @@ def test_approval_without_acknowledgement_is_rejected():
 def test_append_only_revision_identity_and_time_are_enforced(bad):
     c=case()
     with pytest.raises(PolicyError):
-        replay_governance(c,(event(c,1,DecisionKind.SUBMIT,MAKER,GovernanceRole.PLANNER,**bad),))
+        replay_governance(c,(replace(event(c,1,DecisionKind.SUBMIT,MAKER,GovernanceRole.PLANNER),**bad),))
 
 
 def test_repeated_submit_and_close_before_decision_fail():
