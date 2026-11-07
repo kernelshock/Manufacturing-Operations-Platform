@@ -56,13 +56,13 @@ jobs:
           test "$(python -m alembic heads | grep -c '(head)')" -eq 1
           python -m alembic upgrade head
           python -m alembic check
-      - name: Run G7.1–G7.4 and G0–G6 regression on disposable PostgreSQL
+      - name: Run G7.1–G7.5 and G0–G6 regression on disposable PostgreSQL
         run: python -m pytest tests/g0 tests/g1 tests/g2 tests/g3 tests/g4 tests/g5 tests/g6 tests/g7 -q
       - name: Verify security and source pins
         run: |
           ./infrastructure/scripts/repository-secret-scan.sh
           ./infrastructure/scripts/supply-chain-pin-check.sh
-      - name: Confirm G7.2–G7.4 remain read-only and have no migrations
+      - name: Confirm G7.2–G7.5 remain read-only and have no migrations
         run: |
           test -f src/mop/api/v1/planning.py
           test ! -e migrations/versions/0034_g7_planning.py
@@ -73,5 +73,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "G7.1–G7.4 policy, stock, supplier business days and reorder-point scenarios plus G0–G6 regression passed."
+          echo "G7.1–G7.5 policy, stock, supplier business days and PP/CR scenarios plus G0–G6 regression passed."
           echo "No G7 release, FAIC production deployment or automatic purchases authorized."
