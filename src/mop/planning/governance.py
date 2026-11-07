@@ -4,7 +4,7 @@ Event log is an immutable *in-memory projection contract* for approval workflows
 It is not yet an authoritative persisted audit ledger. Database-backed append-only
 workflow and IAM mappings are separate G7.6 production-readiness prerequisites.
 """
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal
@@ -43,6 +43,40 @@ class GovernanceRole(StrEnum):
     QUALITY = "QUALITY"
     PRODUCTION_MANAGER = "PRODUCTION_MANAGER"
     DIRECTOR = "DIRECTOR"
+
+
+@dataclass(frozen=True)
+class ProductionRiskEvidence:
+    """Explicit factual classification; no invented stoppage from an estimated PP."""
+    verified: EvidenceState
+    known_material_shortage: bool | None
+    threatened_published_operation: bool | None
+    active_production_stoppage: bool | None
+    source_references: tuple[str, ...]
+
+    def __post_init__(self):
+        if self.verified == EvidenceState.VERIFIED and (
+            self.known_material_shortage is None or
+            self.threatened_published_operation is None or
+            self.active_production_stoppage is None or
+            not self.source_references
+        ):
+            raise PolicyError("verified production impact requires complete factual evidence")
+        if any(not ref.strip() for ref in self.source_references):
+            raise PolicyError("production impact provenance cannot be blank")
+
+
+def classify_severity(evidence: ProductionRiskEvidence) -> Severity | None:
+    """UNKNOWN and PARTIAL never silently become low-risk or no-shortage."""
+    if evidence.verified != EvidenceState.VERIFIED:
+        return None
+    if evidence.active_production_stoppage:
+        return Severity.STOPPAGE
+    if evidence.threatened_published_operation:
+        return Severity.PRODUCTION_RISK
+    if evidence.known_material_shortage:
+        return Severity.SHORTAGE
+    return Severity.WATCH
 
 
 @dataclass(frozen=True)
