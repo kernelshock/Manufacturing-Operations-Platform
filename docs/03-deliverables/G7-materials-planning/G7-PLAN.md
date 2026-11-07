@@ -1,7 +1,7 @@
 # G7 — Materials Planning & Procurement Intelligence
 
 **Initiation:** 2026-11-06 UTC.  
-**Status:** G7.1–G7.4 limited-scope technical acceptance recorded. G7.5 FIXED/CALCULATED C.R. what-if scenarios TECHNICALLY ACCEPTED (code SHA `e17c975ea11270c4742826179492314ea8080cba`, CI `42333192319`, 297 passing tests). Real Quality and supplier terms, representative supplier history and time-phased stock planning remain OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
+**Status:** G7.1–G7.5 limited-scope technical acceptance recorded. G7.6 deterministic exception and governance contracts TECHNICALLY ACCEPTED (code SHA `5e34c72acbddd7fc34a87fab68c1c9c6b3d3504f`, CI `42333877696`, 327 passing tests). **Full G7.6 operational closure remains OPEN** for durable PostgreSQL events, authenticated IAM/API and actual workflow. Real Quality, supplier evidence and time-phased stock planning remain OPEN. G7 overall IN DEVELOPMENT; no purchasing or production deployment.  
 **Branch:** `feat/G7-materials-planning`.  
 **Baseline:** Released G6 on `main`, PR #14 merged at `b52b3b9e748f4e4b846df16199510733338f2046`; code-release evidence in `docs/03-deliverables/G6-materials/G6-RELEASE-RECORD.md`.
 
@@ -79,3 +79,11 @@ CI run `42209496111` succeeded with **267 passing tests on code SHA `f7e216c07ac
 Multi-supplier what-if comparisons are stable and source-identified, with **no automatic supplier choice, price-based award, inventory change or purchase order**. CI run `42333192319` passed **297 tests on code SHA `e17c975...`** including prior gates and disposable PostgreSQL. G7.5 contains pure contracts and deterministic tests, not a new UI or a verified supplier-terms integration; data quality remains a prerequisite.
 
 **Next milestone: G7.6 — Exception Management / Governance.** Develop explicit human approval, issue severity and production-risk/alternate-supplier review with immutable audit records. The G7.2 full dated inventory/MRP projection remains OPEN before production procurement recommendations.
+
+## G7.6 — Governance contracts passed; durable workflow remains open
+
+[Contract acceptance and residual blockers](G7.6-EVIDENCE.md). Frozen exception cases, severity based on verified shortage/production risk, independent maker/reviewer/Direction decisions, alternative supplier qualification and append-sequenced decision-event replay were tested successfully. The completed CI run `42333877696` reports **327 passing tests**, on code SHA `5e34c72...` including existing PostgreSQL G0–G7 regressions.
+
+**Critical distinction:** the G7.6 approval engine currently runs as a pure contract; its actor role is not yet mapped to authoritative IAM, and case/event history is not persisted in PostgreSQL. Do not claim an operational audit trail, multiuser approval or real supplier authorization exists yet. G7.6 still needs a separately validated persistent transactional service, role-gated API, read-side restrictions and reviewer UX.
+
+**Next controlled movement:** G7.6 durable governance completion, then G7.7 — Dashboard, Reporting & Integration. G7.2 time-phased inventory and real Quality/supplier trust requirements also remain open before any purchasing rollout. No G7 merge or FAIC production deployment authorized.
