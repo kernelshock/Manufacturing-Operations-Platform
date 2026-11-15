@@ -14,9 +14,12 @@ from sqlalchemy.exc import DBAPIError
 
 from mop.application import create_app
 from mop.audit.models import AuditEntry
+from mop.core.models import Plant
 from mop.iam.models import User
-from mop.iam.schemas import UserCreate
+from mop.iam.schemas import RoleAssignmentCreate, RoleCreate, UserCreate
 from mop.iam.service import IdentityService
+from mop.materials.models import MaterialMovement
+from mop.config import Settings
 from mop.planning.governance import (
     DecisionKind, ExceptionCase, ExceptionStatus, GovernanceRole, ProductionRiskEvidence, Severity,
 )
@@ -39,7 +42,7 @@ def governance_case():
     try:
         with TestClient(create_app(settings, database=db)) as client:
             fixtures.auth(client, username)
-            data, _, uom, _ = fixtures.prepared(client, db, suffix, plant_id, initial=None)
+            data, _, uom, _ = fixtures.prepared(client, db, suffix, plant_id, initial="20")
         with db.session() as session:
             identity = IdentityService(session)
             reviewer, director, other = (
@@ -133,3 +136,91 @@ def test_concurrent_direction_decisions_append_only_once(governance_case):
         assert session.scalar(select(func.count()).select_from(AuditEntry).where(
             AuditEntry.object_id == str(case.case_id),
         )) == 3
+
+
+def test_governance_http_enforces_plant_scope_and_resolves_ledger_evidence(governance_case):
+    db, case, reviewer, director, outsider = governance_case
+    password = "G65-Tests-Only-Do-Not-Reuse-2026!"
+    settings = Settings(environment="test", _env_file=None)
+    root = "/api/v1/planning/governance/cases"
+    case_url = f"{root}/{case.case_id}"
+
+    with db.session() as session:
+        submit(session, case)
+        session.commit()
+        iam = IdentityService(session)
+        same_organization = session.get(Plant, case.plant_id).organization_id
+        other_plant = Plant(
+            organization_id=same_organization, code=f"G76-{uuid4().hex[:12]}",
+            name="G76 unrelated plant",
+        )
+        session.add(other_plant)
+        session.commit()
+        role_suffix = uuid4().hex[:10]
+        roles = (
+            (reviewer, case.plant_id, "quality"),
+            (director, case.plant_id, "direction"),
+            (outsider, other_plant.id, "quality"),
+        )
+        usernames = {}
+        for user_id, plant_id, capability in roles:
+            role = iam.create_role(RoleCreate(
+                code=f"G76-{capability}-{user_id.hex[:8]}-{role_suffix}",
+                name="G76 scoped governance",
+            ))
+            iam.grant_permission(role.id, "planning.governance.read")
+            iam.grant_permission(role.id, f"planning.governance.{capability}")
+            iam.assign_role(user_id, RoleAssignmentCreate(
+                role_id=role.id, scope_type="plant", scope_id=plant_id,
+            ))
+            usernames[user_id] = session.get(User, user_id).username
+        movement_id = session.scalar(select(MaterialMovement.id).where(
+            MaterialMovement.article_id == case.article_id,
+        ))
+        assert movement_id is not None
+
+    with TestClient(create_app(settings, database=db)) as client:
+        def login(user_id):
+            assert client.post("/api/v1/auth/login", json={
+                "username": usernames[user_id], "password": password,
+            }).status_code == 200
+
+        assert client.get(case_url).status_code == 401
+        login(outsider)
+        assert client.get(case_url).status_code == 404
+        assert client.get(root, params={"plant_id": str(case.plant_id)}).status_code == 403
+        login(reviewer)
+        assert client.get(root, params={"plant_id": str(case.plant_id)}).json() == [str(case.case_id)]
+        detail = client.get(case_url)
+        assert detail.status_code == 200
+        assert detail.headers["Cache-Control"] == "no-store"
+        transition = f"{case_url}/transitions"
+        command = {
+            "action": "ACKNOWLEDGE", "reason": "Checked ledger", "expected_revision": 1,
+            "idempotency_key": "http-review", "movement_ids": [str(uuid4())],
+        }
+        assert client.post(transition, json=command).status_code == 422
+        command["movement_ids"] = [str(movement_id)]
+        assert client.post(transition, json={**command, "actor_role": "DIRECTOR"}).status_code == 422
+        reviewed = client.post(transition, json=command)
+        assert reviewed.status_code == 200, reviewed.text
+        event = reviewed.json()["event_log"][-1]
+        assert event["actor_role"] == "QUALITY"
+        assert event["evidence_refs"] == [f"G6:MOVEMENT:{movement_id}"]
+        assert client.post(transition, json=command).json()["revision"] == 2
+        rejected = {
+            "action": "REJECT", "reason": "Do not proceed", "expected_revision": 2,
+            "idempotency_key": "http-reject",
+        }
+        assert client.post(transition, json=rejected).status_code == 403
+        login(director)
+        assert client.post(transition, json={**rejected, "action": "APPROVE"}).status_code == 422
+        response = client.post(transition, json=rejected)
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "REJECTED"
+        closed = client.post(transition, json={
+            "action": "CLOSE", "reason": "Review complete", "expected_revision": 3,
+            "idempotency_key": "http-close",
+        })
+        assert closed.status_code == 200, closed.text
+        assert closed.json()["status"] == "CLOSED"
