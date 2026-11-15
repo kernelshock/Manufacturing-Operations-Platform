@@ -62,11 +62,11 @@ jobs:
         run: |
           ./infrastructure/scripts/repository-secret-scan.sh
           ./infrastructure/scripts/supply-chain-pin-check.sh
-      - name: Confirm G7.2–G7.6 contracts have no new persistence or migrations
+      - name: Verify governance migration round trip
         run: |
-          test -f src/mop/api/v1/planning.py
-          test ! -e migrations/versions/0034_g7_planning.py
-          python -m compileall -q src/mop/planning src/mop/api/v1/planning.py tests/g7
+          python -m alembic downgrade 0033_g6_6
+          python -m alembic upgrade head
+          python -m alembic check
 
   g7-gate:
     needs: [g7-policy-contracts]
