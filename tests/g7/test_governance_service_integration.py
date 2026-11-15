@@ -224,3 +224,58 @@ def test_governance_http_enforces_plant_scope_and_resolves_ledger_evidence(gover
         })
         assert closed.status_code == 200, closed.text
         assert closed.json()["status"] == "CLOSED"
+
+
+def test_submit_stoppage_requires_source_and_replays_after_source_changes(governance_case, monkeypatch):
+    from types import SimpleNamespace
+    from mop.api.v1 import planning_governance
+
+    db, case, _, _, _ = governance_case
+    settings = Settings(environment="test", _env_file=None)
+    root = "/api/v1/planning/governance/cases"
+    with db.session() as session:
+        iam = IdentityService(session)
+        role = iam.create_role(RoleCreate(code=f"G76-OPEN-{uuid4().hex}", name="Scoped intake"))
+        iam.grant_permission(role.id, "planning.governance.read")
+        iam.assign_role(case.creator_id, RoleAssignmentCreate(
+            role_id=role.id, scope_type="plant", scope_id=case.plant_id,
+        ))
+        username = session.get(User, case.creator_id).username
+        role_id = role.id
+
+    command = {
+        "plant_id": str(case.plant_id), "article_id": str(case.article_id),
+        "location_id": str(uuid4()), "interruption_id": str(uuid4()),
+        "idempotency_key": "stoppage-intake",
+    }
+    with TestClient(create_app(settings, database=db)) as client:
+        assert client.post(root, json=command).status_code == 401
+        assert client.post("/api/v1/auth/login", json={
+            "username": username, "password": "G65-Tests-Only-Do-Not-Reuse-2026!",
+        }).status_code == 200
+        assert client.post(root, json=command).status_code == 403
+        with db.session() as session:
+            IdentityService(session).grant_permission(role_id, "planning.governance.planner")
+
+        missing = client.post(root, json=command)
+        assert missing.status_code == 422
+        assert "no active MES interruption" in missing.json()["detail"]
+
+        original_resolver = planning_governance.resolve_material_stoppage
+        monkeypatch.setattr(
+            planning_governance, "resolve_material_stoppage",
+            lambda *args, **kwargs: SimpleNamespace(taquilla_id=uuid4(), uom_id=case.uom_id),
+        )
+        opened = client.post(root, json=command)
+        assert opened.status_code == 201, opened.text
+        body = opened.json()
+        assert body["case"]["severity"] == "STOPPAGE"
+        assert body["case"]["scenario_state"] == "BLOCKED"
+        assert body["status"] == "UNDER_REVIEW"
+        assert body["revision"] == 1
+
+        monkeypatch.setattr(planning_governance, "resolve_material_stoppage", original_resolver)
+        repeated = client.post(root, json=command)
+        assert repeated.status_code == 201, repeated.text
+        assert repeated.json() == body
+        assert client.post(root, json={**command, "location_id": str(uuid4())}).status_code == 409
