@@ -3,7 +3,7 @@
 import importlib.util
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -279,3 +279,95 @@ def test_submit_stoppage_requires_source_and_replays_after_source_changes(govern
         assert repeated.status_code == 201, repeated.text
         assert repeated.json() == body
         assert client.post(root, json={**command, "location_id": str(uuid4())}).status_code == 409
+
+
+def test_open_stoppage_from_persisted_mes_and_g6():
+    from mop.aps.service import APSService
+    from mop.mes.schemas import ExecutionDispatchCreate, ExecutionStartCreate, InterruptionStartCreate
+    from mop.mes.service import MESService
+
+    tests = Path(__file__).resolve().parents[1]
+
+    def load_fixture(group, name):
+        spec = importlib.util.spec_from_file_location(f"g76_{name}", tests / group / f"{name}.py")
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    dispatch_fixture = load_fixture("g5", "test_dispatch_integration")
+    reservations = load_fixture("g6", "test_reservations_integration")
+    materials = reservations.fixture_module()
+    settings, db, suffix, username, _, actor_id = reservations.setup()
+    try:
+        with db.session() as session:
+            (_, _, _, _, _, _, _, run, start_at, _, plant,
+             article_revision) = dispatch_fixture.seed_dispatch_schedule(session, suffix)
+            plant_id, revision_id = plant.id, article_revision.id
+            publication, _, _ = APSService(session).publish_schedule(run.id, "G7.6 test schedule", actor_id)
+            mes = MESService(session)
+            dispatch, _, _ = mes.create_dispatch(ExecutionDispatchCreate(
+                publication_id=publication.id, dispatch_code=f"G76-{suffix}",
+            ), actor_id)
+            mes.release_dispatch(dispatch.id)
+            operation = list(mes.list_operations(dispatch.id))[0]
+            operation_id = operation.id
+            mes.start_operation(operation_id, ExecutionStartCreate(occurred_at=start_at), actor_id)
+
+            identity = IdentityService(session)
+            role = identity.create_role(RoleCreate(code=f"G76-REAL-{suffix}", name="Scoped planning"))
+            identity.grant_permission(role.id, "planning.governance.read")
+            identity.grant_permission(role.id, "planning.governance.planner")
+            identity.assign_role(actor_id, RoleAssignmentCreate(
+                role_id=role.id, scope_type="plant", scope_id=plant_id,
+            ))
+
+        with TestClient(create_app(settings, database=db)) as client:
+            reservations.auth(client, username)
+            uom = materials.write(client, "/api/v1/master-data/uoms", {
+                "code": f"G76-UN-{suffix}", "dimension": "COUNT", "canonical": True,
+            })["id"]
+            material = materials.new_article(client, suffix, "G76-STEEL", "PURCHASED", uom)
+            materials.bom(client, str(revision_id), datetime.now(timezone.utc) - timedelta(days=1), [
+                (material, "2", uom, None, None),
+            ])
+            warehouse = reservations.post(client, "/api/v1/materials/warehouses", {
+                "plant_id": str(plant_id), "code": "CENTRAL", "name": "Central",
+            })
+            location = reservations.post(client, "/api/v1/materials/locations", {
+                "warehouse_id": warehouse["id"], "code": "A1", "name": "Rack A1",
+            })
+            with db.session() as session:
+                _, interruption, _ = MESService(session).pause_operation(
+                    operation_id, InterruptionStartCreate(
+                        reason_code=f"MATERIAL_SHORTAGE:{material}",
+                        occurred_at=start_at + timedelta(minutes=20),
+                    ), actor_id,
+                )
+                interruption_id = str(interruption.id)
+
+            root = "/api/v1/planning/governance/cases"
+            command = {
+                "plant_id": str(plant_id), "article_id": material,
+                "location_id": location["id"], "interruption_id": interruption_id,
+                "idempotency_key": f"G76-REAL-{suffix}",
+            }
+            unknown = client.post(root, json=command)
+            assert unknown.status_code == 422, unknown.text
+            assert "does not corroborate a known shortage" in unknown.json()["detail"]
+
+            reservations.post(client, "/api/v1/materials/movements", {
+                "article_id": material, "location_id": location["id"], "uom_id": uom,
+                "kind": "OPENING_ZERO", "quantity": "0", "source_system": "G76_TEST",
+                "source_reference": "INITIAL", "idempotency_key": f"G76-ZERO-{suffix}",
+            })
+            response = client.post(root, json=command)
+            assert response.status_code == 201, response.text
+            result = response.json()
+            assert result["status"] == "UNDER_REVIEW"
+            assert result["case"]["severity"] == "STOPPAGE"
+            assert result["case"]["scenario_state"] == "BLOCKED"
+            assert f"MES:INTERRUPTION:{interruption_id}" in result["case"]["source_references"]
+            assert client.post(root, json=command).json() == result
+    finally:
+        db.dispose()
