@@ -56,17 +56,17 @@ jobs:
           test "$(python -m alembic heads | grep -c '(head)')" -eq 1
           python -m alembic upgrade head
           python -m alembic check
+      - name: Verify governance migration round trip
+        run: |
+          python -m alembic downgrade 0033_g6_6
+          python -m alembic upgrade head
+          python -m alembic check
       - name: Run G7.1–G7.6 and G0–G6 regression on disposable PostgreSQL
         run: python -m pytest tests/g0 tests/g1 tests/g2 tests/g3 tests/g4 tests/g5 tests/g6 tests/g7 -q
       - name: Verify security and source pins
         run: |
           ./infrastructure/scripts/repository-secret-scan.sh
           ./infrastructure/scripts/supply-chain-pin-check.sh
-      - name: Verify governance migration round trip
-        run: |
-          python -m alembic downgrade 0033_g6_6
-          python -m alembic upgrade head
-          python -m alembic check
 
   g7-gate:
     needs: [g7-policy-contracts]

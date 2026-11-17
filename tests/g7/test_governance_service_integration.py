@@ -437,3 +437,67 @@ def test_receipt_lot_persists_with_g6_and_protects_quarantine(governance_case):
         assert (balances.available, balances.quarantine) == (1, 6)
         assert stock.balance(case.article_id, location.id).on_hand == balances.physical == 7
         session.rollback()
+
+
+def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
+    from decimal import Decimal
+    from mop.materials.models import MaterialLocation
+
+    db, case, _, _, outsider = governance_case
+    settings = Settings(environment="test", _env_file=None)
+    root = "/api/v1/materials/receipt-lots"
+    with db.session() as session:
+        stock_location = session.scalar(select(MaterialMovement.location_id).where(
+            MaterialMovement.article_id == case.article_id,
+        ))
+        location = MaterialLocation(
+            warehouse_id=session.get(MaterialLocation, stock_location).warehouse_id,
+            code=f"G76-HTTP-{uuid4().hex[:10]}", name="Receipt API quarantine",
+        )
+        session.add(location)
+        session.commit()
+        iam = IdentityService(session)
+        role = iam.create_role(RoleCreate(code=f"G76-REC-{uuid4().hex}", name="Plant receiving"))
+        for code in ("materials.receipt.receive", "materials.receipt.read"):
+            iam.grant_permission(role.id, code)
+        iam.assign_role(case.creator_id, RoleAssignmentCreate(
+            role_id=role.id, scope_type="plant", scope_id=case.plant_id,
+        ))
+        receiver = session.get(User, case.creator_id).username
+        outsider_username = session.get(User, outsider).username
+        location_id = location.id
+
+    command = {
+        "receipt_line_ref": f"G76-RECEIPT-{uuid4()}", "lot_ref": "BATCH-1",
+        "article_id": str(case.article_id), "location_id": str(location_id),
+        "uom_id": str(case.uom_id), "quantity": "10",
+    }
+    with TestClient(create_app(settings, database=db)) as client:
+        def login(username):
+            response = client.post("/api/v1/auth/login", json={
+                "username": username, "password": "G65-Tests-Only-Do-Not-Reuse-2026!",
+            })
+            assert response.status_code == 200, response.text
+
+        assert client.post(root, json=command).status_code == 401
+        login(outsider_username)
+        assert client.post(root, json=command).status_code == 404
+        login(receiver)
+        assert client.post(root, json={**command, "quantity": 1.5}).status_code == 422
+        received = client.post(root, json=command)
+        assert received.status_code == 201, received.text
+        lot = received.json()
+        assert Decimal(lot["physical"]) == Decimal(lot["quarantine"]) == 10
+        assert Decimal(lot["available"]) == 0
+        assert client.post(root, json=command).json() == lot
+        assert client.post(root, json={**command, "quantity": "11"}).status_code == 409
+        url = f"{root}/{lot['id']}"
+        assert client.get(url).json() == lot
+        login(outsider_username)
+        assert client.get(url).status_code == 404
+
+    with db.session() as session:
+        assert session.scalar(select(func.count(MaterialMovement.id)).where(
+            MaterialMovement.article_id == case.article_id,
+            MaterialMovement.location_id == location_id,
+        )) == 1
