@@ -441,6 +441,8 @@ def test_receipt_lot_persists_with_g6_and_protects_quarantine(governance_case):
 
 def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
     from decimal import Decimal
+    from mop.master_data.models import Supplier
+    from mop.prolowin.procurement_models import ProcurementCapture, ProcurementEvidenceEvent
     from mop.materials.models import MaterialLocation
 
     db, case, _, _, outsider = governance_case
@@ -466,6 +468,25 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
         receiver = session.get(User, case.creator_id).username
         outsider_username = session.get(User, outsider).username
         location_id = location.id
+        supplier = Supplier(code=f"G76-SUP-{uuid4().hex}", legal_name="Synthetic supplier")
+        capture = ProcurementCapture(
+            source_type="MANUAL", source_reference="Synthetic order", captured_by=case.creator_id,
+        )
+        session.add_all((supplier, capture))
+        session.flush()
+        order = ProcurementEvidenceEvent(
+            capture_id=capture.id, source_event_key=f"G76-{uuid4()}",
+            kind="ORDER", po_number=f"G76-{uuid4()}", line_number=1,
+            supplier_code=supplier.code, article_code="SYNTH", uom_code="SYNTH",
+            quantity=Decimal("10"), event_date=datetime.now(timezone.utc),
+            source_reference="Synthetic verified order", mapped_supplier_id=supplier.id,
+            mapped_article_id=case.article_id, mapped_uom_id=case.uom_id,
+            review_status="VERIFIED", entered_by=case.creator_id,
+            reviewed_by=outsider, reviewed_at=datetime.now(timezone.utc),
+        )
+        session.add(order)
+        session.commit()
+        evidence_id = str(order.id)
 
     command = {
         "receipt_line_ref": f"G76-RECEIPT-{uuid4()}", "lot_ref": "BATCH-1",
@@ -493,6 +514,23 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
         assert client.post(root, json={**command, "quantity": "11"}).status_code == 409
         url = f"{root}/{lot['id']}"
         assert client.get(url).json() == lot
+        assert client.post(root, json={
+            **command, "receipt_line_ref": f"G76-{uuid4()}",
+            "purchase_order_evidence_id": str(uuid4()),
+        }).status_code == 422
+        for quantity in ("4", "6"):
+            linked_command = {
+                **command, "receipt_line_ref": f"G76-{uuid4()}",
+                "purchase_order_evidence_id": evidence_id, "quantity": quantity,
+            }
+            linked = client.post(root, json=linked_command)
+            assert linked.status_code == 201, linked.text
+            assert linked.json()["purchase_order_evidence_id"] == evidence_id
+            assert client.post(root, json=linked_command).json() == linked.json()
+        assert client.post(root, json={
+            **command, "receipt_line_ref": f"G76-{uuid4()}",
+            "purchase_order_evidence_id": evidence_id, "quantity": "1",
+        }).status_code == 409
         login(outsider_username)
         assert client.get(url).status_code == 404
 
@@ -500,4 +538,4 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
         assert session.scalar(select(func.count(MaterialMovement.id)).where(
             MaterialMovement.article_id == case.article_id,
             MaterialMovement.location_id == location_id,
-        )) == 1
+        )) == 3

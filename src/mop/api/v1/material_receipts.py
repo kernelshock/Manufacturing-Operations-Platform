@@ -34,6 +34,7 @@ class ReceiptLotCreate(BaseModel):
     article_id: UUID
     location_id: UUID
     uom_id: UUID
+    purchase_order_evidence_id: UUID | None = None
     quantity: Decimal = Field(gt=0, max_digits=24, decimal_places=8)
 
     @field_validator("quantity", mode="before")
@@ -52,6 +53,7 @@ class ReceiptLotRead(BaseModel):
     article_id: UUID
     location_id: UUID
     uom_id: UUID
+    purchase_order_evidence_id: UUID | None
     received_quantity: Decimal
     physical: Decimal
     quarantine: Decimal
@@ -76,7 +78,8 @@ def _read(service: ReceiptService, lot: MaterialReceiptLot, plant_id: UUID) -> R
     return ReceiptLotRead(
         id=lot.id, plant_id=plant_id, receipt_line_ref=lot.receipt_line_ref,
         lot_ref=lot.lot_ref, article_id=lot.article_id, location_id=lot.location_id,
-        uom_id=lot.uom_id, received_quantity=lot.quantity, physical=balances.physical,
+        uom_id=lot.uom_id, purchase_order_evidence_id=lot.purchase_order_evidence_id,
+        received_quantity=lot.quantity, physical=balances.physical,
         quarantine=balances.quarantine, available=balances.available,
         nonconforming=balances.nonconforming,
     )
@@ -89,6 +92,10 @@ def receive_lot(command: ReceiptLotCreate, session: SessionDependency, actor: Cu
         actor.id, "materials.receipt.receive", "plant", plant_id,
     ):
         raise HTTPException(status_code=404, detail="receipt location not found")
+    if command.purchase_order_evidence_id is not None and not AuthorizationService(session).allowed(
+        actor.id, "prolowin.procurement.read",
+    ):
+        raise HTTPException(status_code=403, detail="purchase evidence permission required")
     service = ReceiptService(session)
     try:
         lot = checked(lambda: service.receive(

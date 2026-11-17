@@ -16,6 +16,7 @@ class MaterialReceiptLot(Base):
         UniqueConstraint("receipt_line_ref", "lot_ref", name="uq_mat_receipt_lot_reference"),
         Index("ix_mat_receipt_lot_stock", "article_id", "location_id"),
         CheckConstraint("quantity > 0", name="ck_mat_receipt_lot_quantity"),
+        Index("ix_mat_receipt_lot_purchase_evidence", "purchase_order_evidence_id"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -25,6 +26,9 @@ class MaterialReceiptLot(Base):
     location_id: Mapped[UUID] = mapped_column(ForeignKey("mat_location.id", ondelete="RESTRICT"))
     uom_id: Mapped[UUID] = mapped_column(ForeignKey("md_uom.id", ondelete="RESTRICT"))
     quantity: Mapped[Decimal] = mapped_column(Numeric(24, 8))
+    purchase_order_evidence_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("int_proc_evidence_event.id", ondelete="RESTRICT"),
+    )
     movement_id: Mapped[UUID] = mapped_column(ForeignKey("mat_movement.id", ondelete="RESTRICT"), unique=True)
 
 

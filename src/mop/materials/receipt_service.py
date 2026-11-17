@@ -8,13 +8,14 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from mop.materials.models import MaterialMovement
 from mop.materials.quantity import decimal_quantity
 from mop.materials.receipt_disposition import LotAction, LotBucket, ReceiptBalances, apply_lot_decision
 from mop.materials.receipt_models import MaterialReceiptDecision, MaterialReceiptLot
+from mop.prolowin.procurement_models import ProcurementEvidenceEvent
 from mop.materials.service import RECEIPT_LEDGER_SOURCE, MaterialsConflict, MaterialsNotFound, MaterialsRule, MaterialsService
 
 
@@ -26,6 +27,7 @@ class ReceiptService:
     def receive(
         self, *, receipt_line_ref: str, lot_ref: str, article_id: UUID, location_id: UUID,
         uom_id: UUID, quantity: Decimal, actor_id: UUID, username: str,
+        purchase_order_evidence_id: UUID | None = None,
     ) -> MaterialReceiptLot:
         line = self._reference(receipt_line_ref)
         lot_ref = self._reference(lot_ref)
@@ -37,8 +39,9 @@ class ReceiptService:
                 MaterialReceiptLot.receipt_line_ref == line, MaterialReceiptLot.lot_ref == lot_ref,
             ))
             if lot is not None:
-                if (lot.article_id, lot.location_id, lot.uom_id, lot.quantity) != (
-                    article_id, location_id, uom_id, amount,
+                if (lot.article_id, lot.location_id, lot.uom_id, lot.quantity,
+                    lot.purchase_order_evidence_id) != (
+                    article_id, location_id, uom_id, amount, purchase_order_evidence_id,
                 ):
                     raise MaterialsConflict("receipt identity already has different evidence")
                 return lot
@@ -47,6 +50,9 @@ class ReceiptService:
             if not self.stock.is_lot_managed(article_id, location_id) and balance.initialized:
                 raise MaterialsRule("new lot tracking requires a material/location without legacy movements")
 
+            if purchase_order_evidence_id is not None:
+                self._verify_order(purchase_order_evidence_id, article_id, uom_id, amount)
+
             lot_id = uuid4()
             movement = self._post_movement(
                 lot_id, article_id, location_id, uom_id, "RECEIPT", amount, actor_id, username,
@@ -54,11 +60,39 @@ class ReceiptService:
             lot = MaterialReceiptLot(
                 id=lot_id, receipt_line_ref=line, lot_ref=lot_ref, article_id=article_id,
                 location_id=location_id, uom_id=uom_id, quantity=amount, movement_id=movement.id,
+                purchase_order_evidence_id=purchase_order_evidence_id,
             )
             self.session.add(lot)
             self.stock._audit(actor_id, username, "materials.receipt.receive", lot)
             self.session.flush()
             return lot
+
+    def _verify_order(self, evidence_id: UUID, article_id: UUID, uom_id: UUID, amount: Decimal) -> None:
+        order = self.session.get(ProcurementEvidenceEvent, evidence_id)
+        if (
+            order is None or order.kind != "ORDER" or order.review_status != "VERIFIED"
+            or order.mapped_supplier_id is None or order.mapped_article_id != article_id
+            or order.mapped_uom_id != uom_id or order.quantity is None
+        ):
+            raise MaterialsRule("verified order evidence must match supplier, article and unit")
+
+        self.stock._advisory_lock(f"receipt-order:{order.po_number}:{order.line_number}")
+        verified_orders = self.session.scalar(select(func.count()).select_from(
+            ProcurementEvidenceEvent,
+        ).where(
+            ProcurementEvidenceEvent.po_number == order.po_number,
+            ProcurementEvidenceEvent.line_number == order.line_number,
+            ProcurementEvidenceEvent.kind == "ORDER",
+            ProcurementEvidenceEvent.review_status == "VERIFIED",
+        ))
+        if verified_orders != 1:
+            raise MaterialsConflict("purchase line has ambiguous verified order evidence")
+
+        received = self.session.scalar(select(func.coalesce(func.sum(MaterialReceiptLot.quantity), 0)).where(
+            MaterialReceiptLot.purchase_order_evidence_id == evidence_id,
+        ))
+        if received + amount > order.quantity:
+            raise MaterialsConflict("linked receipts exceed ordered quantity")
 
     def decide(
         self, lot_id: UUID, *, action: LotAction, source: LotBucket, quantity: Decimal,
