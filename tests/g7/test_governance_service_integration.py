@@ -371,3 +371,69 @@ def test_open_stoppage_from_persisted_mes_and_g6():
             assert client.post(root, json=command).json() == result
     finally:
         db.dispose()
+
+
+def test_receipt_lot_persists_with_g6_and_protects_quarantine(governance_case):
+    from decimal import Decimal
+
+    from mop.materials.models import MaterialLocation
+    from mop.materials.receipt_disposition import LotAction, LotBucket, ReceiptDispositionError
+    from mop.materials.receipt_service import ReceiptService
+    from mop.materials.reservation_service import ReservationService
+    from mop.materials.schemas import MovementCreate
+    from mop.materials.service import MaterialsRule, MaterialsService
+
+    db, case, _, _, _ = governance_case
+    with db.session() as session:
+        location_id = session.scalar(select(MaterialMovement.location_id).where(
+            MaterialMovement.article_id == case.article_id,
+        ))
+        warehouse_id = session.get(MaterialLocation, location_id).warehouse_id
+        location = MaterialLocation(
+            warehouse_id=warehouse_id, code=f"G76-{uuid4().hex[:10]}", name="Lot-managed stock",
+        )
+        session.add(location)
+        session.flush()
+        actor = session.get(User, case.creator_id)
+        actor_fields = {"actor_id": actor.id, "username": actor.username}
+        stock_fields = {"article_id": case.article_id, "location_id": location.id, "uom_id": case.uom_id}
+        receipt = ReceiptService(session)
+        inbound = dict(
+            receipt_line_ref=f"RECEIPT-{uuid4()}", lot_ref="BATCH-1", quantity=Decimal("10"),
+            **stock_fields, **actor_fields,
+        )
+        lot = receipt.receive(**inbound)
+        assert receipt.receive(**inbound).id == lot.id
+        stock = MaterialsService(session)
+        assert stock.balance(case.article_id, location.id).on_hand == Decimal("10")
+        availability = ReservationService(session).availability(case.article_id, location.id)
+        assert availability.unallocated_on_hand is None
+        assert receipt.balances(lot.id).available == 0
+        with pytest.raises(ReceiptDispositionError):
+            receipt.decide(
+                lot.id, action=LotAction.ISSUE, source=LotBucket.QUARANTINE,
+                quantity=Decimal("1"), decision_ref="PREMATURE-ISSUE", expected_revision=0,
+                **actor_fields,
+            )
+        with pytest.raises(MaterialsRule, match="lot-managed"):
+            stock.post(MovementCreate(
+                **stock_fields, kind="ISSUE", quantity="1", source_system="G76_TEST",
+                source_reference=str(lot.id), idempotency_key=str(lot.id),
+            ), **actor_fields)
+
+        release = dict(
+            action=LotAction.RELEASE, source=LotBucket.QUARANTINE, quantity=Decimal("4"),
+            decision_ref="RELEASE-1", expected_revision=0, verified_release_quantity=Decimal("4"),
+            **actor_fields,
+        )
+        decision = receipt.decide(lot.id, **release)
+        assert receipt.decide(lot.id, **release).id == decision.id
+        assert stock.balance(case.article_id, location.id).on_hand == Decimal("10")
+        receipt.decide(
+            lot.id, action=LotAction.ISSUE, source=LotBucket.AVAILABLE, quantity=Decimal("3"),
+            decision_ref="ISSUE-1", expected_revision=1, **actor_fields,
+        )
+        balances = receipt.balances(lot.id)
+        assert (balances.available, balances.quarantine) == (1, 6)
+        assert stock.balance(case.article_id, location.id).on_hand == balances.physical == 7
+        session.rollback()
