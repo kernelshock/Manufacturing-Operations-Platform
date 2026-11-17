@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_serializer, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -57,6 +57,10 @@ class ReceiptLotRead(BaseModel):
     quarantine: Decimal
     available: Decimal
     nonconforming: Decimal
+
+    @field_serializer("received_quantity", "physical", "quarantine", "available", "nonconforming", when_used="json")
+    def serialize_quantity(self, quantity: Decimal) -> str:
+        return format(quantity, ".8f")
 
 
 def _location_plant(session: Session, location_id: UUID) -> UUID | None:
