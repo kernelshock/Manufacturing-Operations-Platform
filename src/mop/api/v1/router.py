@@ -15,6 +15,7 @@ from mop.api.v1.auth import router as auth_router
 from mop.api.v1.iam import router as iam_router
 from mop.api.v1.master_data import router as master_data_router
 from mop.api.v1.materials import router as materials_router
+from mop.api.v1.material_release import router as material_release_router
 from mop.api.v1.material_receipts import router as material_receipts_router
 from mop.api.v1.meta import router as meta_router
 from mop.api.v1.mes import router as mes_router
@@ -51,3 +52,4 @@ router.include_router(organization_router)
 
 router.include_router(planning_router)
 router.include_router(planning_governance_router)
+router.include_router(material_release_router)

@@ -589,3 +589,208 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
             MaterialMovement.article_id == case.article_id,
             MaterialMovement.location_id == location_id,
         )) == 3
+
+
+def test_signed_receipt_release_enforces_authority_signature_and_quantity(governance_case):
+    import base64
+    import hashlib
+    import json
+    from decimal import Decimal
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from mop.core.models import Area
+    from mop.materials.models import MaterialLocation
+    from mop.materials.receipt_service import ReceiptService
+
+    db, case, engineering, laboratory, leader = governance_case
+    settings = Settings(environment="test", _env_file=None)
+    password = "G65-Tests-Only-Do-Not-Reuse-2026!"
+    private_keys = {actor: Ed25519PrivateKey.generate() for actor in (engineering, laboratory, leader)}
+    with db.session() as session:
+        stock_location = session.scalar(select(MaterialMovement.location_id).where(
+            MaterialMovement.article_id == case.article_id,
+        ))
+        location = MaterialLocation(
+            warehouse_id=session.get(MaterialLocation, stock_location).warehouse_id,
+            code=f"G76-SIGN-{uuid4().hex[:8]}", name="Signed release quarantine",
+        )
+        area = Area(plant_id=case.plant_id, code=f"G76-SIGN-{uuid4().hex[:8]}", name="Assembly")
+        wrong_area = Area(plant_id=case.plant_id, code=f"G76-SIGN-{uuid4().hex[:8]}", name="Other area")
+        session.add_all((location, area, wrong_area))
+        session.flush()
+        maker = session.get(User, case.creator_id)
+        lot = ReceiptService(session).receive(
+            receipt_line_ref=f"G76-SIGNED-{uuid4()}", lot_ref="BATCH",
+            article_id=case.article_id, location_id=location.id, uom_id=case.uom_id,
+            quantity=Decimal("10"), actor_id=maker.id, username=maker.username,
+        )
+        session.commit()
+        lot_id, area_id, wrong_area_id = lot.id, area.id, wrong_area.id
+        identity = IdentityService(session)
+        assignments = (
+            (case.creator_id, "configure", "plant", case.plant_id),
+            (engineering, "engineering", "plant", case.plant_id),
+            (laboratory, "laboratory", "plant", case.plant_id),
+            (leader, "area", "area", wrong_area_id),
+        )
+        for actor_id, capability, scope_type, scope_id in assignments:
+            role = identity.create_role(RoleCreate(
+                code=f"G76-SIGN-{uuid4().hex}", name=f"Receipt {capability}",
+            ))
+            identity.grant_permission(role.id, "materials.receipt.read")
+            identity.grant_permission(role.id, f"materials.release.{capability}")
+            # Area roles receive plant read separately for case lookup.
+            identity.assign_role(actor_id, RoleAssignmentCreate(
+                role_id=role.id, scope_type=scope_type, scope_id=scope_id,
+            ))
+            if actor_id == leader:
+                read_role = identity.create_role(RoleCreate(
+                    code=f"G76-READ-{uuid4().hex}", name="Receipt read",
+                ))
+                identity.grant_permission(read_role.id, "materials.receipt.read")
+                identity.assign_role(actor_id, RoleAssignmentCreate(
+                    role_id=read_role.id, scope_type="plant", scope_id=case.plant_id,
+                ))
+                leader_role_id = role.id
+        usernames = {actor: session.get(User, actor).username for actor in
+                     (case.creator_id, engineering, laboratory, leader)}
+
+    root = "/api/v1/materials/release"
+    lot_url = f"{root}/lots/{lot_id}"
+    with TestClient(create_app(settings, database=db)) as client:
+        def login(actor_id):
+            response = client.post("/api/v1/auth/login", json={
+                "username": usernames[actor_id], "password": password,
+            })
+            assert response.status_code == 200, response.text
+
+        assert client.get(f"{lot_url}/inspection-policy").status_code == 401
+        login(case.creator_id)
+        key_ids = {}
+        for actor_id, private in private_keys.items():
+            public = private.public_key().public_bytes(
+                serialization.Encoding.Raw, serialization.PublicFormat.Raw,
+            )
+            response = client.post(f"{root}/signer-keys", json={
+                "user_id": str(actor_id), "public_key_base64": base64.b64encode(public).decode(),
+                "identity_reference": "Synthetic verified identity",
+            })
+            assert response.status_code == 201, response.text
+            key_ids[actor_id] = response.json()["id"]
+
+        policy_command = {
+            "expected_revision": 0, "engineering_defined": True,
+            "criteria": ["DIMENSIONS", "MATERIAL"],
+        }
+        response = client.post(f"{lot_url}/inspection-policy", json=policy_command)
+        assert response.status_code == 201, response.text
+        policy_id = response.json()["id"]
+        command = {
+            "policy_id": policy_id, "key_id": key_ids[engineering], "authority": "ENGINEERING",
+            "decision_ref": "SIGNED-RELEASE-1", "expected_revision": 0, "quantity": "4",
+            "checks": {"DIMENSIONS": True, "MATERIAL": True},
+            "document_base64": base64.b64encode(b"Synthetic inspection results").decode(),
+        }
+        login(leader)
+        assert client.post(f"{lot_url}/signing-payload", json={
+            **command, "key_id": key_ids[leader], "authority": "AREA_LEADER",
+        }).status_code == 403
+
+        login(engineering)
+        assert client.post(f"{root}/signer-keys", json={
+            "user_id": str(engineering), "public_key_base64": "A" * 44,
+            "identity_reference": "Unauthorized registration",
+        }).status_code == 403
+        assert client.post(f"{lot_url}/signing-payload", json={
+            **command, "checks": {"DIMENSIONS": True},
+        }).status_code == 422
+        assert client.post(f"{lot_url}/signing-payload", json={
+            **command, "checks": {"DIMENSIONS": False, "MATERIAL": True},
+        }).status_code == 422
+        prepared = client.post(f"{lot_url}/signing-payload", json=command)
+        assert prepared.status_code == 200, prepared.text
+        payload = prepared.json()["payload"].encode()
+        signature = base64.b64encode(private_keys[engineering].sign(payload)).decode()
+        signed = {**command, "signature_base64": signature}
+        assert client.post(f"{lot_url}/decisions", json={
+            **signed, "document_base64": base64.b64encode(b"Modified document").decode(),
+        }).status_code == 422
+        assert client.post(f"{lot_url}/decisions", json={
+            **signed, "quantity": "5",
+        }).status_code == 422
+        response = client.post(f"{lot_url}/decisions", json=signed)
+        assert response.status_code == 201, response.text
+        original = response.json()
+        assert original["quantity"] == "4.00000000"
+        assert client.post(f"{lot_url}/decisions", json=signed).json() == original
+        evidence_response = client.get(f"{lot_url}/decisions/{original['id']}/evidence")
+        assert evidence_response.status_code == 200, evidence_response.text
+        evidence = evidence_response.json()
+        assert evidence["payload"] == prepared.json()["payload"]
+        assert evidence["document_sha256"] == hashlib.sha256(b"Synthetic inspection results").hexdigest()
+        assert json.loads(evidence["payload"])["actor_id"] == str(engineering)
+        private_keys[engineering].public_key().verify(
+            base64.b64decode(evidence["signature_base64"]), evidence["payload"].encode(),
+        )
+        balance = client.get(f"/api/v1/materials/receipt-lots/{lot_id}").json()
+        assert Decimal(balance["available"]) == 4
+        assert Decimal(balance["physical"]) == 10
+
+        # Laboratory is also an authorized engineering-material signer.
+        lab_command = {**command, "key_id": key_ids[laboratory], "authority": "LABORATORY",
+                       "decision_ref": "LAB-RELEASE", "expected_revision": 1, "quantity": "7"}
+        login(laboratory)
+        lab_payload = client.post(f"{lot_url}/signing-payload", json=lab_command)
+        assert lab_payload.status_code == 200, lab_payload.text
+        over = client.post(f"{lot_url}/decisions", json={
+            **lab_command, "signature_base64": base64.b64encode(
+                private_keys[laboratory].sign(lab_payload.json()["payload"].encode()),
+            ).decode(),
+        })
+        assert over.status_code == 422
+        assert len(client.get(f"/api/v1/materials/receipt-lots/{lot_id}/decisions").json()) == 1
+
+        # A replacement policy invalidates unsigned work prepared against the old one.
+        login(case.creator_id)
+        updated = client.post(f"{lot_url}/inspection-policy", json={
+            "expected_revision": 1, "engineering_defined": False,
+            "responsible_area_id": str(area_id), "criteria": ["VISUAL"],
+        })
+        assert updated.status_code == 201, updated.text
+        assert client.post(f"{lot_url}/inspection-policy", json={
+            **policy_command, "expected_revision": 0,
+        }).status_code == 409
+
+        login(engineering)
+        assert client.post(f"{lot_url}/signing-payload", json=command).status_code == 409
+        area_command = {
+            **command, "policy_id": updated.json()["id"], "key_id": key_ids[leader],
+            "authority": "AREA_LEADER", "decision_ref": "AREA-RELEASE",
+            "expected_revision": 1, "quantity": "2", "checks": {"VISUAL": True},
+        }
+        login(leader)
+        assert client.post(f"{lot_url}/signing-payload", json=area_command).status_code == 403
+        with db.session() as session:
+            IdentityService(session).assign_role(leader, RoleAssignmentCreate(
+                role_id=leader_role_id, scope_type="area", scope_id=area_id,
+            ))
+        ready = client.post(f"{lot_url}/signing-payload", json=area_command)
+        assert ready.status_code == 200, ready.text
+        area_signed = {**area_command, "signature_base64": base64.b64encode(
+            private_keys[leader].sign(ready.json()["payload"].encode()),
+        ).decode()}
+        success = client.post(f"{lot_url}/decisions", json=area_signed)
+        assert success.status_code == 201, success.text
+
+        login(case.creator_id)
+        assert client.post(f"{root}/signer-keys/{key_ids[leader]}/revoke",
+                           json={"reason": "Synthetic rotation"}).status_code == 200
+        login(leader)
+        assert client.post(f"{lot_url}/signing-payload", json=area_command).status_code == 403
+        # A retry returns the already committed decision, even after key revocation.
+        assert client.post(f"{lot_url}/decisions", json=area_signed).json() == success.json()
+        balance = client.get(f"/api/v1/materials/receipt-lots/{lot_id}").json()
+        assert Decimal(balance["available"]) == 6
+        assert Decimal(balance["quarantine"]) == 4
