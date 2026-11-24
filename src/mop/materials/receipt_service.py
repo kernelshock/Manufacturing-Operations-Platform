@@ -1,7 +1,7 @@
 """Internal receipt commands sharing the G6 transaction and stock lock.
 
-The caller authenticates and authorizes the actor, verifies release evidence,
-and commits. There is no HTTP entry point for these commands yet.
+The receipt API authorizes intake. Trusted decision callers authenticate the
+actor, authorize the action, verify release evidence and commit the transaction.
 """
 
 from datetime import datetime, timezone
@@ -73,8 +73,12 @@ class ReceiptService:
             order is None or order.kind != "ORDER" or order.review_status != "VERIFIED"
             or order.mapped_supplier_id is None or order.mapped_article_id != article_id
             or order.mapped_uom_id != uom_id or order.quantity is None
+            or order.reviewed_by is None or order.reviewed_by == order.entered_by
+            or order.reviewed_at is None
+            or order.event_date > datetime.now(timezone.utc)
+            or order.reviewed_at > datetime.now(timezone.utc)
         ):
-            raise MaterialsRule("verified order evidence must match supplier, article and unit")
+            raise MaterialsRule("order evidence requires independent review and matching supplier, article and unit")
 
         self.stock._advisory_lock(f"receipt-order:{order.po_number}:{order.line_number}")
         verified_orders = self.session.scalar(select(func.count()).select_from(

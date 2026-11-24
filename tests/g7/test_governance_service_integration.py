@@ -487,6 +487,25 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
         session.add(order)
         session.commit()
         evidence_id = str(order.id)
+        invalid_order_ids = []
+        for self_reviewed, future_order in ((True, False), (False, True)):
+            invalid = ProcurementEvidenceEvent(
+                capture_id=capture.id, source_event_key=f"G76-{uuid4()}",
+                kind="ORDER", po_number=f"G76-{uuid4()}", line_number=1,
+                supplier_code=supplier.code, article_code="SYNTH", uom_code="SYNTH",
+                quantity=Decimal("10"),
+                event_date=datetime.now(timezone.utc) + timedelta(days=1) if future_order else datetime.now(timezone.utc),
+                source_reference="Invalid order evidence", mapped_supplier_id=supplier.id,
+                mapped_article_id=case.article_id, mapped_uom_id=case.uom_id,
+                review_status="VERIFIED", entered_by=case.creator_id,
+                reviewed_by=case.creator_id if self_reviewed else outsider,
+                reviewed_at=datetime.now(timezone.utc),
+            )
+            session.add(invalid)
+            session.flush()
+            invalid_order_ids.append(str(invalid.id))
+        session.commit()
+
 
     command = {
         "receipt_line_ref": f"G76-RECEIPT-{uuid4()}", "lot_ref": "BATCH-1",
@@ -518,6 +537,13 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
             **command, "receipt_line_ref": f"G76-{uuid4()}",
             "purchase_order_evidence_id": str(uuid4()),
         }).status_code == 422
+        for invalid_order_id in invalid_order_ids:
+            response = client.post(root, json={
+                **command, "receipt_line_ref": f"G76-{uuid4()}",
+                "purchase_order_evidence_id": invalid_order_id,
+            })
+            assert response.status_code == 422, response.text
+        assert client.get(f"{url}/decisions").json() == []
         for quantity in ("4", "6"):
             linked_command = {
                 **command, "receipt_line_ref": f"G76-{uuid4()}",
@@ -531,8 +557,32 @@ def test_receipt_http_enforces_scope_and_posts_quarantine_once(governance_case):
             **command, "receipt_line_ref": f"G76-{uuid4()}",
             "purchase_order_evidence_id": evidence_id, "quantity": "1",
         }).status_code == 409
+        from mop.materials.receipt_disposition import LotAction, LotBucket
+        from mop.materials.receipt_service import ReceiptService
+        with db.session() as session:
+            decision = ReceiptService(session).decide(
+                UUID(lot["id"]), action=LotAction.RELEASE, source=LotBucket.QUARANTINE,
+                quantity=Decimal("2"), decision_ref="VERIFIED-INTERNAL-RELEASE",
+                expected_revision=0, actor_id=case.creator_id, username=receiver,
+                verified_release_quantity=Decimal("2"),
+            )
+            decision_id = str(decision.id)
+            session.commit()
+        history = client.get(f"{url}/decisions")
+        assert history.status_code == 200, history.text
+        assert history.headers["Cache-Control"] == "no-store"
+        assert len(history.json()) == 1
+        record = history.json()[0]
+        assert record["id"] == decision_id
+        assert record["revision"] == 1
+        assert record["actor_id"] == str(case.creator_id)
+        assert record["action"] == "RELEASE"
+        assert record["quantity"] == record["verified_release_quantity"] == "2.00000000"
+        assert record["movement_id"] is None
+        assert record["occurred_at"]
         login(outsider_username)
         assert client.get(url).status_code == 404
+        assert client.get(f"{url}/decisions").status_code == 404
 
     with db.session() as session:
         assert session.scalar(select(func.count(MaterialMovement.id)).where(

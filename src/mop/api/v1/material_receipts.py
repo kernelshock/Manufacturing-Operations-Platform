@@ -1,5 +1,6 @@
 """Plant-scoped intake and queries for material receipt lots."""
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
@@ -16,7 +17,8 @@ from mop.iam.dependencies import get_current_user
 from mop.iam.models import User
 from mop.materials.models import MaterialLocation, MaterialWarehouse
 from mop.materials.quantity import MaterialQuantityError
-from mop.materials.receipt_models import MaterialReceiptLot
+from mop.materials.receipt_disposition import LotAction, LotBucket
+from mop.materials.receipt_models import MaterialReceiptDecision, MaterialReceiptLot
 from mop.materials.receipt_service import ReceiptService
 from mop.persistence.dependencies import get_session
 
@@ -119,3 +121,40 @@ def get_lot(lot_id: UUID, session: SessionDependency, actor: CurrentUser):
     ):
         raise HTTPException(status_code=404, detail="receipt lot not found")
     return _read(ReceiptService(session), lot, plant_id)
+
+
+class ReceiptDecisionRead(BaseModel):
+    """Persisted decision evidence in its original sequence."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    lot_id: UUID
+    revision: int
+    action: LotAction
+    source: LotBucket
+    decision_ref: str
+    quantity: Decimal
+    verified_release_quantity: Decimal | None
+    movement_id: UUID | None
+    actor_id: UUID
+    occurred_at: datetime
+
+    @field_serializer("quantity", "verified_release_quantity", when_used="json")
+    def serialize_quantity(self, quantity: Decimal | None) -> str | None:
+        return format(quantity, ".8f") if quantity is not None else None
+
+
+@router.get("/{lot_id}/decisions", response_model=list[ReceiptDecisionRead])
+def get_lot_decisions(lot_id: UUID, session: SessionDependency, actor: CurrentUser):
+    lot = session.get(MaterialReceiptLot, lot_id)
+    plant_id = _location_plant(session, lot.location_id) if lot is not None else None
+    if lot is None or plant_id is None or not AuthorizationService(session).allowed(
+        actor.id, "materials.receipt.read", "plant", plant_id,
+    ):
+        raise HTTPException(status_code=404, detail="receipt lot not found")
+    return list(session.scalars(
+        select(MaterialReceiptDecision)
+        .where(MaterialReceiptDecision.lot_id == lot_id)
+        .order_by(MaterialReceiptDecision.revision)
+    ))
