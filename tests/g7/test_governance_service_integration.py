@@ -729,6 +729,8 @@ def test_signed_receipt_release_enforces_authority_signature_and_quantity(govern
         assert evidence_response.status_code == 200, evidence_response.text
         evidence = evidence_response.json()
         assert evidence["payload"] == prepared.json()["payload"]
+        assert evidence["signer_user_id"] == str(engineering)
+        assert evidence["key_revoked"] is False
         assert evidence["document_sha256"] == hashlib.sha256(b"Synthetic inspection results").hexdigest()
         assert json.loads(evidence["payload"])["actor_id"] == str(engineering)
         private_keys[engineering].public_key().verify(
@@ -794,3 +796,52 @@ def test_signed_receipt_release_enforces_authority_signature_and_quantity(govern
         balance = client.get(f"/api/v1/materials/receipt-lots/{lot_id}").json()
         assert Decimal(balance["available"]) == 6
         assert Decimal(balance["quarantine"]) == 4
+
+
+        # Two independently signed commands targeting one revision cannot both consume it.
+        login(case.creator_id)
+        replacement_key = Ed25519PrivateKey.generate()
+        replacement_public = replacement_key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw,
+        )
+        replacement = client.post(f"{root}/signer-keys", json={
+            "user_id": str(leader), "public_key_base64": base64.b64encode(replacement_public).decode(),
+            "identity_reference": "Synthetic identity for replacement key",
+        })
+        assert replacement.status_code == 201, replacement.text
+        login(leader)
+        competing = []
+        for reference in ("CONCURRENT-1", "CONCURRENT-2"):
+            proposal = {
+                **area_command, "key_id": replacement.json()["id"],
+                "decision_ref": reference, "expected_revision": 2, "quantity": "3",
+            }
+            preparation = client.post(f"{lot_url}/signing-payload", json=proposal)
+            assert preparation.status_code == 200, preparation.text
+            competing.append({
+                **proposal, "signature_base64": base64.b64encode(
+                    replacement_key.sign(preparation.json()["payload"].encode()),
+                ).decode(),
+            })
+
+        from mop.materials.service import MaterialsConflict
+        from mop.materials.release_schemas import SignedReleaseCreate
+        from mop.materials.release_service import ReceiptReleaseService
+
+        def apply_signed(command):
+            with db.session() as session:
+                service = ReceiptReleaseService(session, session.get(User, leader))
+                try:
+                    decision = service.release(lot_id, SignedReleaseCreate(**command))
+                    session.commit()
+                    return decision.revision
+                except MaterialsConflict:
+                    session.rollback()
+                    return "conflict"
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            assert set(executor.map(apply_signed, competing)) == {3, "conflict"}
+        balance = client.get(f"/api/v1/materials/receipt-lots/{lot_id}").json()
+        assert Decimal(balance["available"]) == 9
+        assert Decimal(balance["quarantine"]) == 1
+        assert Decimal(balance["physical"]) == 10

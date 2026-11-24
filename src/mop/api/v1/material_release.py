@@ -121,7 +121,11 @@ def release_evidence(lot_id: UUID, decision_id: UUID, session: SessionDependency
         evidence = session.get(ReceiptReleaseEvidence, decision_id)
         if decision is None or decision.lot_id != lot_id or evidence is None:
             raise MaterialsNotFound("signed release evidence not found")
+        key = session.get(ReceiptSignerKey, evidence.key_id)
         return {
+            "public_key_base64": base64.b64encode(key.public_key).decode("ascii"),
+            "signer_user_id": str(key.user_id),
+            "key_revoked": session.get(ReceiptSignerRevocation, key.id) is not None,
             "decision_id": str(decision_id), "key_id": str(evidence.key_id),
             "policy_id": str(evidence.policy_id), "document_sha256": evidence.document_sha256,
             "document_base64": base64.b64encode(evidence.document).decode("ascii"),
