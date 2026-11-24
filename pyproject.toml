@@ -9,6 +9,7 @@ description = "Manufacturing Operations Platform"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+  "cryptography>=50.0.2,<51.0.0",
   "alembic>=1.20.1,<2.0.0",
   "fastapi>=0.162.0,<0.163.0",
   "psycopg[binary]>=3.3.6,<4.0.0",

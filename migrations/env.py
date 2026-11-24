@@ -17,9 +17,12 @@ from mop.iam import models as iam_models  # noqa: F401
 from mop.master_data import models as master_data_models  # noqa: F401
 from mop.materials import models as materials_models  # noqa: F401
 from mop.materials import consumption_models as materials_consumption_models  # noqa: F401
+from mop.materials import release_models  # noqa: F401
+from mop.materials import receipt_models  # noqa: F401
 from mop.materials import reservation_models as materials_reservation_models  # noqa: F401
 from mop.mes import models as mes_models  # noqa: F401
 from mop.mes import rework_models as mes_rework_models  # noqa: F401
+from mop.planning import governance_models  # noqa: F401
 from mop.prolowin import models as prolowin_models  # noqa: F401
 from mop.prolowin import procurement_models as prolowin_procurement_models  # noqa: F401
 from mop.persistence.base import Base

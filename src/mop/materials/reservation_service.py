@@ -75,10 +75,12 @@ class ReservationService:
     def availability(self, article_id: UUID, location_id: UUID) -> LocationAvailability:
         stock = self.materials.balance(article_id, location_id)
         held = reserved_quantity(self.session, article_id, location_id)
+        managed = self.materials.is_lot_managed(article_id, location_id)
         return LocationAvailability(
             article_id=article_id, location_id=location_id, uom_id=stock.uom_id,
             on_hand=stock.on_hand, reserved=held,
-            unallocated_on_hand=stock.on_hand - held if stock.on_hand is not None else None,
+            unallocated_on_hand=stock.on_hand - held if stock.on_hand is not None and not managed else None,
+            state="LOT_MANAGED_REQUIRES_ALLOCATION" if managed else "PHYSICAL_UNALLOCATED_NOT_QUALITY_CERTIFIED",
         )
 
     def coverage(self, taquilla_id: UUID, article_id: UUID, location_id: UUID,
@@ -151,6 +153,7 @@ class ReservationService:
             raise MaterialsRule("reservation exceeds effective taquilla material demand")
 
         self.materials._advisory_lock(f"balance:{data.article_id}:{data.location_id}")
+        self.materials.require_legacy_stock(data.article_id, data.location_id)
         stock = self.materials._check_dimensions(data.article_id, data.location_id, data.uom_id)
         held = reserved_quantity(self.session, data.article_id, data.location_id)
         if stock.on_hand is None:

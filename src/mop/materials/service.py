@@ -16,6 +16,9 @@ from mop.materials.schemas import (
     BalanceRead, LocationCreate, MovementCreate, MovementReverse, WarehouseCreate,
 )
 from mop.materials.quantity import decimal_quantity
+from mop.materials.receipt_models import MaterialReceiptLot
+
+RECEIPT_LEDGER_SOURCE = "MOP_G7_RECEIPT"
 
 
 class MaterialsNotFound(LookupError):
@@ -125,6 +128,15 @@ class MaterialsService:
             raise MaterialsRule("ledger UoM mismatch")
         return prior
 
+    def is_lot_managed(self, article_id: UUID, location_id: UUID) -> bool:
+        return self.session.scalar(select(MaterialReceiptLot.id).where(
+            MaterialReceiptLot.article_id == article_id, MaterialReceiptLot.location_id == location_id,
+        ).limit(1)) is not None
+
+    def require_legacy_stock(self, article_id: UUID, location_id: UUID) -> None:
+        if self.is_lot_managed(article_id, location_id):
+            raise MaterialsRule("lot-managed inventory requires a receipt lot decision")
+
     def _store(self, entity: MaterialMovement, actor_id: UUID, username: str):
         self.session.add(entity)
         self._audit(actor_id, username, "materials.movement.post", entity)
@@ -132,6 +144,8 @@ class MaterialsService:
 
     def post(self, data: MovementCreate, actor_id: UUID, username: str):
         from mop.materials.schemas import PostingResult
+        if data.source_system == RECEIPT_LEDGER_SOURCE:
+            raise MaterialsRule("receipt ledger source is reserved")
         if data.source_system == "MOP_G6_CONSUMPTION":
             raise MaterialsRule("MES consumption source is reserved for governed measured consumption")
         qty = decimal_quantity(data.quantity, allow_zero=data.kind == "OPENING_ZERO")
@@ -155,6 +169,7 @@ class MaterialsService:
             return PostingResult(movement=existing, idempotent_replay=True)
 
         self._advisory_lock(f"balance:{data.article_id}:{data.location_id}")
+        self.require_legacy_stock(data.article_id, data.location_id)
         current = self._check_dimensions(data.article_id, data.location_id, data.uom_id)
         if data.kind.startswith("OPENING") and current.initialized:
             raise MaterialsRule("opening balance can be posted only once per material/location")
@@ -181,6 +196,8 @@ class MaterialsService:
 
     def reverse(self, movement_id: UUID, data: MovementReverse, actor_id: UUID, username: str):
         from mop.materials.schemas import PostingResult
+        if data.source_system.strip() == RECEIPT_LEDGER_SOURCE:
+            raise MaterialsRule("receipt ledger source is reserved")
         self._advisory_lock(f"source:{data.source_system}:{data.idempotency_key}")
         existing = self.session.scalar(select(MaterialMovement).where(
             MaterialMovement.source_system == data.source_system,
@@ -201,6 +218,7 @@ class MaterialsService:
         if original.kind in ("REVERSAL", "OPENING_ZERO"):
             raise MaterialsRule("cannot reverse a reversal")
         self._advisory_lock(f"balance:{original.article_id}:{original.location_id}")
+        self.require_legacy_stock(original.article_id, original.location_id)
         if self.session.scalar(select(MaterialMovement.id).where(MaterialMovement.reversal_of_id == movement_id)):
             raise MaterialsConflict("movement already reversed")
         current = self.balance(original.article_id, original.location_id)

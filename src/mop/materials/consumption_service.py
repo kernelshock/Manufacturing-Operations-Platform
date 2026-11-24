@@ -136,6 +136,7 @@ class MaterialConsumptionService:
 
         # This lock is shared with every G6 stock posting and reversal.
         self.materials._advisory_lock(f"balance:{data.article_id}:{data.location_id}")
+        self.materials.require_legacy_stock(data.article_id, data.location_id)
         balance = self.materials._check_dimensions(data.article_id, data.location_id, data.uom_id)
         if not balance.initialized or balance.on_hand is None:
             raise MaterialsRule("cannot consume material from UNKNOWN inventory")
@@ -199,6 +200,7 @@ class MaterialConsumptionService:
         if original.kind != "CONSUME":
             raise MaterialsRule("cannot reverse a reversal event")
         self.materials._advisory_lock(f"balance:{original.article_id}:{original.location_id}")
+        self.materials.require_legacy_stock(original.article_id, original.location_id)
         if self.session.scalar(select(MaterialConsumption.id).where(
             MaterialConsumption.reversal_of_id == consumption_id
         )) is not None:
